@@ -54,7 +54,12 @@ func NewSynth(e *Engine, rate int) *Synth {
 	s.Chip.SetFilter(true)
 	return s
 }
-func (s *Synth) Edit(fn func(*Engine)) { s.mu.Lock(); defer s.mu.Unlock(); fn(s.Engine) }
+func (s *Synth) Edit(fn func(*Engine)) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	fn(s.Engine)
+	s.midiTransport()
+}
 func (s *Synth) Snapshot() (Engine, [512]float32) {
 	return s.SnapshotInto(nil)
 }
@@ -97,15 +102,14 @@ func (s *Synth) Reset() {
 func (s *Synth) Read(p []byte) (int, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	s.midiTransport()
 	if s.reference != nil && s.referenceActive {
 		return s.readReference(p)
 	}
 	frames := len(p) / 4
 	for i := 0; i < frames; i++ {
 		if s.untilTick <= 0 {
-			s.Engine.Tick()
-			s.configure()
-			s.midiTick()
+			s.Engine.tickWithOutput(s.renderTick)
 			s.untilTick += float64(s.Rate) / float64(s.Engine.Project.Song.TickRate())
 		}
 		s.untilTick--
@@ -152,6 +156,14 @@ func (s *Synth) Read(p []byte) (int, error) {
 		s.waveAt = (s.waveAt + 1) % len(s.waveform)
 	}
 	return frames * 4, nil
+}
+
+func (s *Synth) renderTick(external bool) {
+	if external && s.midi.enabled {
+		s.midi.push(0xf8)
+	}
+	s.configure()
+	s.midiNotes()
 }
 
 var _ io.Reader = (*Synth)(nil)

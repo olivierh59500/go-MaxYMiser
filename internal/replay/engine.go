@@ -55,6 +55,8 @@ type Engine struct {
 	ExternalClock                                bool
 	clockPulses                                  int
 	rowParsed                                    bool
+	transportGeneration                          uint64
+	transportCommand                             byte
 	NextPatterns                                 [4]byte
 	nextPatternMask                              byte
 	NextPosition                                 int
@@ -67,6 +69,8 @@ func New(p *model.Project) *Engine {
 	return e
 }
 func (e *Engine) Reset() {
+	e.transportGeneration++
+	e.transportCommand = 0xfc
 	e.Voices = [3]Voice{}
 	e.DMA = [2]PCMVoice{}
 	e.pending = [3]bool{}
@@ -92,6 +96,8 @@ func (e *Engine) Reset() {
 	e.Patterns = e.Project.Song.Orders[0]
 }
 func (e *Engine) Play(pattern bool) {
+	e.transportGeneration++
+	e.transportCommand = 0xfa
 	if !pattern {
 		e.loadPosition()
 	}
@@ -101,7 +107,17 @@ func (e *Engine) Play(pattern bool) {
 	e.Row = 0
 	e.rowParsed, e.clockPulses = false, 0
 }
+
+// Continue preserves the current row and replay phase for MIDI transport.
+func (e *Engine) Continue() {
+	e.Playing = true
+	e.transportGeneration++
+	e.transportCommand = 0xfb
+}
+
 func (e *Engine) Stop() {
+	e.transportGeneration++
+	e.transportCommand = 0xfc
 	e.Playing = false
 	e.pending = [3]bool{}
 	e.PositionQueued = false
@@ -121,6 +137,12 @@ func (e *Engine) Stop() {
 	e.Registers[8], e.Registers[9], e.Registers[10] = 0, 0, 0
 }
 func (e *Engine) Tick() {
+	e.tickWithOutput(nil)
+}
+
+// tickWithOutput lets the audio renderer consume each external call separately,
+// retaining note and timer events when several pulses arrive in one buffer.
+func (e *Engine) tickWithOutput(output func(external bool)) {
 	if e.Playing && e.ExternalClock {
 		// In the native editor, external pulses call the whole replayer.
 		// The internal timer only services sound while playback is stopped.
@@ -134,9 +156,13 @@ func (e *Engine) Tick() {
 		var ym [3]bool
 		var pcm [2]bool
 		envelope := false
+		hadPulses := e.clockPulses > 0
 		for e.clockPulses > 0 {
 			e.clockPulses--
 			e.tick(true)
+			if output != nil {
+				output(true)
+			}
 			for i := range ym {
 				ym[i] = ym[i] || e.Voices[i].Triggered
 			}
@@ -152,9 +178,15 @@ func (e *Engine) Tick() {
 			e.DMA[i].Triggered = pcm[i]
 		}
 		e.EnvelopeWrite = envelope
+		if output != nil && !hadPulses {
+			output(false)
+		}
 		return
 	}
 	e.tick(false)
+	if output != nil {
+		output(false)
+	}
 }
 
 func (e *Engine) tick(external bool) {

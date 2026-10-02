@@ -82,7 +82,7 @@ func Apply(e *replay.Engine, message []byte) {
 			e.Play(false)
 			e.CompensateClockLatency()
 		case 0xfb:
-			e.Playing = true
+			e.Continue()
 			e.CompensateClockLatency()
 		case 0xfc:
 			e.Stop()

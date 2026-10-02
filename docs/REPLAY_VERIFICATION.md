@@ -127,3 +127,32 @@ volume envelopes, ignored internal callbacks, clock-source filtering, order
 boundaries and a compensated PCM trigger reaching the audio renderer once.
 These checks establish transport/cadence behavior; they do not measure physical
 MIDI-device latency or establish timestamp-accurate delivery of batched input.
+
+## MIDI note output and relay
+
+Native debugger captures also inspect the output byte at the original editor's
+ACIA transmit instruction. They confirm the attenuation table, seven-bit
+transposition wrap, zero-velocity release, and ordering controlled by the current
+sample number. For channel 4, a C4 with transpose +12 and attenuation 2+1 emits
+note 72 with velocity 79. A subsequent sample-zero E4 emits note 76 before
+releasing 72; a nonzero sample then releases 76 before emitting 79. Attenuation
+eight emits zero velocity. The native routine sends no program change for a
+sample number.
+
+The Go checks use these captured values and ordering, including a transposed
+MIDI note zero. The Go output omits native cleanup messages for a previous note
+that was not active; genuine note zero is tracked independently and released.
+Changing an output channel releases the previous note on its original channel.
+
+The renderer handles each queued external pulse separately, emitting its clock
+and notes before moving to the following call. A seven-pulse batch preserves
+both its initial note and the following row's note. A dense two-voice fixture
+with the maximum 255 compensation calls produces 1,274 queued events without
+overflow. The fixed queue holds 2,048 events and reports excess events; the audio
+path allocates no memory during this external-clock check.
+
+An end-to-end local CoreMIDI test delivered 24 generated tracker messages to a
+temporary virtual destination unchanged: 14 relayed pulses, three note onsets,
+Stop and Continue, and the corresponding releases. This verifies the native-port
+delivery path without a physical synthesizer; hardware latency and timestamp
+scheduling remain separate measurements.

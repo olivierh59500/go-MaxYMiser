@@ -290,8 +290,19 @@ MIDI clock to use a MIDI input in its place.
 Controllers 44–47 queue patterns at the next pattern boundary.
 **MIDI output** lists macOS destinations and connects only to the selected one.
 The renderer queues transport, clock and the two PCM-pattern voices in MIDI mode.
+External pulses, including native latency compensation, are relayed once per
+replay call. Batched pulses retain intermediate notes in their original order.
+Continue preserves the current phase; starting at another song position sends
+Song Position Pointer followed by Continue instead of resetting the receiver.
+MIDI notes use native track transposition and attenuation: total values 0–7
+produce velocities 127, 111, 95, 79, 63, 47, 31 and 15; eight or more is silent.
+Notes can play without a sample number. With sample zero, a new note precedes
+the previous note's release for legato; a sample number selects retrigger order.
+The sample number does not automatically send a MIDI program change. Disconnect,
+channel changes and switching to the YM reference release sounding notes.
 CoreMIDI sends are handled outside the audio callback. End-to-end output was
-checked through a temporary virtual destination; physical hardware and precise
+checked with generated tracker events through a temporary virtual destination;
+physical hardware and precise
 future-timestamp scheduling remain unverified. Physical Sync24 hardware is not
 included in this edition.
 

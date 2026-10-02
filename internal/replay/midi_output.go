@@ -8,13 +8,15 @@ type MIDIMessage struct {
 }
 
 type midiOutputState struct {
-	enabled, playing bool
-	clockPhase       float64
-	notes            [2]byte
-	channels         [2]byte
-	queue            [256]MIDIMessage
-	read, write      uint64
-	dropped          uint64
+	enabled, playing    bool
+	transportGeneration uint64
+	clockPhase          float64
+	notes               [2]byte
+	channels            [2]byte
+	active              [2]bool
+	queue               [2048]MIDIMessage
+	read, write         uint64
+	dropped             uint64
 }
 
 func (s *Synth) EnableMIDIOutput(enabled bool) {
@@ -27,6 +29,8 @@ func (s *Synth) EnableMIDIOutput(enabled bool) {
 	if enabled {
 		s.midi.playing = false
 		s.midi.clockPhase = 0
+		s.midi.transportGeneration = s.Engine.transportGeneration
+		s.midiTransport()
 	}
 }
 
@@ -42,11 +46,8 @@ func (m *midiOutputState) push(data ...byte) {
 }
 
 func (m *midiOutputState) stop() {
-	for voice, note := range m.notes {
-		if note > 1 {
-			m.push(0x80|m.channels[voice], note, 0)
-		}
-		m.notes[voice] = 0
+	for voice := range m.notes {
+		m.release(voice)
 	}
 	if m.playing {
 		m.push(0xfc)
@@ -54,28 +55,53 @@ func (m *midiOutputState) stop() {
 	m.playing = false
 }
 
-func (s *Synth) midiTick() {
+func (m *midiOutputState) release(voice int) {
+	if m.active[voice] {
+		m.push(0x90|m.channels[voice], m.notes[voice], 0)
+	}
+	m.active[voice] = false
+}
+
+func (s *Synth) midiTransport() {
 	m, e := &s.midi, s.Engine
 	if !m.enabled {
 		return
 	}
-	if e.Playing != m.playing {
-		if e.Playing {
-			pointer := e.Position*64 + e.Row
-			m.push(0xf2, byte(pointer&127), byte(pointer>>7)&127)
-			m.push(0xfa)
-			m.clockPhase = 0
-		} else {
-			m.stop()
+	changed := e.transportGeneration != m.transportGeneration
+	if !changed && e.Playing == m.playing {
+		return
+	}
+	m.transportGeneration = e.transportGeneration
+	if !e.Playing {
+		m.stop()
+		return
+	}
+	if changed && e.transportCommand == 0xfb {
+		m.push(0xfb)
+	} else {
+		for voice := range m.notes {
+			m.release(voice)
 		}
-		m.playing = e.Playing
+		pointer := e.Position*64 + e.Row
+		if pointer == 0 {
+			m.push(0xfa)
+		} else {
+			m.push(0xf2, byte(pointer&127), byte(pointer>>7)&127)
+			m.push(0xfb)
+		}
+	}
+	m.playing = true
+	m.clockPhase = 0
+}
+
+func (s *Synth) midiNotes() {
+	m, e := &s.midi, s.Engine
+	if !m.enabled {
+		return
 	}
 	if e.Project.Song.State[49] != 4 {
-		for voice, note := range m.notes {
-			if note > 1 {
-				m.push(0x80|m.channels[voice], note, 0)
-				m.notes[voice] = 0
-			}
+		for voice := range m.notes {
+			m.release(voice)
 		}
 		return
 	}
@@ -84,16 +110,29 @@ func (s *Synth) midiTick() {
 		if !v.Triggered {
 			continue
 		}
-		if m.notes[voice] > 1 {
-			m.push(0x80|m.channels[voice], m.notes[voice], 0)
-			m.notes[voice] = 0
+		previous, previousChannel, previousActive := m.notes[voice], m.channels[voice], m.active[voice]
+		if v.Sample > 0 || previousChannel != channel {
+			m.release(voice)
+			previousActive = false
 		}
-		if v.Note > 1 && v.Sample > 0 {
-			m.push(0xc0|channel, (v.Sample-1)&127)
-			velocity := byte(max(1, 127-int(v.Volume)*8))
-			m.push(0x90|channel, v.Note&127, velocity)
-			m.notes[voice], m.channels[voice] = v.Note&127, channel
+		active := false
+		var note byte
+		if v.Note >= 12 && v.Note < 128 {
+			note = byte((int(v.Note) + v.Transpose) & 127)
+			attenuation := max(0, int(v.Volume)+v.TrackVolume)
+			velocity := byte(max(0, 127-attenuation*16))
+			m.push(0x90|channel, note, velocity)
+			active = velocity > 0
 		}
+		// With no sample number, the native routine sends the new note
+		// before releasing the previous one for monophonic legato.
+		if previousActive {
+			m.push(0x90|previousChannel, previous, 0)
+			if previous == note && previousChannel == channel {
+				active = false
+			}
+		}
+		m.notes[voice], m.channels[voice], m.active[voice] = note, channel, active
 	}
 }
 
