@@ -312,12 +312,18 @@ func controller(e *replay.Engine, ch int, code, value byte) {
 		}
 		e.QueuePattern(int(code-44), pattern)
 	case code == 48:
-		e.MasterVolume = int(value)
+		e.SetMicrowire(0x4c0 | uint16(int(value)*41/128))
 	case code == 49:
-		e.Pan = (int(value) - 64) / 4
+		if value < 64 {
+			e.SetMicrowire(0x500 | uint16(int(value)*21/64))
+			e.SetMicrowire(0x554)
+		} else {
+			e.SetMicrowire(0x540 | uint16((127-int(value))*21/64))
+			e.SetMicrowire(0x514)
+		}
 	case code == 50:
-		e.Bass = int(value) * 12 / 127
+		e.SetMicrowire(0x440 | uint16(value/10))
 	case code == 51:
-		e.Treble = int(value) * 12 / 127
+		e.SetMicrowire(0x480 | uint16(value/10))
 	}
 }

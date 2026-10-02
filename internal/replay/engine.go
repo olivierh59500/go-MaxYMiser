@@ -2,9 +2,9 @@
 package replay
 
 import (
-	"github.com/olivierh59500/go-MaxYMiser/internal/model"
-	"math"
 	"strings"
+
+	"github.com/olivierh59500/go-MaxYMiser/internal/model"
 )
 
 type Voice struct {
@@ -533,18 +533,19 @@ func (e *Engine) effect(v *Voice, code, value byte, muted bool) {
 		}
 		switch {
 		case value <= 12:
-			e.Bass = int(value)
+			e.SetMicrowire(0x440 | uint16(value))
 		case value >= 16 && value <= 28:
-			e.Treble = int(value - 16)
+			e.SetMicrowire(0x480 | uint16(value-16))
 		case value >= 128 && value <= 160:
-			e.MicrowireGain = math.Pow(10, float64(int(value)-160)*2/20)
+			e.SetMicrowire(0x4c0 | uint16(value-120))
 		case value >= 192 && value <= 224:
 			pan := int(value) - 208
-			e.MicrowireLeft, e.MicrowireRight = 1, 1
+			e.SetMicrowire(0x554)
+			e.SetMicrowire(0x514)
 			if pan < 0 {
-				e.MicrowireRight = math.Pow(10, float64(pan)*2/20)
+				e.SetMicrowire(0x500 | uint16(20+pan))
 			} else if pan > 0 {
-				e.MicrowireLeft = math.Pow(10, float64(-pan)*2/20)
+				e.SetMicrowire(0x540 | uint16(20-pan))
 			}
 		}
 	case 'W':

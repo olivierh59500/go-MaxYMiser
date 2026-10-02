@@ -95,6 +95,20 @@ filters using 2 dB steps; default flat settings bypass processing. Frequency
 response tests verify low/high boosts and cuts. This preserves the intended
 controls but is not a transistor-level emulation of the LMC1992 analog circuit.
 
+The native 1.67 STe MIDI controller paths were executed for all 128 values of
+controllers 48–51. Intercepting the hardware-send routine captured 640 command
+words for 512 inputs; balance sends two commands. The regression fixture stores
+only those command words, without native executable code or music data. It checks
+controller quantization against the captured values, while explicit decibel
+fixtures check the shared Microwire command decoder. Pattern `U` commands use
+that same decoder. Disabled DMA leaves these controls inactive, and hardware
+volume/balance retain their independence from the editor's controls.
+
+The captured master/right/left command fields use the LMC1992 2 dB volume steps
+documented in [Hatari's DMA sound implementation](https://github.com/hatari/hatari/blob/main/src/dmaSnd.c).
+This verification covers native command generation and its digital application;
+it does not measure an analog STe output or Falcon's separate volume emulation.
+
 ## External clock and latency
 
 The 1.67 editor's original MIDI dispatch tests the external-clock and Sync24

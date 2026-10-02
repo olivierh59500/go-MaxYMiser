@@ -344,6 +344,11 @@ including its sequence links, using the native value scales. These bank edits
 participate in undo and native saves. The A–E sound selectors support `00` for
 disabled input, `01–20` for YM instruments, `DD` for middle-C percussion, and
 `01–08` for PCM banks. Channel assignments remain independent.
+With DMA enabled, controllers 48–51 adjust Microwire volume, balance, bass and
+treble using the original STe value scales. These commands share the pattern
+`U` controls and preserve the independent editor volume. Native instruction
+checks cover all 128 values of each controller; the analog circuit response
+remains approximated digitally.
 Native MMC play/stop messages control transport; a remote stop leaves recording
 mode. Malformed or unrelated SysEx messages are ignored.
 
