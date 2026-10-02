@@ -38,6 +38,8 @@ SID/PWM/DigiDrum volume and FM frequency registers can belong to timer
 interrupts and are deliberately not rewritten by the native main call. Comparing
 their held values as though they were main-call targets would give false failures.
 Fixtures without a `Written` mask continue to compare all fourteen registers.
+The verifier excludes main-call envelope flags only when a native write mask
+identifies a SyncBuzzer-owned R13. Timer envelope writes are checked separately.
 
 These traces cover 59.98 seconds for examples 1 and 2 and 55.6 seconds for example 3
 at the replay-call level. They do not prove full-song parity, timer phase accuracy, every tracker
@@ -65,6 +67,15 @@ sequence levels, and main-call writes that overwrote timer-owned registers.
 The corrections are covered by regression tests. The audio renderer still
 schedules writes on its sample grid; matching these discrete values and rates
 does not claim cycle-exact 68000 interrupt timing.
+
+## Combined effect songs
+
+Longer captures of supplied tunes compare 1,000 main calls of PWMWVJAM, 980 calls
+of SEQUENCE in STe mode, and 994 calls of FMERGENCY. All captured main-call
+register writes match. FMERGENCY's start-sync path uses additional tone writes;
+its call boundaries are identified by the main write block rather than one
+fixed R0 instruction. SyncBuzzer R13 ownership is separated from main calls.
+This extends sequencer evidence while retaining the sample-grid timer limitation.
 
 ## PCM and Microwire
 

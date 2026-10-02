@@ -34,7 +34,10 @@ func VerifyRegisterTrace(project *model.Project, expected []RegisterTick) error 
 				return fmt.Errorf("replay: tick %d R%d: Go %02X, native %02X", tick, reg, engine.Registers[reg], value)
 			}
 		}
-		if engine.EnvelopeWrite != reference.EnvelopeWrite {
+		owner := envelopeOwner(engine)
+		timer := byte(engine.Voices[owner].Values[3] & 15)
+		timerEnvelope := (timer == 11 || timer == 12) && reference.Written != nil && !reference.Written[13]
+		if engine.EnvelopeWrite != reference.EnvelopeWrite && !timerEnvelope {
 			return fmt.Errorf("replay: tick %d envelope write: Go %t, native %t", tick, engine.EnvelopeWrite, reference.EnvelopeWrite)
 		}
 	}
