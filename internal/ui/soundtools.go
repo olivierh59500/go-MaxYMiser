@@ -3,7 +3,6 @@ package ui
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -107,9 +106,9 @@ func (a *App) soundAction(name string) bool {
 	}
 	switch name {
 	case "instrument-load":
-		a.modal, a.entry = "Load instrument (.myi)", ""
+		a.beginFileBrowser("Load instrument (.myi)", "", false)
 	case "instrument-save":
-		a.modal, a.entry = "Save instrument (.myi)", filepath.Join(a.directory, fmt.Sprintf("instrument-%02X.myi", a.instrument+1))
+		a.beginFileBrowser("Save instrument (.myi)", fmt.Sprintf("instrument-%02X.myi", a.instrument+1), true)
 	case "seq-tools":
 		a.sequenceTools = !a.sequenceTools
 	case "gen-signed":
@@ -164,7 +163,7 @@ func (a *App) soundAction(name string) bool {
 	case "sample-sign":
 		a.editSample(func(sample *model.Sample) error { edit.ToggleSampleSign(sample); return nil })
 	case "sample-save":
-		a.modal, a.entry = "Save signed PCM sample", filepath.Join(a.directory, fmt.Sprintf("sample-%d.pcm", a.sample+1))
+		a.beginFileBrowser("Save signed PCM sample", fmt.Sprintf("sample-%d.pcm", a.sample+1), true)
 	case "sample-preview":
 		if _, ok := a.synth.Reference(); ok {
 			a.synth.SelectReference(false)

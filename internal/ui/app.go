@@ -74,6 +74,7 @@ type App struct {
 	modal, entry                                                       string
 	listed                                                             []fs.DirEntry
 	directory                                                          string
+	browser                                                            *fileBrowser
 	mouseX, mouseY                                                     int
 	ctrl                                                               bool
 	lastSave                                                           time.Time
@@ -193,7 +194,11 @@ func (a *App) Draw(dst *ebiten.Image) {
 	a.text(dst, a.status, 24, 768, 12, dim)
 	a.text(dst, fmt.Sprintf("Octave %d · step %d · %s", a.octave, a.step, map[bool]string{true: "EDIT", false: "PREVIEW"}[a.editing]), 984, 768, 12, purple)
 	if a.modal != "" {
-		a.drawModal(dst)
+		if a.browser != nil {
+			a.drawFileBrowser(dst)
+		} else {
+			a.drawModal(dst)
+		}
 	}
 }
 func noteName(n byte) string {
@@ -451,6 +456,9 @@ func (a *App) Update() error {
 	default:
 	}
 	_, wheel := ebiten.Wheel()
+	if a.browser != nil {
+		a.browser.scroll = max(0, min(max(0, len(a.browser.entries)-10), a.browser.scroll-int(wheel)*3))
+	}
 	if a.tab == "Song" {
 		a.scroll = max(0, a.scroll-int(wheel)*3)
 	}
@@ -474,9 +482,24 @@ midiDone:
 		}
 		if inpututil.IsKeyJustPressed(ebiten.KeyEscape) {
 			a.modal = ""
+			a.browser = nil
 		}
 		if inpututil.IsKeyJustPressed(ebiten.KeyEnter) {
 			a.applyModal()
+		}
+		if a.browser != nil {
+			if inpututil.IsKeyJustPressed(ebiten.KeyArrowDown) {
+				a.browser.move(1)
+				if a.browser.selected >= 0 {
+					a.entry = a.browser.entries[a.browser.selected].Name()
+				}
+			}
+			if inpututil.IsKeyJustPressed(ebiten.KeyArrowUp) {
+				a.browser.move(-1)
+				if a.browser.selected >= 0 {
+					a.entry = a.browser.entries[a.browser.selected].Name()
+				}
+			}
 		}
 	} else {
 		a.keyboard()
@@ -492,7 +515,7 @@ midiDone:
 	}
 	if files := ebiten.DroppedFiles(); files != nil {
 		fs.WalkDir(files, ".", func(path string, entry fs.DirEntry, err error) error {
-			if err != nil || entry.IsDir() {
+			if err != nil || entry == nil || entry.IsDir() {
 				return nil
 			}
 			data, err := fs.ReadFile(files, path)
@@ -502,7 +525,10 @@ midiDone:
 			}
 			switch strings.ToLower(filepath.Ext(path)) {
 			case ".ym":
-				a.loadYMBytes(data)
+				if err := a.loadYMBytes(data); err != nil {
+					a.status = err.Error()
+					break
+				}
 				a.ymPath = path
 			case ".snd", ".sndh":
 				value, err := native.DecodeContainer(data)
@@ -558,15 +584,15 @@ func (a *App) keyboard() {
 			a.restore(true)
 			return
 		}
-		if inpututil.IsKeyJustPressed(ebiten.KeyC) {
+		if (a.tab == "Patterns" || a.tab == "Edit") && inpututil.IsKeyJustPressed(ebiten.KeyC) {
 			a.patternAction("block-copy")
 			return
 		}
-		if inpututil.IsKeyJustPressed(ebiten.KeyV) {
+		if (a.tab == "Patterns" || a.tab == "Edit") && inpututil.IsKeyJustPressed(ebiten.KeyV) {
 			a.patternAction("block-paste")
 			return
 		}
-		if inpututil.IsKeyJustPressed(ebiten.KeyX) {
+		if (a.tab == "Patterns" || a.tab == "Edit") && inpututil.IsKeyJustPressed(ebiten.KeyX) {
 			a.patternAction("block-cut")
 			return
 		}
@@ -754,6 +780,9 @@ func (a *App) enterField(r rune) {
 	}
 }
 func (a *App) action(name string) {
+	if a.fileAction(name) {
+		return
+	}
 	if a.patternAction(name) {
 		return
 	}
@@ -769,6 +798,7 @@ func (a *App) action(name string) {
 			a.applyModal()
 		} else {
 			a.modal = ""
+			a.browser = nil
 		}
 		return
 	}
@@ -880,8 +910,7 @@ func (a *App) action(name string) {
 		a.dirty = true
 		a.status = fmt.Sprintf("Reconstructed candidate: %d instruments, %d patterns. Compare with the original YM.", report.Instruments, report.Patterns)
 	case "ym:profile":
-		a.modal = "Load composer profile (.json)"
-		a.entry = ""
+		a.beginFileBrowser("Load composer profile (.json)", "", false)
 	case "ym:reference":
 		a.synth.SelectReference(true)
 	case "ym:score":
@@ -935,12 +964,10 @@ func (a *App) action(name string) {
 		a.dirty = false
 		a.status = "New project"
 	case "open":
-		a.modal = "Open music (.mys / .myv / .snd / .ym)"
-		a.entry = a.projectPath
+		a.beginFileBrowser("Open music (.mys / .myv / .snd / .ym)", "", false)
 	case "save":
 		if a.projectPath == "" {
-			a.modal = "Save project (.mys + .myv)"
-			a.entry = filepath.Join(a.directory, "untitled.mys")
+			a.beginFileBrowser("Save project (.mys + .myv)", "untitled.mys", true)
 		} else {
 			a.save(a.projectPath)
 		}
@@ -1011,8 +1038,7 @@ func (a *App) action(name string) {
 		a.modal = "Instrument name"
 		a.entry = e.Project.Bank.Instruments[a.instrument].Name()
 	case "import-sample":
-		a.modal = "Import raw PCM or WAV sample"
-		a.entry = ""
+		a.beginFileBrowser("Import raw PCM or WAV sample", "", false)
 	case "clear-sample":
 		a.remember()
 		a.synth.Edit(func(e *replay.Engine) { e.Project.Bank.Samples[a.sample] = model.Sample{} })
@@ -1049,8 +1075,7 @@ func (a *App) action(name string) {
 		e, _ := a.synth.Snapshot()
 		a.modal, a.entry = "Song title / artist", e.Project.Title+" / "+e.Project.Author
 	case "export":
-		a.modal = "Export WAV"
-		a.entry = filepath.Join(a.directory, "maxymiser.wav")
+		a.beginFileBrowser("Export WAV", "maxymiser.wav", true)
 	default:
 		if strings.HasPrefix(name, "setting:") {
 			a.modal = "Setting " + strings.TrimPrefix(name, "setting:")
@@ -1072,6 +1097,11 @@ func (a *App) save(path string) {
 	a.status = "Saved native song and voice bank"
 }
 func (a *App) applyModal() {
+	if a.browser != nil {
+		if !a.browserConfirm() {
+			return
+		}
+	}
 	modal, entry := a.modal, strings.TrimSpace(a.entry)
 	a.modal = ""
 	if a.patternModal(modal, entry) {
@@ -1261,6 +1291,11 @@ func (a *App) SetTab(name string) { a.tab = name }
 
 // SetSequenceTools selects the generation workspace for interface captures.
 func (a *App) SetSequenceTools(enabled bool) { a.sequenceTools = enabled }
+
+// ShowFileBrowser opens the native file chooser for captures and initial views.
+func (a *App) ShowFileBrowser() {
+	a.beginFileBrowser("Open music (.mys / .myv / .snd / .ym)", "", false)
+}
 
 // SelectInstrument selects the editable definition, not a channel's cached
 // playback parameters. Linked sequences are read from the same voice bank.

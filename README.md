@@ -46,6 +46,9 @@ trying the editor. External MaxYMiser files are not needed to launch it.
 
 The window can be resized. The waveform at the bottom displays the actual
 synthesizer output.
+Open, new-path saves, individual instrument exchange, sample import/export and
+composer profile loading use the built-in file browser. Navigate folders, scroll
+the list, select a file and confirm; a full path can also be typed.
 
 ## Keyboard
 
