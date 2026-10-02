@@ -81,3 +81,25 @@ func TestPCMUsesSTeDACHoldAndNativeModeSkipsInitialByte(t *testing.T) {
 		t.Fatal("native PCM start/cadence does not match STe")
 	}
 }
+
+func TestLivePCMTransposeAndTrackAttenuationDoNotRestartTheSample(t *testing.T) {
+	p := model.New()
+	p.Bank.Samples[0].PCM = make([]byte, 1000)
+	e := New(p)
+	e.TriggerSample(0, 48, 1)
+	e.Tick()
+	s := NewSynth(e, 48000)
+	s.configure()
+	s.pcm[0].position = 17
+	e.DMA[0].Triggered = false
+	e.DMA[0].Transpose = 12
+	e.DMA[0].TrackVolume = 2
+	s.configure()
+	if s.pcm[0].position != 17 || s.pcm[0].volume != 3 || math.Abs(s.pcm[0].step-16574.0/25033) > 1e-9 {
+		t.Fatal("PCM controller restarted the sample or ignored native pitch/attenuation")
+	}
+	e.TriggerSample(0, 48, 1)
+	if e.DMA[0].Transpose != 12 || e.DMA[0].TrackVolume != 2 {
+		t.Fatal("new live sample lost track controllers")
+	}
+}

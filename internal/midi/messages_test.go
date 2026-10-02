@@ -16,14 +16,16 @@ func TestRunningStatusWithRealtimeClock(t *testing.T) {
 	}
 }
 func TestNotesControllersAndTransportReachTracker(t *testing.T) {
-	e := replay.New(model.New())
+	p := model.New()
+	p.Song.State[31] |= 4
+	e := replay.New(p)
 	Apply(e, []byte{0x90, 69, 127})
 	e.Tick()
 	if e.Voices[0].Note != 69 || e.Registers[8] != 15 {
 		t.Fatal("MIDI note did not reach YM")
 	}
 	Apply(e, []byte{0xb0, 38, 80})
-	if e.MasterVolume != 80 {
+	if e.Voices[0].TrackVolume != 5 || e.Voices[1].TrackVolume != 5 || e.Voices[2].TrackVolume != 5 {
 		t.Fatal("global volume controller failed")
 	}
 	Apply(e, []byte{0xfa})
@@ -87,6 +89,7 @@ func TestSongPointerAndRealtimeMessagesPreserveMIDIFraming(t *testing.T) {
 
 func TestNextPatternControllersWaitForThePatternBoundary(t *testing.T) {
 	p := model.Demo()
+	p.Song.State[31] |= 4
 	p.Song.SetSpeed(1)
 	e := replay.New(p)
 	e.Play(false)
@@ -105,6 +108,7 @@ func TestNextPatternControllersWaitForThePatternBoundary(t *testing.T) {
 
 func TestPositionControllerUsesNativeJamBoundaryNavigation(t *testing.T) {
 	p := model.Demo()
+	p.Song.State[31] |= 4
 	p.Song.SetSpeed(1)
 	e := replay.New(p)
 	e.Jam = true

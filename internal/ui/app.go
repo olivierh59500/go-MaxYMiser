@@ -478,6 +478,7 @@ func (a *App) drawSettings(dst *ebiten.Image, e *replay.Engine) {
 	a.btn(dst, "Load CNF", 870, 236, 160, 30, "config-load", false)
 	a.btn(dst, "Save CNF", 1044, 236, 160, 30, "config-save", false)
 	a.btn(dst, "Reload CNF", 1060, 205, 144, 28, "config-reload", a.nativeConfiguration[10] != 0)
+	a.btn(dst, "Controllers", 870, 205, 174, 28, "midi-controllers", e.Project.Song.State[31]&4 != 0)
 	modes := []string{"Disabled", "One voice", "Two voices", "Native STe rate", "MIDI output"}
 	mode := int(e.Project.Song.State[49])
 	if mode >= len(modes) {
@@ -495,6 +496,12 @@ func (a *App) drawSettings(dst *ebiten.Image, e *replay.Engine) {
 	for track, offset := range []int{40, 41, 42, 43, 51} {
 		x := 670 + track*106
 		a.btn(dst, fmt.Sprintf("%s %02X", []string{"A", "B", "C", "D", "E"}[track], e.Project.Song.State[offset]&15), x, 636, 94, 28, fmt.Sprintf("midi-channel:%d", track), false)
+	}
+	for track, offset := range []int{32, 33, 34, 35, 50} {
+		if track == 0 {
+			a.text(dst, "MIDI sounds · 00 off · DD percussion", 42, 612, 12, dim)
+		}
+		a.btn(dst, fmt.Sprintf("%s %02X", []string{"A", "B", "C", "D", "E"}[track], e.Project.Song.State[offset]), 42+track*108, 636, 98, 28, fmt.Sprintf("midi-sound:%d", track), false)
 	}
 }
 func (a *App) drawHelp(dst *ebiten.Image) {
@@ -780,7 +787,7 @@ func (a *App) enterNote(note byte) {
 		if a.channel < 3 {
 			if a.drumKeyboard && note > 1 {
 				a.instrument = int(note-12) % 32
-				note = 48
+				note = 60
 			}
 			e.Trigger(a.channel, note, byte(a.instrument+1))
 		} else {
@@ -883,6 +890,9 @@ func (a *App) enterField(r rune) {
 	}
 }
 func (a *App) action(name string) {
+	if a.modal == "" && a.midiAssignmentAction(name) {
+		return
+	}
 	if a.ymPatternAction(name) {
 		return
 	}
@@ -1111,6 +1121,10 @@ func (a *App) action(name string) {
 			}
 		})
 		a.dirty = true
+	case "midi-controllers":
+		a.remember()
+		a.synth.Edit(func(e *replay.Engine) { e.Project.Song.State[31] ^= 4 })
+		a.dirty = true
 	case "bank:0":
 		a.instrument = a.instrument % 16
 	case "bank:1":
@@ -1317,6 +1331,9 @@ func (a *App) applyModal() {
 	}
 	modal, entry := a.modal, strings.TrimSpace(a.entry)
 	a.modal = ""
+	if a.midiAssignmentModal(modal, entry) {
+		return
+	}
 	if a.libraryModal(modal, entry) {
 		return
 	}

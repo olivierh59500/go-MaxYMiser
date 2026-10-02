@@ -15,7 +15,7 @@ func TestPercussionKeyboardAndRecordUseNativeInstruments(t *testing.T) {
 	app.drumKeyboard, app.editing = true, true
 	app.enterNote(60)
 	e, _ := app.synth.Snapshot()
-	if e.Voices[0].Note != 48 || e.Project.Song.Patterns[0][0].Note != 48 || e.Project.Song.Patterns[0][0].Instrument != 17 {
+	if e.Voices[0].Note != 60 || e.Project.Song.Patterns[0][0].Note != 60 || e.Project.Song.Patterns[0][0].Instrument != 17 {
 		t.Fatal("percussion keyboard did not map note to a middle-C sound")
 	}
 	app.action("record")

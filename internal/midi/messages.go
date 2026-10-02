@@ -89,8 +89,8 @@ func Apply(e *replay.Engine, message []byte) {
 		return
 	}
 	if status == 0xf0 {
-		if len(message) >= 6 && message[1] == 0x7f && message[3] == 6 {
-			switch message[4] {
+		if command, ok := MachineControl(message); ok {
+			switch command {
 			case 1:
 				e.Stop()
 			case 2:
@@ -134,7 +134,7 @@ func Apply(e *replay.Engine, message []byte) {
 			e.Voices[channel].Instrument = message[1]%32 + 1
 		}
 	case 0xb0:
-		if len(message) >= 3 {
+		if len(message) >= 3 && e.Project.Song.State[31]&4 != 0 {
 			controller(e, channel, message[1], message[2])
 		}
 	}
@@ -186,6 +186,15 @@ func ApplyMapped(e *replay.Engine, message []byte) {
 	}
 	channel := message[0] & 15
 	status := message[0] & 0xf0
+	if status == 0xb0 {
+		if len(message) < 3 || e.Project.Song.State[31]&4 == 0 {
+			return
+		}
+		if message[1] >= 16 && message[1] <= 51 {
+			controller(e, 0, message[1], message[2])
+			return
+		}
+	}
 	var tracks []int
 	for track, offset := range []int{40, 41, 42, 43, 51} {
 		if e.Project.Song.State[offset]&15 != channel {
@@ -197,9 +206,6 @@ func ApplyMapped(e *replay.Engine, message []byte) {
 		}
 	}
 	if len(tracks) == 0 {
-		if status == 0xb0 && len(message) >= 3 && message[1] >= 16 && message[1] <= 51 {
-			controller(e, 0, message[1], message[2])
-		}
 		return
 	}
 	if status == 0x90 && len(message) >= 3 && message[2] > 0 {
@@ -217,10 +223,16 @@ func ApplyMapped(e *replay.Engine, message []byte) {
 		mapped := append([]byte(nil), message...)
 		mapped[0] = status | byte(track)
 		if track < 3 {
+			if e.Project.Song.State[32+track] == 0xdd && (status == 0x80 || status == 0x90 && len(mapped) >= 3 && mapped[2] == 0) {
+				if e.Voices[track].Instrument == mapped[1]%32+1 {
+					e.Trigger(track, 1, 0)
+				}
+				continue
+			}
 			if status == 0x90 && len(mapped) >= 3 && mapped[2] > 0 {
 				note, instrument := mapped[1], e.Project.Song.State[32+track]
-				if instrument == 255 {
-					instrument, note = note%32+1, 48
+				if instrument == 0xdd {
+					instrument, note = note%32+1, 60
 				}
 				if instrument <= 32 {
 					e.Trigger(track, note, instrument)
@@ -238,17 +250,20 @@ func ApplyMapped(e *replay.Engine, message []byte) {
 	}
 }
 func controller(e *replay.Engine, ch int, code, value byte) {
-	v := &e.Voices[ch]
+	if code >= 60 {
+		instrumentController(e, ch, code, value)
+		return
+	}
 	switch {
 	case code >= 16 && code <= 20:
 		bit := byte(1 << (code - 16))
-		if value == 0 {
+		if value >= 32 {
 			e.Mutes &^= bit
 		} else {
 			e.Mutes |= bit
 		}
 	case code == 21:
-		e.Speed = max(2, int(value))
+		e.Speed = int(value>>3) + 2
 	case code == 22:
 		e.SelectPosition(int(value))
 	case code == 23:
@@ -256,52 +271,39 @@ func controller(e *replay.Engine, ch int, code, value byte) {
 	case code == 24:
 		e.PatternMode = value != 0
 	case code == 25:
-		e.Row = int(value) % 64
+		e.Row = int(value >> 1)
 		e.TickInRow = 0
 	case code == 28:
 		for i := range e.Voices {
-			e.Voices[i].NoiseTranspose = int(value) - 64
+			e.Voices[i].TrackNoiseTranspose = -((int(value) - 64) >> 1)
 		}
 	case code >= 29 && code <= 31:
-		e.Voices[code-29].NoiseTranspose = int(value) - 64
+		e.Voices[code-29].TrackNoiseTranspose = -((int(value) - 64) >> 1)
 	case code == 32:
 		for i := range e.Voices {
-			e.Voices[i].Transpose = int(value) - 64
+			e.Voices[i].TrackTranspose = (int(value) - 64) >> 1
 		}
 	case code >= 33 && code <= 35:
-		e.Voices[code-33].Transpose = int(value) - 64
+		e.Voices[code-33].TrackTranspose = (int(value) - 64) >> 1
+	case code == 36 || code == 37:
+		e.DMA[code-36].Transpose = (int(value) - 64) >> 1
 	case code == 38:
-		e.MasterVolume = int(value)
+		for i := range e.Voices {
+			e.Voices[i].TrackVolume = 15 - int(value>>3)
+		}
+		for i := range e.DMA {
+			e.DMA[i].TrackVolume = 8 - int(value/15)
+		}
 	case code >= 39 && code <= 41:
 		e.Voices[code-39].TrackVolume = 15 - int(value>>3)
+	case code == 42 || code == 43:
+		e.DMA[code-42].TrackVolume = 8 - int(value/15)
 	case code >= 44 && code <= 47:
-		e.QueuePattern(int(code-44), value)
-	case code >= 60 && code <= 67:
-		offset := int(code-60) + 32
-		if code == 67 {
-			offset = 39
+		pattern := value
+		if pattern >= 126 {
+			pattern += 128
 		}
-		v.Parameters[offset] = value
-		v.SeqIndex = [7]int{}
-		v.SeqDone = [7]bool{}
-	case code == 109:
-		v.Parameters[22] = value >> 3
-	case code == 110:
-		v.Parameters[16] = value
-	case code == 111:
-		v.Parameters[20] = value % 9
-	case code == 112:
-		v.Parameters[21] = value
-	case code == 113:
-		v.Parameters[18] = value & 15
-	case code == 114:
-		v.Parameters[19] = value
-	case code == 115:
-		v.Parameters[23] = value - 64
-	case code == 116:
-		v.Parameters[24] = value - 64
-	case code == 117:
-		v.Parameters[17] = value * 2
+		e.QueuePattern(int(code-44), pattern)
 	case code == 48:
 		e.MasterVolume = int(value)
 	case code == 49:

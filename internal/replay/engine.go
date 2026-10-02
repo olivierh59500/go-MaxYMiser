@@ -8,29 +8,31 @@ import (
 )
 
 type Voice struct {
-	Parameters                         [48]byte
-	Note, Instrument                   byte
-	SeqIndex                           [7]int
-	SeqDone                            [7]bool
-	SeqClock                           int
-	Values                             [7]uint16
-	ColumnVolume, TrackVolume          int
-	Transpose, NoiseTranspose          int
-	SlideRate, Slide, PortaRate, Porta int16
-	Extra                              [2]byte
-	ExtraStep                          int
-	SequenceArpeggio                   uint16
-	PWMRate                            int8
-	PWMOffset                          int16
-	PWMLocked                          bool
-	Triggered                          bool
-	ParametersDirty                    bool
-	PreviewTriggers                    uint64
+	Parameters                          [48]byte
+	Note, Instrument                    byte
+	SeqIndex                            [7]int
+	SeqDone                             [7]bool
+	SeqClock                            int
+	Values                              [7]uint16
+	ColumnVolume, TrackVolume           int
+	Transpose, NoiseTranspose           int
+	TrackTranspose, TrackNoiseTranspose int
+	SlideRate, Slide, PortaRate, Porta  int16
+	Extra                               [2]byte
+	ExtraStep                           int
+	SequenceArpeggio                    uint16
+	PWMRate                             int8
+	PWMOffset                           int16
+	PWMLocked                           bool
+	Triggered                           bool
+	ParametersDirty                     bool
+	PreviewTriggers                     uint64
 }
 type PCMVoice struct {
-	Sample, Note, Volume byte
-	Triggered            bool
-	PreviewTriggers      uint64
+	Sample, Note, Volume   byte
+	Triggered              bool
+	PreviewTriggers        uint64
+	TrackVolume, Transpose int
 }
 
 type Engine struct {
@@ -107,8 +109,14 @@ func (e *Engine) Stop() {
 	e.nextPatternMask = 0
 	// The audio renderer consumes a stop trigger at the next sequencer tick.
 	e.pendingDMA = [2]bool{true, true}
-	e.Voices = [3]Voice{}
-	e.DMA = [2]PCMVoice{}
+	for i := range e.Voices {
+		v := &e.Voices[i]
+		*v = Voice{TrackVolume: v.TrackVolume, TrackTranspose: v.TrackTranspose, TrackNoiseTranspose: v.TrackNoiseTranspose}
+	}
+	for i := range e.DMA {
+		v := &e.DMA[i]
+		*v = PCMVoice{TrackVolume: v.TrackVolume, Transpose: v.Transpose}
+	}
 	e.Registers[7] = 255
 	e.Registers[8], e.Registers[9], e.Registers[10] = 0, 0, 0
 }
@@ -289,7 +297,7 @@ func (e *Engine) TriggerSample(channel int, note, sample byte) {
 	for note >= 68 && e.Project.Song.State[49] != 4 {
 		note -= 12
 	}
-	e.DMA[channel] = PCMVoice{Sample: sample, Note: note, PreviewTriggers: e.DMA[channel].PreviewTriggers + 1}
+	e.DMA[channel] = PCMVoice{Sample: sample, Note: note, PreviewTriggers: e.DMA[channel].PreviewTriggers + 1, TrackVolume: e.DMA[channel].TrackVolume, Transpose: e.DMA[channel].Transpose}
 	e.pendingDMA[channel] = true
 }
 func (e *Engine) parse(ch int, cell model.Cell, muted bool) {
@@ -318,7 +326,7 @@ func (e *Engine) parse(ch int, cell model.Cell, muted bool) {
 			v.Triggered = true
 		}
 		if cell.Note == model.NoteOff {
-			*v = Voice{}
+			*v = Voice{TrackVolume: v.TrackVolume, TrackTranspose: v.TrackTranspose, TrackNoiseTranspose: v.TrackNoiseTranspose}
 			v.Triggered = true
 		} else if cell.Note > 1 {
 			if porta && v.Note > 1 {
@@ -581,7 +589,7 @@ func (e *Engine) Period(v *Voice, component int) uint16 {
 			adjust += int(int16(v.Values[1]))
 		}
 		if p[3]&bit != 0 {
-			adjust += v.Transpose
+			adjust += v.Transpose + v.TrackTranspose
 		}
 		index := int(v.Note) + adjust
 		period = int(table(tonePeriods[:], index))
@@ -658,7 +666,7 @@ func (e *Engine) configure() {
 			}
 			if mixer&0x1000 != 0 {
 				e.Registers[7] &^= 1 << (ch + 3)
-				noise := int(v.Values[4]) + v.NoiseTranspose
+				noise := int(v.Values[4]) + v.NoiseTranspose + v.TrackNoiseTranspose
 				e.Registers[6] = byte(max(0, min(31, noise)))
 			}
 		}

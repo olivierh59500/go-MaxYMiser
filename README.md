@@ -244,6 +244,16 @@ checked through a temporary virtual destination; physical hardware and precise
 future-timestamp scheduling remain unverified. Physical Sync24 hardware is not
 included in this edition.
 
+**Settings → Controllers** uses the original configuration bit and controls
+whether incoming CC messages are applied. Tracker controllers respond globally
+on any MIDI channel; instrument controllers edit the assigned YM definition,
+including its sequence links, using the native value scales. These bank edits
+participate in undo and native saves. The A–E sound selectors support `00` for
+disabled input, `01–20` for YM instruments, `DD` for middle-C percussion, and
+`01–08` for PCM banks. Channel assignments remain independent.
+Native MMC play/stop messages control transport; a remote stop leaves recording
+mode. Malformed or unrelated SysEx messages are ignored.
+
 ## Verification
 
 ```sh
@@ -262,8 +272,8 @@ loops and saved Jam behaviour. Isolated timer tests verify native levels,
 frequency steps and MFP divider/data calculations.
 See [native replay verification](docs/REPLAY_VERIFICATION.md) for the scope,
 method and register-trace verifier.
-The [SNDH corpus audit](docs/SNDH_CORPUS.md) covers 674 imported files, 850 native
-subtunes and 654 unchanged export/reload checks, with explicit remaining issues.
+The [SNDH corpus audit](docs/SNDH_CORPUS.md) covers 687 imported files, 863 native
+subtunes and 667 unchanged export/reload checks, with explicit remaining issues.
 
 ## Credits
 

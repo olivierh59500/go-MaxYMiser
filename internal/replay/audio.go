@@ -260,9 +260,13 @@ func (s *Synth) configure() {
 				s.pcm[ch].active = false
 				continue
 			}
-			rate := pcmRate(v.Note, mode)
-			volume := int(v.Volume)
-			if volume > int(e.Project.Song.State[56]) || rate == 0 {
+			note := int(v.Note) + v.Transpose
+			rate := 0
+			if note >= 0 && note <= 255 {
+				rate = pcmRate(byte(note), mode)
+			}
+			volume := int(v.Volume) + v.TrackVolume
+			if int(v.Volume) > int(e.Project.Song.State[56]) || volume >= 8 || rate == 0 {
 				s.pcm[ch].active = false
 				continue
 			}
@@ -280,7 +284,22 @@ func (s *Synth) configure() {
 			s.pcm[ch] = sampleVoice{sample: int(v.Sample) - 1, position: position, step: float64(rate) / float64(dacRate), dacStep: float64(s.Rate) / float64(dacRate), volume: volume, active: volume < 8}
 		}
 		if !v.Triggered && s.pcm[ch].active {
-			volume := int(v.Volume)
+			note := int(v.Note) + v.Transpose
+			rate := 0
+			if note >= 0 && note <= 255 {
+				rate = pcmRate(byte(note), mode)
+			}
+			dacRate := 25033
+			if mode == 3 {
+				dacRate = rate
+			}
+			if rate > 0 && dacRate > 0 {
+				s.pcm[ch].step = float64(rate) / float64(dacRate)
+				s.pcm[ch].dacStep = float64(s.Rate) / float64(dacRate)
+			} else {
+				s.pcm[ch].active = false
+			}
+			volume := int(v.Volume) + v.TrackVolume
 			if mode == 2 {
 				volume++
 			}

@@ -57,13 +57,14 @@ var helpText = [][]string{
 	},
 	{
 		"Native input/output ports are on macOS. Output connects to a selected destination.",
+		"Controllers must be enabled in Settings; native CC values are scaled.",
 		"Settings A–E values are 00–0F, corresponding to MIDI channels 1–16.",
-		"Shared channel assignments allocate free voices; note-off targets matching notes.",
+		"MIDI sounds: 00 disabled, 01–20 YM, DD middle-C drums, 01–08 PCM.",
 		"Clock: six F8 pulses advance a tracker row; sounds retain internal cadence.",
 		"Start/continue/stop and Song Position Pointer are supported.",
 		"CC16–20: mutes · 21: speed · 22: position · 23: Jam · 24: mode · 25: row",
 		"CC44–47 queue patterns at the boundary; sound controllers change parameters.",
-		"PCM MIDI mode sends two note/sample lanes. Audio queues output clock/transport.",
+		"Instrument CC edits are saved/undoable. MMC play/stop accepts complete frames.",
 		"Virtual-port output is verified; physical Sync24 and latency remain separate.",
 	},
 }
