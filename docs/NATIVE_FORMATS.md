@@ -27,6 +27,27 @@ Version 1 sequences use 126 bytes of word values and final length/repeat bytes.
 Version 0 uses half that stride. `MYM1DIGI` precedes the sample payload. Unused
 sample tails and instrument reserved bytes are preserved when saving.
 
+## Individual instruments
+
+An individual instrument starts with `MYM0.MYI` through `MYM3.MYI`, followed by
+the first 48 bytes of its native instrument definition. Sequence IDs are omitted;
+the actual sequence records follow instead. Versions 0/1 carry seven 64-byte
+records. Version 2 carries seven 128-byte records. Version 3 carries eight
+128-byte records, including PWM. Its sample payload starts at offset 1080.
+
+When the instrument uses a DigiDrum, remaining bytes are the signed sample in
+versions 1–3. Version 0 uses four-bit DAC levels terminated by a negative byte;
+the import uses the original editor's inverse DAC lookup. New exports use MYI3.
+Import remaps definitions into unused sequence and sample slots and fails
+without changing the bank when there is insufficient room.
+
+The supplied Atari editor was used to load a Go-exported MYI3: instrument
+parameters, arpeggio/mixer/volume/PWM sequences and the sample's initial bytes
+were verified in its memory. Its MYI3 loader retains a fixed 504-byte subtraction
+for the sample length, despite the 1080-byte prefix, adding 576 bytes to the
+reported sample length. The Go importer uses the actual version-specific prefix
+and does not reproduce this out-of-bounds legacy behaviour.
+
 ## Embedded MaxYMiser exports
 
 An unpacked MaxYMiser SNDH places its tracker payload between the voice-bank

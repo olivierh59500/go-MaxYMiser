@@ -11,6 +11,7 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/vector"
 	"github.com/olivierh59500/go-MaxYMiser/internal/edit"
 	"github.com/olivierh59500/go-MaxYMiser/internal/model"
+	"github.com/olivierh59500/go-MaxYMiser/internal/native"
 	"github.com/olivierh59500/go-MaxYMiser/internal/replay"
 )
 
@@ -105,6 +106,10 @@ func (a *App) soundAction(name string) bool {
 		return true
 	}
 	switch name {
+	case "instrument-load":
+		a.modal, a.entry = "Load instrument (.myi)", ""
+	case "instrument-save":
+		a.modal, a.entry = "Save instrument (.myi)", filepath.Join(a.directory, fmt.Sprintf("instrument-%02X.myi", a.instrument+1))
 	case "seq-tools":
 		a.sequenceTools = !a.sequenceTools
 	case "gen-signed":
@@ -198,6 +203,47 @@ func (a *App) soundModal(modal, entry string) bool {
 		return true
 	}
 	switch modal {
+	case "Load instrument (.myi)":
+		raw, err := os.ReadFile(entry)
+		var file native.InstrumentFile
+		if err == nil {
+			file, err = native.DecodeInstrument(raw)
+		}
+		e, _ := a.synth.Snapshot()
+		bank := e.Project.Bank
+		if err == nil {
+			err = native.ImportInstrument(&bank, a.instrument, file)
+		}
+		if err != nil {
+			a.status = err.Error()
+		} else {
+			a.remember()
+			a.synth.Edit(func(e *replay.Engine) { e.Project.Bank = bank; e.Stop() })
+			a.dirty, a.status = true, "Native instrument loaded with independent sequence slots"
+		}
+	case "Save instrument (.myi)":
+		e, _ := a.synth.Snapshot()
+		file, err := native.ExportInstrument(&e.Project.Bank, a.instrument)
+		var raw []byte
+		if err == nil {
+			raw, err = native.EncodeInstrument(file)
+		}
+		if err == nil {
+			var output *os.File
+			output, err = os.OpenFile(entry, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0644)
+			if err == nil {
+				_, err = output.Write(raw)
+				closeErr := output.Close()
+				if err == nil {
+					err = closeErr
+				}
+			}
+		}
+		if err != nil {
+			a.status = err.Error()
+		} else {
+			a.status = "Native MYI3 instrument saved"
+		}
 	case "Tune sample (semitones)":
 		semitones, err := strconv.ParseFloat(entry, 64)
 		if err != nil {

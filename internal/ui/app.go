@@ -312,9 +312,11 @@ func (a *App) drawInstruments(dst *ebiten.Image, e *replay.Engine) {
 	}
 	inst := p.Bank.Instruments[a.instrument]
 	a.text(dst, fmt.Sprintf("%02X · %s", a.instrument+1, inst.Name()), 320, 210, 20, fg)
-	a.btn(dst, "I", 846, 202, 52, 32, "bank:0", a.instrument < 16)
-	a.btn(dst, "II", 906, 202, 52, 32, "bank:1", a.instrument >= 16)
-	a.btn(dst, "Rename", 1100, 202, 126, 34, "rename-instrument", false)
+	a.btn(dst, "I", 804, 202, 42, 32, "bank:0", a.instrument < 16)
+	a.btn(dst, "II", 852, 202, 42, 32, "bank:1", a.instrument >= 16)
+	a.btn(dst, "Load MYI", 902, 202, 104, 34, "instrument-load", false)
+	a.btn(dst, "Save MYI", 1014, 202, 104, 34, "instrument-save", false)
+	a.btn(dst, "Rename", 1126, 202, 104, 34, "rename-instrument", false)
 	a.text(dst, "DIRECT SETTINGS", 320, 246, 10, dim)
 	a.text(dst, "SOUND SEQUENCES · click to edit", 820, 246, 10, dim)
 	labels := []string{"Portamento mask", "Arpeggio mask", "Vibrato mask", "Transpose mask", "Fixed frequency", "Fixed detune", "Sequence speed", "Pulse width", "Envelope shape", "Start sync", "Digi sample", "Digi rate", "Attenuation", "Detune coarse", "Detune fine", "Frequency resolution"}
@@ -903,7 +905,7 @@ func (a *App) action(name string) {
 		a.dirty = false
 		a.status = "New project"
 	case "open":
-		a.modal = "Open music (.mys / .snd / .ym)"
+		a.modal = "Open music (.mys / .myv / .snd / .ym)"
 		a.entry = a.projectPath
 	case "save":
 		if a.projectPath == "" {
@@ -1046,6 +1048,22 @@ func (a *App) applyModal() {
 	var x, y int
 	switch {
 	case strings.HasPrefix(modal, "Open music"):
+		if strings.EqualFold(filepath.Ext(entry), ".myv") {
+			data, err := os.ReadFile(entry)
+			if err != nil {
+				a.status = err.Error()
+				return
+			}
+			bank, err := native.DecodeVoiceBank(data)
+			if err != nil {
+				a.status = err.Error()
+				return
+			}
+			a.remember()
+			a.synth.Edit(func(e *replay.Engine) { e.Project.Bank = bank; e.Stop() })
+			a.directory, a.status, a.dirty = filepath.Dir(entry), "Voice bank loaded", true
+			return
+		}
 		if strings.EqualFold(filepath.Ext(entry), ".ym") {
 			if err := a.LoadYM(entry); err != nil {
 				a.status = err.Error()

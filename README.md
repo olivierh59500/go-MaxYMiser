@@ -28,6 +28,8 @@ trying the editor. External MaxYMiser files are not needed to launch it.
   envelope, timer, sample and PWM parameters. Linked sequence values are shown
   beside the direct settings; click the values to open that sequence. Sequence
   definitions are shared by every instrument referring to the same ID.
+  **Load MYI / Save MYI** exchange individual instruments with their sequences
+  and optional sample. New exports use the original editor's MYI3 layout.
 - **Sequences**: up to 256 native 16-bit sequences, with length and repeat,
   ramp/triangle/sine/square generation, signed words, copying and morphing.
 - **Samples**: eight banks of signed PCM, with raw PCM and 8/16-bit WAV import,
@@ -146,7 +148,7 @@ Subsample timing, oscillator synchronisation, mixed timer combinations and STe
 mixing have not yet been validated against a complete Atari recording matrix;
 they should not be described as bit-exact hardware emulation. MIDI input is
 available on macOS, including notes, program changes, controllers and transport.
-MIDI clock output, Sync24 hardware, standalone `.MYI` files and packed ICE SNDH
+MIDI clock output, Sync24 hardware and packed ICE SNDH
 editing are not included in this edition.
 
 ## Verification

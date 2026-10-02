@@ -74,3 +74,36 @@ func TestSampleToolsKeepUndoAndSaveEditedPCM(t *testing.T) {
 		t.Fatal("sample preview did not reach the selected PCM voice")
 	}
 }
+
+func TestMYIButtonsSaveAndImportAnIndependentSound(t *testing.T) {
+	app, err := New(model.Demo(), "", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer app.Close()
+	app.SelectInstrument(1)
+	app.action("instrument-save")
+	path := filepath.Join(t.TempDir(), "chord.myi")
+	app.entry = path
+	app.applyModal()
+	if _, err = os.Stat(path); err != nil {
+		t.Fatal(err)
+	}
+	app.SelectInstrument(7)
+	app.action("instrument-load")
+	app.entry = path
+	app.applyModal()
+	e, _ := app.synth.Snapshot()
+	if e.Project.Bank.Instruments[7].Name() != "Chord pulse" || e.Project.Bank.Instruments[1][49] != 3 {
+		t.Fatalf("MYI did not import without altering the source: %s", app.status)
+	}
+	arp := e.Project.Bank.Instruments[7][49]
+	if e.Project.Bank.Sequences[arp].Values[1] != 4 {
+		t.Fatal("MYI import lost the arpeggio")
+	}
+	app.restore(false)
+	e, _ = app.synth.Snapshot()
+	if e.Project.Bank.Instruments[7].Name() != "" {
+		t.Fatal("MYI import could not be undone")
+	}
+}
