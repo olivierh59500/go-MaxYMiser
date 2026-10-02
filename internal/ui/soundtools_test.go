@@ -1,13 +1,56 @@
 package ui
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/olivierh59500/go-MaxYMiser/internal/edit"
 	"github.com/olivierh59500/go-MaxYMiser/internal/model"
+	"github.com/olivierh59500/go-MaxYMiser/internal/native"
+	"github.com/olivierh59500/go-MaxYMiser/internal/replay"
 )
+
+func TestSoundExportsCanUpdateExistingFilesWithoutSavingTheProject(t *testing.T) {
+	app, err := New(model.Demo(), "", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer app.Close()
+	app.SelectInstrument(1)
+	root := t.TempDir()
+	instrumentPath := filepath.Join(root, "chord.myi")
+	samplePath := filepath.Join(root, "drum.pcm")
+	for iteration := 0; iteration < 2; iteration++ {
+		name := []string{"First sound", "Updated sound"}[iteration]
+		pcm := [][]byte{{0, 127, 128, 255}, {128, 127}}[iteration]
+		app.synth.Edit(func(e *replay.Engine) {
+			e.Project.Bank.Instruments[1].SetName(name)
+			e.Project.Bank.Samples[0].PCM = append([]byte(nil), pcm...)
+		})
+		app.dirty, app.icePacking = true, iteration == 1
+		app.modal, app.entry = "Save instrument (.myi)", instrumentPath
+		app.applyModal()
+		raw, err := os.ReadFile(instrumentPath)
+		if err != nil {
+			t.Fatal(err)
+		}
+		file, err := native.DecodeInstrument(raw)
+		if err != nil || file.Instrument.Name() != name {
+			t.Fatalf("instrument save did not update its existing file: %v (%s)", err, app.status)
+		}
+		app.modal, app.entry = "Save signed PCM sample", samplePath
+		app.applyModal()
+		raw, err = os.ReadFile(samplePath)
+		if err != nil || !bytes.Equal(raw, pcm) {
+			t.Fatalf("sample save did not update its existing file: %v (%s)", err, app.status)
+		}
+		if !app.dirty || app.projectPath != "" || app.instrument != 1 || app.sample != 0 {
+			t.Fatal("sound export changed composition save state or editor selection")
+		}
+	}
+}
 
 func TestGeneratorAndMorphUpdateSelectedSequencesAndUndo(t *testing.T) {
 	p := model.Demo()

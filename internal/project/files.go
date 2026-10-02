@@ -188,27 +188,6 @@ func SaveCollectionSNDH(source []byte, projects []*model.Project, path string, d
 	}
 	return atomicWrite(path, data)
 }
-func atomicWrite(path string, data []byte) error {
-	dir := filepath.Dir(path)
-	f, err := os.CreateTemp(dir, ".maxymiser-save-")
-	if err != nil {
-		return err
-	}
-	name := f.Name()
-	defer os.Remove(name)
-	if _, err = f.Write(data); err != nil {
-		f.Close()
-		return err
-	}
-	if err = f.Sync(); err != nil {
-		f.Close()
-		return err
-	}
-	if err = f.Close(); err != nil {
-		return err
-	}
-	return os.Rename(name, path)
-}
 func ImportSample(bank *model.VoiceBank, index int, path string) error {
 	if index < 0 || index >= 8 {
 		return fmt.Errorf("project: invalid sample bank")

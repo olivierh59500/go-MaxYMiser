@@ -11,6 +11,7 @@ import (
 	"github.com/olivierh59500/go-MaxYMiser/internal/edit"
 	"github.com/olivierh59500/go-MaxYMiser/internal/model"
 	"github.com/olivierh59500/go-MaxYMiser/internal/native"
+	"github.com/olivierh59500/go-MaxYMiser/internal/project"
 	"github.com/olivierh59500/go-MaxYMiser/internal/replay"
 )
 
@@ -272,25 +273,7 @@ func (a *App) soundModal(modal, entry string) bool {
 		}
 	case "Save instrument (.myi)":
 		e, _ := a.synth.Snapshot()
-		file, err := native.ExportInstrument(&e.Project.Bank, a.instrument)
-		var raw []byte
-		if err == nil {
-			raw, err = native.EncodeInstrument(file)
-		}
-		if err == nil && a.icePacking {
-			raw, err = native.PackICE(raw)
-		}
-		if err == nil {
-			var output *os.File
-			output, err = os.OpenFile(entry, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0644)
-			if err == nil {
-				_, err = output.Write(raw)
-				closeErr := output.Close()
-				if err == nil {
-					err = closeErr
-				}
-			}
-		}
+		err := project.SaveInstrument(&e.Project.Bank, a.instrument, entry, a.icePacking)
 		if err != nil {
 			a.status = err.Error()
 		} else {
@@ -318,14 +301,7 @@ func (a *App) soundModal(modal, entry string) bool {
 		}
 	case "Save signed PCM sample":
 		e, _ := a.synth.Snapshot()
-		file, err := os.OpenFile(entry, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0644)
-		if err == nil {
-			_, err = file.Write(e.Project.Bank.Samples[a.sample].PCM)
-			closeErr := file.Close()
-			if err == nil {
-				err = closeErr
-			}
-		}
+		err := project.SaveSample(e.Project.Bank.Samples[a.sample], entry)
 		if err != nil {
 			a.status = err.Error()
 		} else {

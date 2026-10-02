@@ -194,6 +194,11 @@ when the second file fails. Original filename case and file permissions are
 retained. This protects against write/rename failures; it is not a filesystem
 transaction that guarantees both files switch together during power loss.
 The **As** button beside Save, or Ctrl+Shift+S, chooses a new native destination.
+Individual MYI, signed PCM, CNF and native SNDH saves also stage and sync the
+complete file before replacing an existing regular target. Instruments and
+samples can therefore be edited and saved repeatedly under the same filename.
+Existing permissions are preserved; directories and symbolic links are rejected.
+Saving a sound independently retains the composition's unsaved-edit state.
 
 Unpacked `.SND`/`.SNDH` files created by MaxYMiser can be opened as editable
 projects by extracting their native song and voice-bank payloads. This import

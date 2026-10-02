@@ -4,7 +4,18 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+
+	"github.com/olivierh59500/go-MaxYMiser/internal/model"
 )
+
+// SaveSample writes the signed PCM payload without a native bank trailer.
+// Repeated saves replace a complete previous sample after staging and syncing.
+func SaveSample(sample model.Sample, path string) error {
+	if len(sample.PCM) > 32768 {
+		return fmt.Errorf("project: raw sample exceeds 32 KiB")
+	}
+	return atomicWrite(path, sample.PCM)
+}
 
 // DecodeSample accepts signed headerless PCM or ordinary PCM WAV files.
 func DecodeSample(data []byte) ([]byte, error) {
