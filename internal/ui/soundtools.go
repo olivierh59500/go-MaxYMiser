@@ -28,6 +28,7 @@ func (a *App) drawSequenceTools(dst *ebiten.Image, e *replay.Engine) {
 		a.btn(dst, item.value, x+92, 342, 146, 34, "gen-field:"+item.action, false)
 	}
 	a.btn(dst, "Generate", 862, 342, 168, 34, "gen-apply", false)
+	a.btn(dst, "Modify range", 1044, 342, 186, 34, "gen-modify", false)
 	a.text(dst, "Endpoints use hexadecimal words; cycles use decimal. Ramp holds its last value; waves loop.", 42, 401, 12, dim)
 	length := max(1, min(63, int(e.Project.Bank.Sequences[a.sequence].Length)))
 	low, high, cycles, err := a.generatorValues()
@@ -115,6 +116,9 @@ func (a *App) soundAction(name string) bool {
 		a.sequenceTools = !a.sequenceTools
 	case "gen-signed":
 		a.generatorSigned = !a.generatorSigned
+	case "gen-modify":
+		e, _ := a.synth.Snapshot()
+		a.modal, a.entry = "Modify sequence (first,last,offset,scale)", fmt.Sprintf("0,%d,0,1", max(0, int(e.Project.Bank.Sequences[a.sequence].Length)-1))
 	case "gen-apply":
 		low, high, cycles, err := a.generatorValues()
 		e, _ := a.synth.Snapshot()
@@ -164,6 +168,8 @@ func (a *App) soundAction(name string) bool {
 		a.modal, a.entry = "Trim sample (start,length)", fmt.Sprintf("0,%d", len(e.Project.Bank.Samples[a.sample].PCM))
 	case "sample-sign":
 		a.editSample(func(sample *model.Sample) error { edit.ToggleSampleSign(sample); return nil })
+	case "sample-ymise":
+		a.editSample(func(sample *model.Sample) error { edit.YMiseSample(sample); return nil })
 	case "sample-save":
 		a.beginFileBrowser("Save signed PCM sample", fmt.Sprintf("sample-%d.pcm", a.sample+1), true)
 	case "sample-preview":
@@ -204,6 +210,29 @@ func (a *App) soundModal(modal, entry string) bool {
 		return true
 	}
 	switch modal {
+	case "Modify sequence (first,last,offset,scale)":
+		parts := strings.Split(entry, ",")
+		if len(parts) != 4 {
+			a.status = "Enter decimal first,last,offset,scale"
+			return true
+		}
+		first, e1 := strconv.Atoi(strings.TrimSpace(parts[0]))
+		last, e2 := strconv.Atoi(strings.TrimSpace(parts[1]))
+		offset, e3 := strconv.Atoi(strings.TrimSpace(parts[2]))
+		scale, e4 := strconv.ParseFloat(strings.TrimSpace(parts[3]), 64)
+		if e1 != nil || e2 != nil || e3 != nil || e4 != nil {
+			a.status = "Enter decimal first,last,offset,scale"
+			return true
+		}
+		e, _ := a.synth.Snapshot()
+		sequence := e.Project.Bank.Sequences[a.sequence]
+		if err := edit.ModifySequence(&sequence, first, last, offset, scale, a.generatorSigned); err != nil {
+			a.status = err.Error()
+		} else {
+			a.remember()
+			a.synth.Edit(func(e *replay.Engine) { e.Project.Bank.Sequences[a.sequence] = sequence })
+			a.dirty, a.status = true, "Sequence range modified"
+		}
 	case "Copy instrument (destination 01–20)":
 		to, err := strconv.ParseUint(entry, 16, 8)
 		if err != nil || to < 1 || to > 32 {

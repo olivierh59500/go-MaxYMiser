@@ -21,7 +21,7 @@ type InstrumentFile struct {
 
 // Legacy MYI0 samples contain four-bit DAC levels and a negative end marker.
 // This conversion matches the original editor's inverse DAC table.
-var legacyDACPCM = [16]byte{128, 129, 130, 132, 133, 135, 138, 142, 148, 157, 170, 189, 216, 7, 82, 127}
+var legacyDACPCM = model.DACPCM
 
 func DecodeInstrument(data []byte) (InstrumentFile, error) {
 	var file InstrumentFile

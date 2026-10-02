@@ -413,6 +413,7 @@ func (a *App) drawSamples(dst *ebiten.Image, e *replay.Engine) {
 	a.btn(dst, "Tune", 710, 570, 116, 38, "sample-tune", false)
 	a.btn(dst, "Trim", 838, 570, 116, 38, "sample-trim", false)
 	a.btn(dst, "Sign / unsign", 966, 570, 160, 38, "sample-sign", false)
+	a.btn(dst, "YMise", 1140, 570, 94, 38, "sample-ymise", false)
 	a.btn(dst, "Save PCM", 42, 622, 150, 34, "sample-save", false)
 	a.btn(dst, "Preview", 208, 622, 128, 34, "sample-preview", false)
 	a.text(dst, "Tune: semitones (0.125 = fine step) · Trim: start,length in bytes · Ctrl+Z undoes edits.", 354, 636, 11, dim)

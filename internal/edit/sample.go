@@ -66,3 +66,13 @@ func ToggleSampleSign(sample *model.Sample) {
 	}
 	replaceSample(sample, pcm)
 }
+
+// YMiseSample round-trips through the original YM four-bit DAC mapping so PCM
+// playback reproduces the quantized DigiDrum character of the native editor.
+func YMiseSample(sample *model.Sample) {
+	pcm := make([]byte, len(sample.PCM))
+	for i, value := range sample.PCM {
+		pcm[i] = model.DACPCM[model.DACLevels[value]]
+	}
+	replaceSample(sample, pcm)
+}

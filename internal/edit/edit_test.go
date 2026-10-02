@@ -21,6 +21,20 @@ func TestGeneratedEnvelopeAndSignedVibratoHaveUsefulEndpoints(t *testing.T) {
 	}
 }
 
+func TestSequenceModificationKeepsLoopAndUnselectedWords(t *testing.T) {
+	sequence := model.Sequence{Length: 4, Repeat: 1, Values: [63]uint16{65532, 2, 8, 9}}
+	if err := ModifySequence(&sequence, 0, 2, 1, 2, true); err != nil {
+		t.Fatal(err)
+	}
+	if int16(sequence.Values[0]) != -7 || sequence.Values[1] != 5 || sequence.Values[2] != 17 || sequence.Values[3] != 9 || sequence.Repeat != 1 {
+		t.Fatal("range modification lost signed values, boundaries or loop")
+	}
+	before := sequence
+	if err := ModifySequence(&sequence, 0, 4, 0, 1, true); err == nil || sequence != before {
+		t.Fatal("invalid range partly modified a sequence")
+	}
+}
+
 func TestMorphPreservesEndpointsAndInterpolatesSignedWords(t *testing.T) {
 	var bank model.VoiceBank
 	bank.Sequences[1] = model.Sequence{Length: 2, Repeat: 1, Values: [63]uint16{65528, 4}}

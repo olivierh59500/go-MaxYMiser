@@ -33,9 +33,11 @@ trying the editor. External MaxYMiser files are not needed to launch it.
   **Copy** duplicates a sound while retaining its shared sequence/sample links.
 - **Sequences**: up to 256 native 16-bit sequences, with length and repeat,
   ramp/triangle/sine/square generation, signed words, copying and morphing.
+  **Modify range** adds or scales selected words without changing loop metadata.
 - **Samples**: eight banks of signed PCM, with raw PCM and 8/16-bit WAV import,
   gain, tuning with interpolation, trimming, sign conversion, PCM save and
   independent preview.
+  **YMise** quantizes a sample using the original editor's YM DAC tables.
 - **Edit**: row ranges, masked block copy/cut/paste with overwrite/overlay/underlay,
   row insertion/deletion, expand/shrink, transposition, attenuation and sound remap.
   Sound remapping can cover the current block or every arrangement pattern

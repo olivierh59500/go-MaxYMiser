@@ -356,7 +356,7 @@ func (s *Synth) runTimer(ch int) {
 			if at >= len(pcm) {
 				t.digi = false
 			} else {
-				level = int(digiLevels[pcm[at]])
+				level = int(model.DACLevels[pcm[at]])
 				level = max(0, level+t.digiVolume-15)
 				t.digiPosition += t.digiRate
 			}

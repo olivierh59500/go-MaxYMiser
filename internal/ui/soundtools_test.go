@@ -107,3 +107,23 @@ func TestMYIButtonsSaveAndImportAnIndependentSound(t *testing.T) {
 		t.Fatal("MYI import could not be undone")
 	}
 }
+
+func TestYMiseSampleOperationCanBeUndone(t *testing.T) {
+	p := model.New()
+	p.Bank.Samples[0].PCM = []byte{0, 50, 83, 128, 190, 255}
+	app, err := New(p, "", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer app.Close()
+	app.action("sample-ymise")
+	e, _ := app.synth.Snapshot()
+	if e.Project.Bank.Samples[0].PCM[0] != 7 || e.Project.Bank.Samples[0].PCM[3] != 128 {
+		t.Fatal("YMise did not use native DAC quantization")
+	}
+	app.restore(false)
+	e, _ = app.synth.Snapshot()
+	if e.Project.Bank.Samples[0].PCM[0] != 0 || e.Project.Bank.Samples[0].PCM[1] != 50 {
+		t.Fatal("YMise could not be undone")
+	}
+}

@@ -86,3 +86,24 @@ func MorphSequences(bank *model.VoiceBank, first, last int, signed bool) error {
 	bank.SequenceCount = max(bank.SequenceCount, last+1)
 	return nil
 }
+
+// ModifySequence adds or scales a selected word range without changing loop
+// metadata. It saturates in the selected signed/unsigned native word domain.
+func ModifySequence(sequence *model.Sequence, first, last, offset int, scale float64, signed bool) error {
+	if first < 0 || last < first || last >= int(sequence.Length) || last >= 63 || math.IsNaN(scale) || math.IsInf(scale, 0) || scale < 0 || scale > 64 {
+		return fmt.Errorf("edit: invalid sequence modification range or scale")
+	}
+	minimum, maximum := 0, 65535
+	if signed {
+		minimum, maximum = -32768, 32767
+	}
+	for i := first; i <= last; i++ {
+		value := int(sequence.Values[i])
+		if signed {
+			value = int(int16(sequence.Values[i]))
+		}
+		value = int(math.Round(float64(value)*scale)) + offset
+		sequence.Values[i] = uint16(max(minimum, min(maximum, value)))
+	}
+	return nil
+}
