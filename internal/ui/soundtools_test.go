@@ -80,15 +80,17 @@ func TestMYIImportRetainsScoreOnlySequenceAndLiveSampleReferences(t *testing.T) 
 	app.modal, app.entry = "Load instrument (.myi)", path
 	app.applyModal()
 	e, _ := app.synth.Snapshot()
-	if e.Project.Bank.Instruments[7].Name() != "Imported" || e.Project.Bank.Instruments[7][48] != 6 || e.Project.Bank.Instruments[7][36] != 3 {
-		t.Fatalf("MYI allocation ignored score/live references: %s", app.status)
+	// State[7] also retains PCM pattern zero. Its second sample lane refers
+	// to slot 3, so MIDI slot 1, live slot 2 and saved slot 3 all stay reserved.
+	if e.Project.Bank.Instruments[7].Name() != "Imported" || e.Project.Bank.Instruments[7][48] != 6 || e.Project.Bank.Instruments[7][36] != 4 {
+		t.Fatalf("MYI allocation ignored score/live references: name=%q sequence=%d sample=%d; %s", e.Project.Bank.Instruments[7].Name(), e.Project.Bank.Instruments[7][48], e.Project.Bank.Instruments[7][36], app.status)
 	}
-	if e.Project.Bank.Sequences[3].Values[0] != 0 || e.Project.Bank.Sequences[4].Values[0] != 0 || e.Project.Bank.Sequences[5].Values[0] != 0 || len(e.Project.Bank.Samples[1].PCM) != 0 {
+	if e.Project.Bank.Sequences[3].Values[0] != 0 || e.Project.Bank.Sequences[4].Values[0] != 0 || e.Project.Bank.Sequences[5].Values[0] != 0 || len(e.Project.Bank.Samples[1].PCM) != 0 || len(e.Project.Bank.Samples[2].PCM) != 0 {
 		t.Fatal("MYI import overwrote a referenced empty definition")
 	}
 	app.restore(false)
 	e, _ = app.synth.Snapshot()
-	if e.Project.Bank.Instruments[7].Name() != "" || len(e.Project.Bank.Samples[2].PCM) != 0 || e.Project.Song.Patterns[0][0].Parameter1 != 3 {
+	if e.Project.Bank.Instruments[7].Name() != "" || len(e.Project.Bank.Samples[3].PCM) != 0 || e.Project.Song.Patterns[0][0].Parameter1 != 3 {
 		t.Fatal("undo did not restore the pre-import bank and score references")
 	}
 }
