@@ -9,7 +9,44 @@ import (
 
 	"github.com/olivierh59500/go-MaxYMiser/internal/model"
 	"github.com/olivierh59500/go-MaxYMiser/internal/native"
+	"github.com/olivierh59500/go-MaxYMiser/internal/replay"
 )
+
+func TestWAVReExportKeepsLivePlaybackAndUsesTheCurrentScore(t *testing.T) {
+	app, err := New(model.Demo(), "current.mys", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer app.Close()
+	app.synth.Edit(func(e *replay.Engine) { e.Play(false) })
+	path := filepath.Join(t.TempDir(), "mix.wav")
+	for iteration := 0; iteration < 2; iteration++ {
+		app.synth.Edit(func(e *replay.Engine) { e.Project.Song.Patterns[0][0].Note = byte(60 + iteration*12) })
+		app.dirty = true
+		app.exportDuration = time.Duration(30-iteration*10) * time.Millisecond
+		app.modal, app.entry = "Export WAV", path
+		app.applyModal()
+		deadline := time.Now().Add(5 * time.Second)
+		for !app.pollExportResult() {
+			if time.Now().After(deadline) {
+				t.Fatal("bounded re-export did not finish")
+			}
+			time.Sleep(time.Millisecond)
+		}
+		if app.exporting || app.status != "WAV export complete" {
+			t.Fatalf("re-export failed or did not release the renderer: %s", app.status)
+		}
+		raw, err := os.ReadFile(path)
+		frames := int64(app.exportDuration) * 48000 / int64(time.Second)
+		if err != nil || int64(len(raw)) != 44+frames*4 {
+			t.Fatalf("re-export did not replace the chosen duration: %v", err)
+		}
+		e, _ := app.synth.Snapshot()
+		if !e.Playing || !app.dirty || app.projectPath != "current.mys" || e.Project.Song.Patterns[0][0].Note != byte(60+iteration*12) {
+			t.Fatal("background export changed live playback, score edits or save state")
+		}
+	}
+}
 
 func TestWAVExportUsesChosenDurationAndLeavesEditorUsable(t *testing.T) {
 	app, err := New(model.Demo(), "", true)

@@ -18,7 +18,7 @@ import (
 func main() {
 	song := flag.String("song", "", "native MYS file")
 	bank := flag.String("bank", "", "native MYV bank")
-	wav := flag.String("wav", "", "new WAV output path")
+	wav := flag.String("wav", "", "WAV output path; existing regular files are replaced after complete rendering")
 	sndh := flag.String("sndh", "", "native SNDH output path")
 	template := flag.String("template", "", "existing MaxYMiser SNDH replay template")
 	ice := flag.Bool("ice", false, "ICE-compress native SNDH output")

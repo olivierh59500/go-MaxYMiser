@@ -4,11 +4,12 @@ package export
 import (
 	"encoding/binary"
 	"fmt"
-	"github.com/olivierh59500/go-MaxYMiser/internal/model"
-	"github.com/olivierh59500/go-MaxYMiser/internal/replay"
 	"io"
-	"os"
 	"time"
+
+	"github.com/olivierh59500/go-MaxYMiser/internal/model"
+	"github.com/olivierh59500/go-MaxYMiser/internal/project"
+	"github.com/olivierh59500/go-MaxYMiser/internal/replay"
 )
 
 func WAV(p *model.Project, path string, duration time.Duration) error {
@@ -37,17 +38,6 @@ func writeAudio(reader io.Reader, path string, duration time.Duration) error {
 	rate := 48000
 	frames := int64(duration) * int64(rate) / int64(time.Second)
 	length := frames * 4
-	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0644)
-	if err != nil {
-		return err
-	}
-	success := false
-	defer func() {
-		f.Close()
-		if !success {
-			os.Remove(path)
-		}
-	}()
 	header := make([]byte, 44)
 	copy(header, "RIFF")
 	binary.LittleEndian.PutUint32(header[4:], uint32(length+36))
@@ -61,27 +51,22 @@ func writeAudio(reader io.Reader, path string, duration time.Duration) error {
 	binary.LittleEndian.PutUint16(header[34:], 16)
 	copy(header[36:], "data")
 	binary.LittleEndian.PutUint32(header[40:], uint32(length))
-	if _, err = f.Write(header); err != nil {
-		return err
-	}
-	buffer := make([]byte, 4096*4)
-	for left := frames; left > 0; {
-		count := min(left, 4096)
-		chunk := buffer[:count*4]
-		if _, err = io.ReadFull(reader, chunk); err != nil {
+	return project.WriteFileAtomically(path, func(w io.Writer) error {
+		if _, err := w.Write(header); err != nil {
 			return err
 		}
-		if _, err = f.Write(chunk); err != nil {
-			return err
+		buffer := make([]byte, 4096*4)
+		for left := frames; left > 0; {
+			count := min(left, 4096)
+			chunk := buffer[:count*4]
+			if _, err := io.ReadFull(reader, chunk); err != nil {
+				return err
+			}
+			if _, err := w.Write(chunk); err != nil {
+				return err
+			}
+			left -= count
 		}
-		left -= count
-	}
-	if err = f.Sync(); err != nil {
-		return err
-	}
-	if err = f.Close(); err != nil {
-		return err
-	}
-	success = true
-	return nil
+		return nil
+	})
 }

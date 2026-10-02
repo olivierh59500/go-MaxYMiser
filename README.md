@@ -253,7 +253,10 @@ recording with the reconstructed candidate.
 ```
 
 The headless command requires no graphics window. WAV export produces stereo
-16-bit PCM at 48 kHz and refuses to overwrite an existing output file.
+16-bit PCM at 48 kHz. Re-exporting stages the complete replacement before
+updating an existing regular file, preserving its permissions. The preceding
+audio remains readable during rendering and is retained if reading, writing or
+committing the new output fails.
 The graphical editor renders WAVs in the background; choose the duration in
 **Settings → WAV export seconds** (up to one hour).
 The adjacent **Song** button measures one arrangement traversal to its first
@@ -263,7 +266,9 @@ receive the external timing. The measured traversal is not a
 claim that every oscillator or sample loops without a phase difference.
 The headless command exposes the same option as `-song-duration`, for WAV or
 SNDH exports. WAV rendering handles partial reader chunks and removes its own
-incomplete output on error.
+staged output on error. Directories and symbolic links are rejected before
+audio rendering starts. Editing and live playback remain independent of the
+background renderer; each export uses its captured composition or YM reference.
 
 ## YM reconstruction and composer profiles
 

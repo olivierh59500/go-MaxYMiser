@@ -36,3 +36,8 @@ See [replay verification](REPLAY_VERIFICATION.md).
 The individual MYI3 export has been opened in the original editor. Its instrument
 parameters, sequence remapping and embedded sample bytes were checked in memory.
 See [native formats](NATIVE_FORMATS.md) for layout and legacy loader details.
+
+WAV re-export streams to a staged file with bounded buffers, preserving the
+previous complete audio until the replacement is rendered and synced. Existing
+permissions are retained; failed reads/writes/commits leave the old output intact.
+The UI renderer keeps composition editing and live playback independent.

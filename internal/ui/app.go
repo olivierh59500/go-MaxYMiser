@@ -581,16 +581,7 @@ func (a *App) drawModal(dst *ebiten.Image) {
 }
 func (a *App) Update() error {
 	a.flushMIDIOutput()
-	select {
-	case result := <-a.exportResults:
-		a.exporting = false
-		if result != nil {
-			a.status = result.Error()
-		} else {
-			a.status = "WAV export complete"
-		}
-	default:
-	}
+	a.pollExportResult()
 	_, wheel := ebiten.Wheel()
 	if a.browser != nil {
 		a.browser.scroll = max(0, min(max(0, len(a.browser.entries)-10), a.browser.scroll-int(wheel)*3))

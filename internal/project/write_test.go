@@ -3,12 +3,38 @@ package project
 import (
 	"bytes"
 	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/olivierh59500/go-MaxYMiser/internal/native"
 )
+
+func TestStreamedFileCommitFailurePreservesTheCompleteOriginal(t *testing.T) {
+	root := t.TempDir()
+	path := filepath.Join(root, "output.wav")
+	old := []byte("previous complete audio")
+	if err := os.WriteFile(path, old, 0640); err != nil {
+		t.Fatal(err)
+	}
+	failure := errors.New("simulated streaming commit failure")
+	err := writeFileWithRename(path, func(w io.Writer) error {
+		_, err := io.WriteString(w, "fully rendered replacement audio")
+		return err
+	}, func(from, to string) error { return failure })
+	if !errors.Is(err, failure) {
+		t.Fatalf("stream commit failure was not returned: %v", err)
+	}
+	raw, err := os.ReadFile(path)
+	if err != nil || !bytes.Equal(raw, old) {
+		t.Fatalf("stream commit failure damaged the original: %v", err)
+	}
+	entries, err := os.ReadDir(root)
+	if err != nil || len(entries) != 1 {
+		t.Fatalf("failed stream commit left temporary files: %v", err)
+	}
+}
 
 func TestSingleFileCommitFailurePreservesThePreviousFile(t *testing.T) {
 	root := t.TempDir()
