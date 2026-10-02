@@ -62,6 +62,17 @@ func (s *Synth) StopYM() {
 	}
 	s.referencePlaying = false
 }
+
+// PauseReference keeps the register recording loaded while returning to the
+// current native transport state without resetting its position or voices.
+func (s *Synth) PauseReference() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.reference != nil {
+		s.reference.Pause()
+	}
+	s.referencePlaying, s.referenceActive = false, false
+}
 func (s *Synth) SeekYM(milliseconds uint32) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

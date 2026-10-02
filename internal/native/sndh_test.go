@@ -93,3 +93,30 @@ func TestSNDHRejectsInvalidPrefixWithoutMutatingTemplate(t *testing.T) {
 		t.Fatal("invalid metadata modified the source template")
 	}
 }
+
+func TestSNDHCompositionYearRoundTripsAndRejectsInvalidMetadata(t *testing.T) {
+	raw := syntheticSNDH(t, model.New())
+	copy(raw[86:90], "YEAR")
+	copy(raw[90:94], "2025")
+	raw[94] = 0
+	template, err := ParseSNDHTemplate(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := model.New()
+	p.Title = "Test title"
+	p.Author = "Test author"
+	p.Year = "2026"
+	encoded, err := EncodeSNDH(template, p, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := DecodeContainer(encoded)
+	if err != nil || got.Year != "2026" {
+		t.Fatalf("composition year did not survive SNDH export: %v", err)
+	}
+	p.Year = "20x6"
+	if _, err := EncodeSNDH(template, p, 0); err == nil {
+		t.Fatal("invalid composition year was exported")
+	}
+}

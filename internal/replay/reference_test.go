@@ -5,6 +5,22 @@ import (
 	"testing"
 )
 
+func TestPausingReferenceDoesNotRestartTheEditableNativeTransport(t *testing.T) {
+	e := New(model.Demo())
+	s := NewSynth(e, 48000)
+	raw := make([]byte, 4+14*100)
+	copy(raw, "YM3!")
+	if err := s.LoadYM(raw); err != nil {
+		t.Fatal(err)
+	}
+	e.Position, e.Row, e.TickInRow = 1, 17, 2
+	s.PauseReference()
+	r, ok := s.Reference()
+	if !ok || r.Active || r.Playing || e.Position != 1 || e.Row != 17 || e.TickInRow != 2 {
+		t.Fatal("pausing the register reference reset the native transport")
+	}
+}
+
 func TestYMReferenceLoadsWithoutReconstructingTrackerPatterns(t *testing.T) {
 	raw := append([]byte(nil), []byte("YM3!")...)
 	regs := [14]byte{28, 1, 0, 0, 0, 0, 0, 62, 15, 0, 0, 0, 0, 0}

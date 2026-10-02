@@ -102,6 +102,19 @@ func EncodeSNDH(template SNDHTemplate, project *model.Project, duration time.Dur
 	if err := setSNDHText(out, "COMM", project.Author); err != nil {
 		return nil, err
 	}
+	if project.Year != "" {
+		if len(project.Year) != 4 {
+			return nil, fmt.Errorf("native: composition year must contain four decimal digits")
+		}
+		for _, c := range project.Year {
+			if c < '0' || c > '9' {
+				return nil, fmt.Errorf("native: invalid composition year")
+			}
+		}
+		if err := setSNDHText(out, "YEAR", project.Year); err != nil {
+			return nil, err
+		}
+	}
 	if err := setSNDHRate(out, project.Song.TickRate()); err != nil {
 		return nil, err
 	}

@@ -276,6 +276,7 @@ func (a *App) drawPatterns(dst *ebiten.Image, e *replay.Engine) {
 	a.btn(dst, "+", 282, 199, 40, 32, "pat:+", false)
 	a.btn(dst, "Copy", 344, 199, 70, 32, "copy-pattern", false)
 	a.btn(dst, "Clear", 424, 199, 80, 32, "clear-pattern", false)
+	a.btn(dst, "Rec pattern", 516, 199, 128, 32, "record-pattern", a.editing && e.PatternMode)
 	a.btn(dst, "YM", 658, 199, 70, 32, "mode:ym", a.channel < 3)
 	a.btn(dst, "DMA", 738, 199, 80, 32, "mode:dma", a.channel == 3)
 	if a.channel == 3 {
@@ -291,10 +292,7 @@ func (a *App) drawPatterns(dst *ebiten.Image, e *replay.Engine) {
 	if selected >= len(p.Song.Patterns) {
 		selected = 0
 	}
-	start := max(0, min(44, a.row-10))
-	if e.Playing && !a.editing {
-		start = max(0, min(44, e.Row-10))
-	}
+	start := a.patternViewStart(e)
 	for visible := 0; visible < 20; visible++ {
 		row := start + visible
 		y := 280 + visible*19
@@ -476,6 +474,10 @@ func (a *App) drawSamples(dst *ebiten.Image, e *replay.Engine) {
 func (a *App) drawSettings(dst *ebiten.Image, e *replay.Engine) {
 	rect(dst, 24, 192, 1232, 482, panel)
 	a.text(dst, "PLAYBACK & EDITING", 42, 210, 16, fg)
+	a.btn(dst, "Year", 370, 205, 104, 28, "song-year", false)
+	if e.Project.Year != "" {
+		a.text(dst, e.Project.Year, 489, 214, 12, accent)
+	}
 	items := []struct{ label, value, action string }{{"Replay rate", fmt.Sprint(e.Project.Song.TickRate()), "rate"}, {"Ticks per row", fmt.Sprint(e.Speed), "speed"}, {"Keyboard octave", fmt.Sprint(a.octave), "octave"}, {"Edit step", fmt.Sprint(a.step), "step"}, {"Global volume", fmt.Sprint(e.MasterVolume), "master"}, {"Timer allocation", fmt.Sprintf("%X", e.TimerMask), "timers"}}
 	for i, v := range items {
 		y := 264 + i*57
@@ -491,6 +493,7 @@ func (a *App) drawSettings(dst *ebiten.Image, e *replay.Engine) {
 	a.btn(dst, "Load CNF", 870, 236, 160, 30, "config-load", false)
 	a.btn(dst, "Save CNF", 1044, 236, 160, 30, "config-save", false)
 	a.btn(dst, "Reload CNF", 1060, 205, 144, 28, "config-reload", a.nativeConfiguration[10] != 0)
+	a.btn(dst, "Follow rows", 670, 205, 180, 28, "pattern-scroll", e.Project.Song.State[11] != 0)
 	a.btn(dst, "Controllers", 870, 205, 174, 28, "midi-controllers", e.Project.Song.State[31]&4 != 0)
 	modes := []string{"Disabled", "One voice", "Two voices", "Native STe rate", "MIDI output"}
 	mode := int(e.Project.Song.State[49])
@@ -646,6 +649,10 @@ midiDone:
 	return nil
 }
 func (a *App) keyboard() {
+	if (a.tab == "Patterns" || a.tab == "Song") && inpututil.IsKeyJustPressed(ebiten.KeyShiftRight) {
+		a.togglePatternRecord()
+		return
+	}
 	if inpututil.IsKeyJustPressed(ebiten.KeyControlRight) {
 		a.action("pattern")
 		return
@@ -923,6 +930,9 @@ func (a *App) enterField(r rune) {
 	}
 }
 func (a *App) action(name string) {
+	if a.modal == "" && a.yearAction(name) {
+		return
+	}
 	if a.modal == "" && a.sequenceClipboardAction(name) {
 		return
 	}
@@ -1260,6 +1270,18 @@ func (a *App) action(name string) {
 			}
 		})
 		a.status = "Recording notes into the playing native pattern"
+	case "record-pattern":
+		a.recordPattern()
+	case "pattern-scroll":
+		a.remember()
+		a.synth.Edit(func(e *replay.Engine) {
+			if e.Project.Song.State[11] == 0 {
+				e.Project.Song.State[11] = 255
+			} else {
+				e.Project.Song.State[11] = 0
+			}
+		})
+		a.dirty = true
 	case "pat:+":
 		a.nextEditablePattern(1)
 	case "pat:-":
@@ -1360,6 +1382,9 @@ func (a *App) applyModal() {
 	}
 	modal, entry := a.modal, strings.TrimSpace(a.entry)
 	a.modal = ""
+	if a.yearModal(modal, entry) {
+		return
+	}
 	if a.arrangementModal(modal, entry) {
 		return
 	}
@@ -1639,10 +1664,7 @@ func (a *App) drawDMAPattern(dst *ebiten.Image, e *replay.Engine) {
 	}
 	a.text(dst, "STe A     NOTE SAMPLE VOL", 94, 248, 13, accent)
 	a.text(dst, "STe B     NOTE SAMPLE VOL", 516, 248, 13, purple)
-	start := max(0, min(44, a.row-10))
-	if e.Playing && !a.editing {
-		start = max(0, min(44, e.Row-10))
-	}
+	start := a.patternViewStart(e)
 	for visible := 0; visible < 20; visible++ {
 		row := start + visible
 		y := 280 + visible*19

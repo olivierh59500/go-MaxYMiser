@@ -127,6 +127,10 @@ mode. F9 maps note keys to instruments played at middle C. **Help** provides
 separate keyboard, effects, instruments, native format/YM and MIDI references.
 MIDI notes received in Record/Edit are written into the mapped voice's native
 pattern columns and participate in undo, including same-note retriggers.
+**Rec pattern** in Patterns records the selected pattern combination. Right
+Shift starts pattern recording while stopped, or toggles recording during
+playback without restarting the transport. **Follow rows** in Settings follows
+the native saved Scroll preference for YM and PCM views.
 While playback is running, **Pattern**, **Song** and **Record** switch modes
 without restarting the row, envelope state or audio. In song mode, pressing
 **Song** again stops playback.
@@ -146,6 +150,9 @@ Sample preview uses the Go PCM voice and native note-rate table: 8287 Hz at C3
 and 16574 Hz at C4. Notes above the native range wrap down by octaves.
 Title and artist are runtime/export metadata; the separate native MYS/MYV format
 does not contain SNDH title/artist tags.
+**Settings → Year** edits the four-digit composition year. Own SNDH imports
+retain this tag, SNDH exports write it, and native CNF keeps the same four
+configuration bytes. MYS/MYV do not store the composition year.
 The **Edit** workspace applies operations to the pattern selected in **Patterns**.
 Full-track copy/paste starts at row zero; smaller blocks paste at the cursor.
 Expand/shrink keep displaced rows in the block clipboard. PCM transposition and

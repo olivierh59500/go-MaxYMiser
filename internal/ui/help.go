@@ -10,14 +10,14 @@ import (
 var helpTopics = []string{"Keyboard", "Effects", "Instruments", "Files / YM", "MIDI"}
 var helpText = [][]string{
 	{
-		"Space: song play/stop · Right Ctrl: pattern play · Enter: edit/preview",
+		"Space: song play/stop · Right Ctrl: pattern play · Right Shift: pattern record",
 		"Tab / Shift+Tab: track · arrows: cursor · Page Up/Down: 16 rows",
 		"F1–F8: octave · F9: percussion keyboard · F10: Jam · Shift+F10: disable Jam",
 		"Z S X D C V G B H N J M: lower octave · Q 2 W 3 E R 5 T 6 Y 7 U: upper",
 		"Caps Lock: note-off · Backspace: clear cell · Insert/Delete: insert/delete row",
 		"Ctrl+C/X/V: copy/cut/paste selected range · Ctrl+Z/Y: undo/redo",
 		"Ctrl+Left/Right: song position · Shift+Left/Right: live track pattern",
-		"Ctrl+O/S: open/save · Edit workspace: ranges, masks, transpose and remap",
+		"Enter: edit/preview · Ctrl+O/S: open/save · Ctrl+Shift+S: Save as",
 		"Hexadecimal values: notes use names; instrument IDs 01–20; sequences 00–FF",
 		"Volume: 0 loudest, F quietest · track mutes keep live notes available",
 	},
@@ -48,7 +48,7 @@ var helpText = [][]string{
 		"MYS stores arrangement/patterns; MYV instruments, sequences and samples.",
 		"Open MYS auto-loads matching MYV. MYI import allocates independent links.",
 		"Own MaxYMiser SNDH exposes subtunes; other players need a source decoder.",
-		"Native SNDH export needs a local replay template selected in Settings.",
+		"Native SNDH export needs a replay template; Settings edits composition year.",
 		"ICE applies to native saves; WAV export runs separately from playback.",
 		"YM records chip output. Reconstruction proposes data, not unique source recovery.",
 		"Range/grid selects a passage and row spacing; coarse grids can omit modulation.",

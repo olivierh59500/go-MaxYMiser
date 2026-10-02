@@ -68,7 +68,7 @@ func main() {
 		}
 		report.ReplayTemplates++
 		p := projects[0]
-		project := &model.Project{Title: p.Title, Author: p.Author, Song: p.Song, Bank: p.Bank}
+		project := &model.Project{Title: p.Title, Author: p.Author, Year: p.Year, Song: p.Song, Bank: p.Bank}
 		encoded, err := native.EncodeSNDH(template, project, 0)
 		if err != nil {
 			problem("export", err)
@@ -83,7 +83,7 @@ func main() {
 		newSong, _ := native.EncodeSong(got.Song)
 		bank, _ := native.EncodeVoiceBank(p.Bank)
 		newBank, _ := native.EncodeVoiceBank(got.Bank)
-		if !bytes.Equal(song, newSong) || !bytes.Equal(bank, newBank) || got.Title != p.Title || got.Author != p.Author {
+		if !bytes.Equal(song, newSong) || !bytes.Equal(bank, newBank) || got.Title != p.Title || got.Author != p.Author || got.Year != p.Year {
 			problem("round trip", fmt.Errorf("serialized editable data or metadata changed"))
 			return nil
 		}

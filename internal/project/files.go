@@ -35,7 +35,7 @@ func LoadSubtune(path string, index int) (*model.Project, error) {
 		return nil, fmt.Errorf("project: subtune %d is outside 1–%d", index, len(projects))
 	}
 	value := projects[index-1]
-	return (&model.Project{Title: value.Title, Author: value.Author, Song: value.Song, Bank: value.Bank, ReplaySource: append([]byte(nil), raw...)}).Clone(), nil
+	return (&model.Project{Title: value.Title, Author: value.Author, Year: value.Year, Song: value.Song, Bank: value.Bank, ReplaySource: append([]byte(nil), raw...)}).Clone(), nil
 }
 
 // LoadFS uses the same native decoding and paired-bank lookup for dropped
@@ -71,6 +71,7 @@ func loadWithReader(songPath, bankPath string, read func(string) ([]byte, error)
 			}
 			p.Song, p.Bank = embedded.Song, embedded.Bank
 			p.Title, p.Author = embedded.Title, embedded.Author
+			p.Year = embedded.Year
 			p.ReplaySource = append([]byte(nil), b...)
 			return p, nil
 		}

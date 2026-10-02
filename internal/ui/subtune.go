@@ -58,12 +58,13 @@ func (a *App) SelectSubtune(index int) error {
 		source = p.ReplaySource
 		a.subtunes[current].Song, a.subtunes[current].Bank = p.Song, p.Bank
 		a.subtunes[current].Title, a.subtunes[current].Author = p.Title, p.Author
+		a.subtunes[current].Year = p.Year
 	})
 	a.subtuneWorkspaces[current] = subtuneWorkspace{path: a.projectPath, dirty: a.dirty, undo: a.undo, redo: a.redo, pattern: a.pattern, row: a.row, channel: a.channel, initialized: true, replaySource: source}
 	value := a.subtunes[index]
 	workspace := a.subtuneWorkspaces[index]
 	source = workspace.replaySource
-	p := (&model.Project{Title: value.Title, Author: value.Author, Song: value.Song, Bank: value.Bank, ReplaySource: source}).Clone()
+	p := (&model.Project{Title: value.Title, Author: value.Author, Year: value.Year, Song: value.Song, Bank: value.Bank, ReplaySource: source}).Clone()
 	reloaded := a.reloadConfiguration(&p.Song)
 	a.synth.CloseYM()
 	a.synth.Edit(func(e *replay.Engine) { e.Stop(); e.Project = p; e.Reset() })

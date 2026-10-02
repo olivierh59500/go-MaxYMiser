@@ -21,6 +21,9 @@ func (a *App) LoadConfiguration(path string) error {
 	a.nativeConfiguration = config
 	a.configurationLoaded = true
 	a.synth.Edit(func(e *replay.Engine) { e.Stop(); config.Apply(&e.Project.Song); e.Reset() })
+	if year := string(config[13:17]); validCompositionYear(year) {
+		a.synth.Edit(func(e *replay.Engine) { e.Project.Year = year })
+	}
 	return nil
 }
 
@@ -68,6 +71,9 @@ func (a *App) configurationModal(modal, entry string) bool {
 	case "Save native configuration (.cnf)":
 		e, _ := a.synth.Snapshot()
 		config := native.CaptureConfiguration(e.Project.Song, a.nativeConfiguration)
+		if validCompositionYear(e.Project.Year) {
+			copy(config[13:17], e.Project.Year)
+		}
 		err := project.SaveConfiguration(config, entry)
 		if err != nil {
 			a.status = err.Error()

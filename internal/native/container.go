@@ -12,6 +12,7 @@ type EmbeddedProject struct {
 	Song              model.Song
 	Bank              model.VoiceBank
 	Title, Author     string
+	Year              string
 	Subtune, Subtunes int
 }
 
@@ -166,7 +167,7 @@ func DecodeContainers(data []byte) ([]EmbeddedProject, error) {
 				}
 				continue
 			}
-			projects = append(projects, EmbeddedProject{Song: song, Bank: voice, Title: containerText(plain, "TITL"), Author: containerText(plain, "COMM")})
+			projects = append(projects, EmbeddedProject{Song: song, Bank: voice, Title: containerText(plain, "TITL"), Author: containerText(plain, "COMM"), Year: containerText(plain, "YEAR")})
 			bankStarts = append(bankStarts, start)
 			usedSongs[songAt] = true
 			if len(insts) > 1 {

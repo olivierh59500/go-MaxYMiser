@@ -70,6 +70,7 @@ type VoiceBank struct {
 
 type Project struct {
 	Title, Author string
+	Year          string
 	Song          Song
 	Bank          VoiceBank
 	// ReplaySource is a locally supplied MaxYMiser SNDH used for native export.
@@ -80,6 +81,7 @@ type Project struct {
 func New() *Project {
 	p := &Project{Title: "Untitled", Song: Song{Version: 0, Length: 1, Patterns: make([]Pattern, 3)}, Bank: VoiceBank{Version: 1, SampleVersion: 1, SequenceCount: 16}}
 	p.Song.State[8] = 1
+	p.Song.State[11] = 255
 	p.Song.State[12] = 3
 	p.Song.State[36] = 7
 	p.Song.State[37] = 0
