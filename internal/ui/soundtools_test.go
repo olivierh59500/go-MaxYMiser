@@ -159,6 +159,38 @@ func TestSampleToolsKeepUndoAndSaveEditedPCM(t *testing.T) {
 	}
 }
 
+func TestSampleLengthEditCanBeUndoneAndInvalidInputKeepsTheBank(t *testing.T) {
+	p := model.Demo()
+	p.Bank.Samples[0].PCM = []byte{0, 127, 128, 255}
+	app, err := New(p, "", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer app.Close()
+	app.action("sample-length")
+	if app.entry != "4" {
+		t.Fatal("sample length control did not show the selected sample")
+	}
+	app.entry = "7"
+	app.applyModal()
+	e, _ := app.synth.Snapshot()
+	if !bytes.Equal(e.Project.Bank.Samples[0].PCM, []byte{0, 127, 128, 255, 0, 0, 0}) || !app.dirty {
+		t.Fatal("sample length input did not enter an editable change")
+	}
+	app.restore(false)
+	e, _ = app.synth.Snapshot()
+	if !bytes.Equal(e.Project.Bank.Samples[0].PCM, []byte{0, 127, 128, 255}) {
+		t.Fatal("sample resizing could not restore the prior payload")
+	}
+	app.action("sample-length")
+	app.entry = "32769"
+	app.applyModal()
+	e, _ = app.synth.Snapshot()
+	if len(e.Project.Bank.Samples[0].PCM) != 4 {
+		t.Fatal("oversized length input replaced the selected sample")
+	}
+}
+
 func TestMYIButtonsSaveAndImportAnIndependentSound(t *testing.T) {
 	app, err := New(model.Demo(), "", true)
 	if err != nil {

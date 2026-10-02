@@ -82,3 +82,29 @@ func TestSampleGainTuningTrimAndSignConversion(t *testing.T) {
 		t.Fatal("oversized tuning was not rejected without modifying the sample")
 	}
 }
+
+func TestSampleLengthRetainsPrefixAndPadsSignedSilence(t *testing.T) {
+	original := []byte{0, 127, 128, 255}
+	sample := model.Sample{PCM: original, Parameters: [4]byte{3, 4, 5, 6}, Trailer: []byte{128}}
+	if err := ResizeSample(&sample, 7); err != nil || !bytes.Equal(sample.PCM, []byte{0, 127, 128, 255, 0, 0, 0}) || sample.Parameters != ([4]byte{3, 4, 5, 6}) {
+		t.Fatalf("sample extension lost PCM or did not append signed silence: %v", err)
+	}
+	if !bytes.Equal(original, []byte{0, 127, 128, 255}) || !bytes.Equal(sample.Trailer, []byte{0}) {
+		t.Fatal("resizing altered its original storage or kept a stale native tail")
+	}
+	if err := ResizeSample(&sample, 2); err != nil || !bytes.Equal(sample.PCM, []byte{0, 127}) {
+		t.Fatalf("sample shortening changed its first bytes: %v", err)
+	}
+	if err := ResizeSample(&sample, 32768); err != nil || len(sample.PCM) != 32768 {
+		t.Fatalf("maximum native sample length was rejected: %v", err)
+	}
+	before := append([]byte(nil), sample.PCM...)
+	for _, length := range []int{-1, 32769} {
+		if err := ResizeSample(&sample, length); err == nil || !bytes.Equal(sample.PCM, before) {
+			t.Fatal("invalid sample length changed its previous PCM")
+		}
+	}
+	if err := ResizeSample(&sample, 0); err != nil || len(sample.PCM) != 0 {
+		t.Fatalf("zero-length sample could not be cleared: %v", err)
+	}
+}

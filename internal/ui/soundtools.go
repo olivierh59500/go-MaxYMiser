@@ -174,6 +174,9 @@ func (a *App) soundAction(name string) bool {
 		a.dirty = true
 	case "sample-tune":
 		a.modal, a.entry = "Tune sample (semitones)", "0.125"
+	case "sample-length":
+		e, _ := a.synth.Snapshot()
+		a.modal, a.entry = "Sample length (0–32768 bytes)", strconv.Itoa(len(e.Project.Bank.Samples[a.sample].PCM))
 	case "sample-trim":
 		e, _ := a.synth.Snapshot()
 		a.modal, a.entry = "Trim sample (start,length)", fmt.Sprintf("0,%d", len(e.Project.Bank.Samples[a.sample].PCM))
@@ -295,6 +298,13 @@ func (a *App) soundModal(modal, entry string) bool {
 			a.status = "Enter a decimal tuning in semitones"
 		} else {
 			a.editSample(func(sample *model.Sample) error { return edit.TuneSample(sample, semitones) })
+		}
+	case "Sample length (0–32768 bytes)":
+		length, err := strconv.Atoi(entry)
+		if err != nil {
+			a.status = "Enter a decimal sample length from 0 to 32768 bytes"
+		} else {
+			a.editSample(func(sample *model.Sample) error { return edit.ResizeSample(sample, length) })
 		}
 	case "Trim sample (start,length)":
 		parts := strings.Split(entry, ",")

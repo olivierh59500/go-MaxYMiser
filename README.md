@@ -51,6 +51,8 @@ trying the editor. External MaxYMiser files are not needed to launch it.
 - **Samples**: eight banks of signed PCM, with raw PCM and 8/16-bit WAV import,
   gain, tuning with interpolation, trimming, sign conversion, PCM save and
   independent preview.
+  **Length** changes the selected payload directly (0–32768 bytes), keeping its
+  prefix and extending with signed silence. The operation supports undo/redo.
   **YMise** quantizes a sample using the original editor's YM DAC tables.
 - **Edit**: row ranges, masked block copy/cut/paste with overwrite/overlay/underlay,
   row insertion/deletion, expand/shrink, transposition, attenuation and sound remap.

@@ -460,6 +460,7 @@ func (a *App) drawSamples(dst *ebiten.Image, e *replay.Engine) {
 	}
 	pcm := e.Project.Bank.Samples[a.sample].PCM
 	a.text(dst, fmt.Sprintf("Sample %d · %d bytes", a.sample+1, len(pcm)), 42, 305, 14, accent)
+	a.btn(dst, fmt.Sprintf("Length %d", len(pcm)), 410, 298, 208, 30, "sample-length", false)
 	rect(dst, 42, 348, 1192, 190, bg)
 	if len(pcm) > 1 {
 		for x := 0; x < 1190; x++ {

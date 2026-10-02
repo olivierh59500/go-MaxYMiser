@@ -59,6 +59,18 @@ func TrimSample(sample *model.Sample, start, length int) error {
 	return nil
 }
 
+// ResizeSample retains the existing prefix and pads a longer signed PCM sample
+// with zero-level silence. Native sample capacity is 32 KiB.
+func ResizeSample(sample *model.Sample, length int) error {
+	if length < 0 || length > 32768 {
+		return fmt.Errorf("edit: sample length must be between 0 and 32768 bytes")
+	}
+	pcm := make([]byte, length)
+	copy(pcm, sample.PCM)
+	replaceSample(sample, pcm)
+	return nil
+}
+
 func ToggleSampleSign(sample *model.Sample) {
 	pcm := append([]byte(nil), sample.PCM...)
 	for i := range pcm {
