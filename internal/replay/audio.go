@@ -32,6 +32,10 @@ type timer struct {
 	phase, frequency float64
 	step             int
 	digi             bool
+	digiSample       int
+	digiPosition     float64
+	digiRate         float64
+	digiVolume       int
 }
 type sampleVoice struct {
 	sample         int
@@ -176,19 +180,13 @@ func (s *Synth) configure() {
 		if kind == 13 {
 			sample := int(v.Parameters[20]) - 1
 			if sample >= 0 && sample < 8 && v.Triggered {
-				pcm := e.Project.Bank.Samples[sample].PCM
-				drum := make([]stsound.YmU8, len(pcm))
-				// Convert signed PCM to the chip's four-bit logarithmic DAC scale.
-				for i, b := range pcm {
-					amplitude := int(int8(b)) + 128
-					drum[i] = stsound.YmU8(amplitude*15/255) * 17
-				}
-				rate := 2457600 / (4 * max(1, int(v.Parameters[21])))
-				s.Chip.DrumStart(stsound.YmInt(ch), drum, stsound.YmU32(len(drum)), stsound.YmInt(rate))
-				t.digi = true
+				t.digiSample, t.digiPosition = sample, 0
+				t.digiRate = 2457600 / float64(4*max(1, int(v.Parameters[21]))) / float64(s.Rate)
+				t.digiVolume = int(e.Registers[8+ch])
+				t.digi = len(e.Project.Bank.Samples[sample].PCM) > 0
 			}
 		} else {
-			s.Chip.DrumStop(stsound.YmInt(ch))
+			t.digi = false
 		}
 	}
 	for ch := range 2 {
@@ -238,6 +236,25 @@ func timerFrequency(period uint16, kind byte, length int) float64 {
 
 func (s *Synth) runTimer(ch int) {
 	t := &s.timers[ch]
+	if t.kind == 13 {
+		level := max(0, min(15, t.digiVolume)-2)
+		if t.digiVolume == 15 {
+			level = 13
+		}
+		if t.digi {
+			pcm := s.Engine.Project.Bank.Samples[t.digiSample].PCM
+			at := int(t.digiPosition)
+			if at >= len(pcm) {
+				t.digi = false
+			} else {
+				level = int(digiLevels[pcm[at]])
+				level = max(0, level+t.digiVolume-15)
+				t.digiPosition += t.digiRate
+			}
+		}
+		s.Chip.WriteRegister(stsound.YmInt(8+ch), stsound.YmInt(level))
+		return
+	}
 	if t.frequency <= 0 {
 		return
 	}
@@ -291,6 +308,10 @@ func (s *Synth) runTimer(ch int) {
 			s.Chip.WriteRegister(13, stsound.YmInt(value&15))
 		case 1:
 			period := uint16(e.Registers[ch*2]) | uint16(e.Registers[ch*2+1])<<8
+			transpose := int(byte(value) & 127)
+			if transpose != 0 {
+				period = uint16(uint32(period) * uint32(table(fmScale[:], transpose)) >> 16)
+			}
 			s.Chip.WriteRegister(stsound.YmInt(ch*2), 0)
 			s.Chip.WriteRegister(stsound.YmInt(ch*2+1), 0)
 			s.Chip.WriteRegister(stsound.YmInt(ch*2), stsound.YmInt(period&255))

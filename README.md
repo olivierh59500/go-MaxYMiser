@@ -137,6 +137,8 @@ phrases and timbre differences, with source times for checking each example.
 This is a developer edition. The pattern engine includes sequence playback,
 both effect columns, shared YM noise/envelope behaviour, detune masks,
 portamento, arpeggios, slides, timer synthesis and two PCM sample voices.
+Pattern arpeggios add to instrument arpeggios, fixed periods retain masked
+vibrato, and DigiDrums use the native signed PCM-to-YM DAC mapping.
 
 The native timer paths are implemented in Go and feed the YM Player chip.
 Subsample timing, oscillator synchronisation, mixed timer combinations and STe

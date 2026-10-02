@@ -18,6 +18,7 @@ type Voice struct {
 	SlideRate, Slide, PortaRate, Porta int16
 	Extra                              [2]byte
 	ExtraStep                          int
+	SequenceArpeggio                   uint16
 	PWMRate                            int8
 	PWMOffset                          int16
 	PWMLocked                          bool
@@ -191,6 +192,7 @@ func (e *Engine) parse(ch int, cell model.Cell, muted bool) {
 			v.ColumnVolume, v.Transpose, v.NoiseTranspose = 0, 0, 0
 			v.Extra = [2]byte{}
 			v.ExtraStep = 0
+			v.SequenceArpeggio = 0
 			v.Slide, v.Porta, v.SlideRate, v.PortaRate = 0, 0, 0, 0
 			if porta {
 				v.Slide, v.Porta = oldSlide, oldPorta
@@ -367,6 +369,9 @@ func (e *Engine) sequence(v *Voice) {
 		disabled := number == 0 || (kind == 1 && v.Parameters[1] == 0) || (kind == 2 && v.Parameters[2] == 0) || (kind == 5 && v.Parameters[4] == 0)
 		if disabled {
 			v.Values[kind] = 0
+			if kind == 1 {
+				v.SequenceArpeggio = 0
+			}
 			v.SeqDone[kind] = true
 			continue
 		}
@@ -374,11 +379,17 @@ func (e *Engine) sequence(v *Voice) {
 		length := min(int(seq.Length), len(seq.Values))
 		if length <= 0 {
 			v.Values[kind] = 0
+			if kind == 1 {
+				v.SequenceArpeggio = 0
+			}
 			v.SeqDone[kind] = true
 			continue
 		}
 		index := min(v.SeqIndex[kind], length-1)
 		v.Values[kind] = seq.Values[index]
+		if kind == 1 {
+			v.SequenceArpeggio = v.Values[kind]
+		}
 		index++
 		if index >= length {
 			index = min(int(seq.Repeat), length-1)
@@ -388,24 +399,22 @@ func (e *Engine) sequence(v *Voice) {
 		}
 		v.SeqIndex[kind] = index
 	}
+	v.Values[1] = v.SequenceArpeggio
 	if v.Extra[0] != 0 || v.Extra[1] != 0 {
 		switch v.ExtraStep {
 		case 0:
-			v.Values[1] = 0
 		case 1:
-			v.Values[1] = uint16(v.Extra[0])
+			if v.Extra[0] == 15 {
+				v.Values[1] += uint16(v.Extra[1])
+				v.ExtraStep = -1
+			} else {
+				v.Values[1] += uint16(v.Extra[0])
+			}
 		case 2:
-			v.Values[1] = uint16(v.Extra[1])
+			v.Values[1] += uint16(v.Extra[1])
 		}
 		v.ExtraStep++
-		if v.Extra[0] == 15 || v.Extra[1] == 15 {
-			if v.Extra[0] == 15 {
-				v.Values[1] = uint16(v.Extra[1])
-			}
-			v.ExtraStep %= 2
-		} else {
-			v.ExtraStep %= 3
-		}
+		v.ExtraStep %= 3
 	}
 }
 func table(values []uint16, index int) uint16 {
@@ -420,57 +429,63 @@ func (e *Engine) Period(v *Voice, component int) uint16 {
 	}
 	bit := byte(1 << component)
 	p := v.Parameters
+	period, fixed := 0, false
 	if p[4]&bit != 0 {
 		if p[5]&bit != 0 && p[37] == 0 {
-			return uint16(p[23])<<8 | uint16(p[24])
+			period, fixed = int(p[23])<<8|int(p[24]), true
+		} else if v.Values[5] != 65535 {
+			period, fixed = int(v.Values[5]), true
 		}
-		if v.Values[5] != 65535 {
-			return v.Values[5]
+	}
+	if !fixed {
+		adjust := 0
+		if p[5]&bit != 0 && (component == 1 || p[25] == 0) {
+			adjust = int(int8(p[23]))
 		}
-	}
-	adjust := 0
-	if p[5]&bit != 0 {
-		adjust = int(int8(p[23]))
-	}
-	if p[1]&bit != 0 {
-		adjust += int(int16(v.Values[1]))
-	}
-	if p[3]&bit != 0 {
-		adjust += v.Transpose
-	}
-	index := int(v.Note) + adjust
-	period := int(table(tonePeriods[:], index))
-	if component == 1 {
-		period = int(table(envelopePeriods[:], index))
-	}
-	if component == 0 {
-		period = int(table(timerPeriods[:], index))
-	}
-	if component == 2 && p[25] != 0 {
-		period = int(table(envelopePeriods[:], index)) * 16
-	}
-	if p[0]&bit != 0 {
-		delta := int(v.Porta + v.Slide)
-		if adjust >= 0 {
-			scale := int(table(tuningScale[:], adjust))
-			if scale != 0 {
-				delta = delta * 32 / scale
+		if p[1]&bit != 0 {
+			adjust += int(int16(v.Values[1]))
+		}
+		if p[3]&bit != 0 {
+			adjust += v.Transpose
+		}
+		index := int(v.Note) + adjust
+		period = int(table(tonePeriods[:], index))
+		if component == 1 {
+			period = int(table(envelopePeriods[:], index))
+		}
+		if component == 0 {
+			period = int(table(timerPeriods[:], index))
+		}
+		if component != 1 && p[25] != 0 {
+			period = int(table(envelopePeriods[:], index)) * 16
+			if p[5]&bit != 0 {
+				coarse := int(int8(p[23]))
+				period = period * int(table(tuningScale[:], 36-coarse)) >> 8
 			}
-		} else {
-			delta = delta * int(table(tuningScale[:], -adjust)) / 32
 		}
-		if component == 1 {
-			delta = (delta >> 3) + 1
-			delta >>= 1
+		if p[0]&bit != 0 {
+			delta := int(v.Porta + v.Slide)
+			if adjust >= 0 {
+				scale := int(table(tuningScale[:], adjust))
+				if scale != 0 {
+					delta = delta * 32 / scale
+				}
+			} else {
+				delta = delta * int(table(tuningScale[:], -adjust)) / 32
+			}
+			if component == 1 {
+				delta = (delta >> 3) + 1
+				delta >>= 1
+			}
+			period += delta
 		}
-		period += delta
-	}
-	if p[5]&bit != 0 {
-		fine := int(int8(p[24]))
-		if component == 1 {
-			fine = ((fine >> 3) + 1) >> 1
+		if p[5]&bit != 0 {
+			fine := int(int8(p[24]))
+			if component == 1 {
+				fine = ((fine >> 3) + 1) >> 1
+			}
+			period -= fine
 		}
-		period -= fine
 	}
 	if p[2]&bit != 0 {
 		vibrato := int(int16(v.Values[2]))

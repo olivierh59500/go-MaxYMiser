@@ -190,3 +190,100 @@ func TestBothPCMSampleVoicesCanBePreviewedWithoutSongPlayback(t *testing.T) {
 		t.Fatal("stop did not silence a previewed PCM voice")
 	}
 }
+
+func TestExtraArpeggioAddsToTheInstrumentSequenceAndStartsAtBase(t *testing.T) {
+	p := model.New()
+	p.Bank.Instruments[0][49] = 3
+	p.Bank.Sequences[3] = model.Sequence{Length: 1, Values: [63]uint16{2}}
+	p.Song.Patterns[0][0] = model.Cell{Note: 60, Instrument: 1, Effect1: 'X', Parameter1: 0x47}
+	e := New(p)
+	e.Play(false)
+	for tick, expected := range []uint16{2, 6, 9, 2, 6, 9} {
+		e.Tick()
+		if e.Voices[0].Values[1] != expected {
+			t.Fatalf("tick %d: arpeggio=%d, want %d", tick, e.Voices[0].Values[1], expected)
+		}
+	}
+	p.Song.Patterns[0][0].Parameter1 = 0xfc
+	e.Reset()
+	e.Play(false)
+	for tick, expected := range []uint16{2, 14, 2, 14} {
+		e.Tick()
+		if e.Voices[0].Values[1] != expected {
+			t.Fatalf("two-step tick %d: arpeggio=%d, want %d", tick, e.Voices[0].Values[1], expected)
+		}
+	}
+}
+
+func TestDigiDrumUsesNativeDACLevelsAndAttenuationWithoutTriggerAllocations(t *testing.T) {
+	p := model.New()
+	p.Bank.Samples[0].PCM = []byte{128, 0, 83, 255}
+	p.Bank.Instruments[0][36] = 1
+	p.Bank.Sequences[2].Values[0] = 13
+	p.Song.Patterns[0][0] = model.Cell{Note: 60, Instrument: 1}
+	e := New(p)
+	e.Play(false)
+	s := NewSynth(e, 48000)
+	e.Tick()
+	s.configure()
+	timer := &s.timers[0]
+	for i, expected := range []int{0, 13, 15, 13} {
+		timer.digiPosition = float64(i)
+		s.runTimer(0)
+		if got := int(s.Chip.ReadRegister(8)); got != expected {
+			t.Fatalf("sample %d: DAC level=%d, want %d", i, got, expected)
+		}
+	}
+	timer.digiPosition, timer.digiVolume = 2, 10
+	s.runTimer(0)
+	if s.Chip.ReadRegister(8) != 10 {
+		t.Fatal("native drum attenuation was not applied")
+	}
+	timer.digiPosition = float64(len(p.Bank.Samples[0].PCM))
+	s.runTimer(0)
+	if timer.digi || s.Chip.ReadRegister(8) != 8 {
+		t.Fatal("sample ending did not stop at the attenuated central DAC level")
+	}
+	if allocations := testing.AllocsPerRun(20, func() {
+		e.Voices[0].Triggered = true
+		s.configure()
+	}); allocations != 0 {
+		t.Fatalf("drum retriggers allocate in the audio callback: %f", allocations)
+	}
+}
+
+func TestFixedPeriodsStillReceiveComponentMaskedVibrato(t *testing.T) {
+	e := New(model.New())
+	v := Voice{Note: 69}
+	v.Parameters[4], v.Parameters[2] = 7, 7
+	v.Values[5], v.Values[2] = 1000, 16
+	for component, expected := range []uint16{984, 999, 984} {
+		if got := e.Period(&v, component); got != expected {
+			t.Fatalf("fixed component %d=%d, want %d", component, got, expected)
+		}
+	}
+	v.Parameters[5], v.Parameters[23], v.Parameters[24] = 7, 1, 244
+	if got := e.Period(&v, 2); got != 484 {
+		t.Fatalf("scalar fixed frequency bypassed vibrato: %d", got)
+	}
+	v.Values[5], v.Parameters[5] = 65535, 0
+	if got := e.Period(&v, 2); got != 268 {
+		t.Fatalf("FFFF fixed sentinel did not restore pitched frequency: %d", got)
+	}
+}
+
+func TestBuzzerResolutionAppliesToSquareAndTimerWithCoarseDetune(t *testing.T) {
+	e := New(model.New())
+	v := Voice{Note: 69}
+	v.Parameters[25] = 1
+	for _, component := range []int{0, 2} {
+		if got := e.Period(&v, component); got != envelopePeriods[69]*16 {
+			t.Fatalf("component %d did not use buzzer resolution: %d", component, got)
+		}
+	}
+	v.Parameters[5], v.Parameters[23] = 5, 12
+	expected := uint16(int(envelopePeriods[69]) * 16 * int(tuningScale[24]) >> 8)
+	if got := e.Period(&v, 0); got != expected {
+		t.Fatalf("quantized coarse detune used an unrelated pitch table: %d want %d", got, expected)
+	}
+}
