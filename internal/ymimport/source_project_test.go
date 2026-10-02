@@ -53,7 +53,7 @@ func TestSourceExcerptNamesUnsupportedSoundsAndReportsUntranslatedCommands(t *te
 	if err != nil {
 		t.Fatal(err)
 	}
-	score.Instruments[3].Settings[0] = 0x25
+	score.Instruments[3].Settings[0] = 0x40
 	score.Patterns[0].Commands = append(score.Patterns[0].Commands, SourceCommand{Opcode: 0x88, Operand: []byte{1, 2, 3}})
 	p, report, err := SourceProject(score, 0, 25)
 	if err != nil || report.UnsupportedEvents != 12 || report.UntranslatedCommands[0x88] != 1 || p.Bank.Instruments[3].Name() != "Source 03 ?" {

@@ -139,10 +139,10 @@ Opening an unrelated native project, a YM or a new project clears the old source
 inspection. Dropped source SNDH files use the same inspection workflow.
 
 For the first 6,000 standard Last Ninja frames, conversion produces 86 generated
-patterns, 94 order positions and 36 sequences. Saving and reloading the native
+patterns, 94 order positions and 45 sequences. Saving and reloading the native
 pair retains all 1,561 note/rest events, including their source instrument IDs
 and timestamps, with an exact 120-second excerpt traversal. Of these events,
-61 notes use the two unsupported source sounds. Pattern commands 82 and 84
+No note events in this excerpt use an unsupported instrument. Pattern commands 82 and 84
 are translated for ordinary tone programs with a constant zero arpeggio. These
 data checks do not establish complete sound fidelity:
 unsupported definitions stay silent and marked `?`, while the translated sounds
@@ -210,8 +210,8 @@ instrument, channel, frame range, feature distance and competing-label margin.
 envelopes and arpeggios. Source ID zero maps to tracker instrument 01, and so
 on. Unsupported hardware programs retain their source data in the JSON and
 are listed in the separate MYV analysis report; they do not become invented
-generic instruments. Last Ninja currently yields 30 translated definitions
-and two unsupported ones. The original first-step envelope cadence is
+generic instruments. Last Ninja currently yields 32 translated definitions.
+The original first-step envelope cadence is
 preserved, including speed-zero envelopes advancing before the first output.
 Native execution checks covered 52 triggered notes and 1,186 volume-register
 values with no mismatches. Pattern-controlled vibrato and slides remain
@@ -228,8 +228,21 @@ mixer 3E from the second call, with no extra startup frame. The first noise writ
 is 2F; only its low five bits select the chip period, so the translated sequence
 uses 0F. The arpeggio and volume sequence continue independently. Synthetic
 round-trip and replay checks retain this timing without copying the original
-music into the repository. The remaining two definitions also combine native
-automatic pitch changes, which are not covered by this noise conversion.
+music into the repository.
+
+The two drum definitions also select automatic pitch programs: a one-semitone
+descent per replay call and a signed period accumulator advancing by +72.
+Original calls from a 477-period starting tone produce 578, 680 and 784 while
+the stored note descends and the accumulator reaches 72, 144 and 216. Mixer
+state follows the independent noise program.
+
+These programs become editable arpeggio and vibrato-word sequences for their
+finite audible duration. Conversion requires a zero source arpeggio and a final
+silent volume step; an unbounded audible tail remains unsupported. The last
+pitch value holds only after the volume becomes silent. Source-excerpt export
+also preserves the accumulator's phase across assigned sequence segments.
+MaxYMiser's base period-table rounding remains distinct from the source table,
+so the conversion does not claim identical hardware output at every note.
 
 Paired training also produces editable instrument recipes for registered
 volume, relative pitch, vibrato correction, mixer and noise sequences. Different

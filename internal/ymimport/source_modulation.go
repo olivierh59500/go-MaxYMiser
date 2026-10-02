@@ -115,6 +115,7 @@ func sourcePitchDeltas(score SourceScore) ([][3]int16, error) {
 	var state [3]sourceModulation
 	instrument := [3]int{-1, -1, -1}
 	note := [3]int{}
+	programAge := [3]int{}
 	eligible := [3]bool{}
 	for frame := range values {
 		for _, event := range events[frame] {
@@ -151,6 +152,9 @@ func sourcePitchDeltas(score SourceScore) ([][3]int16, error) {
 				state[channel].instrument(score.Instruments[event.Instrument].Settings)
 			}
 			definition := score.Instruments[event.Instrument]
+			if event.Retrigger {
+				programAge[channel] = 0
+			}
 			note[channel] = event.Note - 24
 			eligible[channel] = definition.Settings[0] == 0 && len(definition.Arpeggio.Values) == 1 && definition.Arpeggio.Values[0] == 0
 			state[channel].note(definition.Settings[4], event.Retrigger)
@@ -159,7 +163,13 @@ func sourcePitchDeltas(score SourceScore) ([][3]int16, error) {
 			delta := state[channel].periodDelta(note[channel])
 			if eligible[channel] {
 				values[frame][channel] = delta
+			} else if instrument[channel] >= 0 {
+				definition := score.Instruments[instrument[channel]]
+				if definition.Settings[0]&^0x3d == 0 && definition.Settings[0]&1 != 0 && sourceArpeggioIsZero(definition.Arpeggio) {
+					values[frame][channel] = int16(72 * (programAge[channel] + 1))
+				}
 			}
+			programAge[channel]++
 		}
 	}
 	return values, nil

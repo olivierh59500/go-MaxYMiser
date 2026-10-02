@@ -17,7 +17,7 @@ type SourceBankReport struct {
 // by a generic sound. The source ID maps to MaxYMiser's one-based ID+1.
 func SourceVoiceBank(score SourceScore) (model.VoiceBank, SourceBankReport, error) {
 	bank := model.VoiceBank{Version: 1, SampleVersion: 1, SequenceCount: 1}
-	report := SourceBankReport{Unsupported: map[int]string{}, Warnings: []string{"Converted definitions retain volume, arpeggio and validated noise-attack timing. Pattern-controlled vibrato, slides, other hardware programs and pitch-table rounding are not part of this bank conversion."}}
+	report := SourceBankReport{Unsupported: map[int]string{}, Warnings: []string{"Converted definitions retain volume, arpeggio, validated noise attacks and finite automatic pitch programs. Pattern-controlled vibrato/slides, other hardware programs and base period-table rounding remain separate from this bank conversion."}}
 	sequenceIDs := map[model.Sequence]byte{}
 	add := func(sequence model.Sequence) (byte, error) {
 		if id, ok := sequenceIDs[sequence]; ok {
@@ -38,8 +38,10 @@ func SourceVoiceBank(score SourceScore) (model.VoiceBank, SourceBankReport, erro
 		}
 		var reason string
 		switch {
-		case source.Settings[0]&^0x1c != 0:
+		case source.Settings[0]&^0x3d != 0:
 			reason = "native hardware-effect flags are not yet translated"
+		case source.Settings[0]&0x21 != 0 && (!sourceArpeggioIsZero(source.Arpeggio) || len(source.VolumeSequence) == 0 || source.VolumeSequence[len(source.VolumeSequence)-1] != 0):
+			reason = "automatic pitch program needs a zero arpeggio and finite silent tail"
 		case (source.Settings[0]&0x1c != 0 || len(source.NoiseProgram) > 0) && len(source.NoiseProgram) < 2:
 			reason = "native noise-program data is missing"
 		case source.Settings[1] >= 128:
@@ -97,6 +99,26 @@ func SourceVoiceBank(score SourceScore) (model.VoiceBank, SourceBankReport, erro
 			report.Unsupported[source.ID] = reason
 			continue
 		}
+		pitch := model.Sequence{Length: 1}
+		if source.Settings[0]&0x21 != 0 {
+			// Automatic programs are represented only through their verified
+			// finite audible duration. The silent tail holds the last value.
+			length := int(volume.Length)
+			if length < 1 || length > 63 {
+				report.Unsupported[source.ID] = "automatic pitch duration exceeds native sequence capacity"
+				continue
+			}
+			arpeggio = model.Sequence{Length: byte(length), Repeat: byte(length - 1)}
+			pitch = model.Sequence{Length: byte(length), Repeat: byte(length - 1)}
+			for frame := 0; frame < length; frame++ {
+				if source.Settings[0]&0x20 != 0 {
+					arpeggio.Values[frame] = uint16(int16(-frame - 1))
+				}
+				if source.Settings[0]&1 != 0 {
+					pitch.Values[frame] = uint16(int16(-72 * (frame + 1)))
+				}
+			}
+		}
 		mixer, noise := model.Sequence{Values: [63]uint16{0x100}, Length: 1}, model.Sequence{Length: 1}
 		if len(source.NoiseProgram) > 0 {
 			steps := source.NoiseProgram[1:]
@@ -120,11 +142,14 @@ func SourceVoiceBank(score SourceScore) (model.VoiceBank, SourceBankReport, erro
 				noise.Values[n] = uint16(step.Period & 31)
 			}
 		}
-		sequences := []model.Sequence{volume, arpeggio, mixer, noise}
+		sequences := []model.Sequence{volume, arpeggio, mixer, noise, pitch}
 		inst := &bank.Instruments[source.ID]
 		inst.SetName(fmt.Sprintf("Source %02X", source.ID))
 		inst[17], inst[19], inst[32] = 4, 4, 1
-		for n, offset := range []int{48, 49, 51, 52} {
+		if source.Settings[0]&1 != 0 {
+			inst[18] = 4
+		}
+		for n, offset := range []int{48, 49, 51, 52, 50} {
 			sequence := sequences[n]
 			id, err := add(sequence)
 			if err != nil {
@@ -135,4 +160,16 @@ func SourceVoiceBank(score SourceScore) (model.VoiceBank, SourceBankReport, erro
 		report.Converted = append(report.Converted, source.ID)
 	}
 	return bank, report, nil
+}
+
+func sourceArpeggioIsZero(sequence SourceSequence) bool {
+	if len(sequence.Values) == 0 {
+		return false
+	}
+	for _, value := range sequence.Values {
+		if value != 0 {
+			return false
+		}
+	}
+	return true
 }

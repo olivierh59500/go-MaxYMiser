@@ -106,6 +106,47 @@ func TestSourceBankRejectsUnsupportedHardwareWithoutInventingSounds(t *testing.T
 	}
 }
 
+func TestAutomaticPitchDrumRetainsItsAudibleSlideAndSemitoneDescent(t *testing.T) {
+	sound := SourceInstrument{ID: 0, Settings: []byte{0x31, 0, 0, 0, 0, 1}, VolumeSequence: []byte{15, 15, 0}, Arpeggio: SourceSequence{StepFrames: 1, Values: []int{0}, Repeat: 0}, NoiseProgram: []SourceNoiseStep{{1, 47}, {2, 47}, {2, 47}, {2, 47}, {3, 47}}}
+	bank, report, err := SourceVoiceBank(SourceScore{Instruments: []SourceInstrument{sound}})
+	if err != nil || len(report.Converted) != 1 || len(report.Unsupported) != 0 {
+		t.Fatalf("verified automatic drum remained unsupported: %+v %v", report, err)
+	}
+	p := model.New()
+	p.Bank = bank
+	e := replay.New(p)
+	e.Trigger(0, 60, 1)
+	for frame := 0; frame < 4; frame++ {
+		e.Tick()
+		if frame < 3 {
+			// Original native calls produce 578, 680, 784 from periods
+			// 506, 536, 568 plus accumulator values 72, 144, 216.
+			want := int(replay.TonePeriod(59-frame)) + 72*(frame+1)
+			period := int(e.Registers[0]) | int(e.Registers[1])<<8
+			if period != want || e.Registers[8] != 15 || e.Registers[7]&63 != 54 {
+				t.Fatalf("automatic drum call %d: period=%d volume=%d mixer=%02x", frame, period, e.Registers[8], e.Registers[7])
+			}
+		} else if e.Registers[8] != 0 {
+			t.Fatal("finite automatic program did not end in silence")
+		}
+	}
+	raw, err := native.EncodeVoiceBank(bank)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := native.DecodeVoiceBank(raw); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestAutomaticPitchProgramsRejectAnUnboundedAudibleTail(t *testing.T) {
+	sound := SourceInstrument{ID: 0, Settings: []byte{0x21, 0, 0, 0, 0, 1}, VolumeSequence: []byte{15}, Arpeggio: SourceSequence{StepFrames: 1, Values: []int{0}, Repeat: 0}}
+	bank, report, err := SourceVoiceBank(SourceScore{Instruments: []SourceInstrument{sound}})
+	if err != nil || report.Unsupported[0] == "" || bank.Instruments[0] != (model.Instrument{}) {
+		t.Fatal("an unbounded automatic program acquired a guessed finite loop")
+	}
+}
+
 func TestSourceArpeggioReadsHoldAndLoopAndRejectsBadPointers(t *testing.T) {
 	for _, end := range []byte{0x8e, 0x8f} {
 		b := sourceFixture()
