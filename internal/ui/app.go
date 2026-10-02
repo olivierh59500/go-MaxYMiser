@@ -25,6 +25,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 const width, height = 1280, 800
@@ -613,7 +614,8 @@ midiDone:
 			chars := ebiten.AppendInputChars(nil)
 			a.entry += string(chars)
 			if inpututil.IsKeyJustPressed(ebiten.KeyBackspace) && len(a.entry) > 0 {
-				a.entry = a.entry[:len(a.entry)-1]
+				_, size := utf8.DecodeLastRuneInString(a.entry)
+				a.entry = a.entry[:len(a.entry)-size]
 			}
 			if inpututil.IsKeyJustPressed(ebiten.KeyEscape) {
 				a.modal = ""
@@ -645,6 +647,15 @@ midiDone:
 			b := a.buttons[i]
 			if a.mouseX >= b.x && a.mouseX < b.x+b.w && a.mouseY >= b.y && a.mouseY < b.y+b.h {
 				a.action(b.action)
+				break
+			}
+		}
+	}
+	if a.modal == "" && inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonRight) {
+		for i := len(a.buttons) - 1; i >= 0; i-- {
+			b := a.buttons[i]
+			if a.mouseX >= b.x && a.mouseX < b.x+b.w && a.mouseY >= b.y && a.mouseY < b.y+b.h {
+				a.rightClickAction(b.action)
 				break
 			}
 		}
@@ -941,6 +952,9 @@ func (a *App) enterField(r rune) {
 	}
 }
 func (a *App) action(name string) {
+	if a.modal == "" && a.transportStartAction(name) {
+		return
+	}
 	if a.modal == "" && a.sourceAction(name) {
 		return
 	}

@@ -150,6 +150,8 @@ the native saved Scroll preference for YM and PCM views.
 While playback is running, **Pattern**, **Song** and **Record** switch modes
 without restarting the row, envelope state or audio. In song mode, pressing
 **Song** again stops playback.
+Right-click **Song** to restart from position 00 and row 00. Right-click
+**Pattern** to start the selected pattern combination at the cursor row.
 In Jam song mode, position changes wait for the current pattern boundary; the
 Song workspace shows the queued target. Jam pattern mode queues the selected
 track's next pattern. Repeated navigation adjusts the pending target, including

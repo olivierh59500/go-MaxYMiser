@@ -6,7 +6,7 @@ replay validation and hardware-specific integration.
 
 | Area | Implemented | Remaining verification or work |
 | --- | --- | --- |
-| Tracker | Three YM voices, two PCM voices, both effect columns, song/pattern recording, native Scroll control, masked block editing, transpose/remap, row tools, octave/percussion shortcuts and undo/redo | Final macOS display validation; further convenience shortcuts |
+| Tracker | Three YM voices, two PCM voices, both effect columns, song/pattern recording, native Scroll control, song-start/pattern-cursor playback, masked block editing, transpose/remap, row tools, octave/percussion shortcuts and undo/redo | Further convenience shortcuts |
 | Arrangement | Independent pattern lists, position insertion/deletion and clipboard ranges, occurrence cloning, length/repeat, Jam jumps, seamless song/pattern/record changes, sequencer-only mutes and validated pattern/sequence packing | Broader hardware-controlled live performance verification |
 | Instruments | 32 definitions, live scalar/mask editing, serialized sequence links, MYI exchange and copying | More native MYI legacy/sample fixtures |
 | Sequences | 256 sequences, live length/repeat/word edits, phase-preserving shared refresh, native clipboard shortcuts, generation, signed values, range modification and morphing | Further native timer phase comparisons |
@@ -15,7 +15,7 @@ replay validation and hardware-specific integration.
 | YM | YM Player reference playback, register inspector, candidate score with selection ranges/explicit grids, onset-alignment proposals, composer corpus, cross-arrangement comparison, verified source-labelled SNDH/YM profiles, source envelope/arpeggio/noise banks, explicit source inspection/editable excerpts with verified ordinary-tone vibrato/slide, measured instrument recipes and browsable source-pattern candidates | More source-player decoders, cross-song validation, original arrangement recovery, other source pattern effects and hardware-program reconstruction |
 | Replay | Sequences, commands, native frequency/DAC tables, timer waveforms, PCM note rates/modes | Broader full-song and mixed-timer evidence; sample-grid timer scheduling remains distinct from cycle-exact hardware |
 | MIDI | macOS notes, program changes, native controller enable/scales and editable bank changes, complete MMC play/stop, external clock/SPP with full replay cadence, Start/Continue latency compensation, channel/sound/DD mapping, duplicate-channel allocation, live PCM transpose/attenuation, selected CoreMIDI output ports, external-clock relay and native note/legato ordering | Physical Sync24 hardware; tighter output timestamp scheduling and physical-device timing measurements |
-| Workflow | Resizable interface, drag/drop, Save as, rollback-protected native pair saving, asynchronous robust WAV export, measured arrangement durations and selectable help | Platform-specific device and clipboard conveniences |
+| Workflow | Resizable interface, visually checked editor/source/file panels, Unicode field erasure, drag/drop, Save as, rollback-protected native pair saving, asynchronous robust WAV export, measured arrangement durations and selectable help | Platform-specific device and clipboard conveniences |
 
 Native register evidence currently includes 8,778 complete replay calls across
 the three supplied examples and isolated timer fixtures. The register checks

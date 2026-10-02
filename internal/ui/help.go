@@ -18,6 +18,7 @@ var helpText = [][]string{
 		"Ctrl+C/X/V: copy/cut/paste selected range · Ctrl+Z/Y: undo/redo",
 		"Ctrl+Left/Right: song position · Shift+Left/Right: live track pattern",
 		"Enter: edit/preview · Ctrl+O/S: open/save · Ctrl+Shift+S: Save as",
+		"Right-click Song: from beginning · right-click Pattern: from cursor row",
 		"Hexadecimal values: notes use names; instrument IDs 01–20; sequences 00–FF",
 		"Volume: 0 loudest, F quietest · track mutes keep live notes available",
 	},

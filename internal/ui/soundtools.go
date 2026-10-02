@@ -54,7 +54,7 @@ func (a *App) drawSequenceTools(dst *ebiten.Image, e *replay.Engine) {
 	a.btn(dst, "Destination "+a.morphDestination, 310, 557, 204, 34, "gen-field:destination", false)
 	a.btn(dst, "Morph between", 530, 557, 198, 34, "gen-morph", false)
 	a.btn(dst, "Copy to destination", 742, 557, 246, 34, "gen-copy", false)
-	a.text(dst, "Morph fills the intervening sequence IDs. Endpoints keep their data; lengths and repeat must match.", 42, 621, 12, dim)
+	a.text(dst, "Morph fills the intervening sequence IDs. Endpoints keep their data; lengths and repeat must match.", 42, 606, 12, dim)
 	a.text(dst, "Ctrl+Z undoes sequence edits.", 410, 647, 12, dim)
 }
 

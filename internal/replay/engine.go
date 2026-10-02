@@ -108,6 +108,17 @@ func (e *Engine) Play(pattern bool) {
 	e.rowParsed, e.clockPulses = false, 0
 }
 
+// PlayFrom starts a selected row without replacing the live pattern combination
+// in pattern mode. The caller chooses whether to stop existing voices first.
+func (e *Engine) PlayFrom(pattern bool, row int) bool {
+	if row < 0 || row >= model.Rows {
+		return false
+	}
+	e.Play(pattern)
+	e.Row = row
+	return true
+}
+
 // Continue preserves the current row and replay phase for MIDI transport.
 func (e *Engine) Continue() {
 	e.Playing = true

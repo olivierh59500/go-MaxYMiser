@@ -82,3 +82,29 @@ func TestNativeScrollPreferenceControlsTheViewWithoutChangingPlayback(t *testing
 		t.Fatal("fixed view moved with the playback row")
 	}
 }
+
+func TestNativeRightClickStartsFromTheSongBeginningOrSelectedPatternRow(t *testing.T) {
+	app, err := New(model.Demo(), "", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer app.Close()
+	app.action("play")
+	app.synth.Edit(func(e *replay.Engine) { e.SelectPosition(2); e.Row = 31; e.Jam = true; e.SelectPosition(1) })
+	app.rightClickAction("play")
+	e, _ := app.synth.Snapshot()
+	if !e.Playing || e.PatternMode || e.Position != 0 || e.Row != 0 || e.PositionQueued {
+		t.Fatal("right-click song retained its old position or pending Jam jump")
+	}
+	app.pattern, app.row, app.channel = 3, 17, 0
+	app.rightClickAction("pattern")
+	e, _ = app.synth.Snapshot()
+	if !e.Playing || !e.PatternMode || e.Row != 17 || e.Patterns[0] != 3 || e.TickInRow != 0 {
+		t.Fatal("right-click pattern did not start the selected row and combination")
+	}
+	app.synth.Edit(func(e *replay.Engine) { e.Tick() })
+	e, _ = app.synth.Snapshot()
+	if e.Voices[0].Note != 0 {
+		t.Fatal("cursor start replayed earlier rows before the selected row")
+	}
+}
