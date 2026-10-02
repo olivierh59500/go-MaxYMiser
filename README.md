@@ -61,6 +61,10 @@ trying the editor. External MaxYMiser files are not needed to launch it.
   **All columns** enables or disables the complete copy/paste mask.
   **Pack project** removes duplicate pattern/sequence definitions and remaps their
   references, including sequence-selection commands in both effect columns.
+  PCM roles remain protected in all stored positions, saved editor selections,
+  disabled tracks and independently edited/live/queued combinations. A shared
+  YM/PCM definition that would require conflicting byte changes is left intact
+  and reported instead of being packed. The operation supports undo.
   **Clear song** empties notes and arrangement while keeping the sound bank,
   composition metadata and playback/edit settings. **Clear bank** empties the
   instruments, sequences and eight sample banks while keeping the partition.

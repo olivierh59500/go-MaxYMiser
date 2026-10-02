@@ -15,6 +15,15 @@ type PackResult struct {
 // instrument links and both sequence-select effect columns. Sample and
 // instrument data are not removed. This is a transaction on a cloned project.
 func PackProject(project *model.Project) (PackResult, error) {
+	return PackProjectWithSelections(project)
+}
+
+// PackProjectWithSelections also protects the track roles of live, queued or
+// independently edited pattern combinations that are not saved in the song.
+func PackProjectWithSelections(project *model.Project, selections ...[4]byte) (PackResult, error) {
+	if project == nil {
+		return PackResult{}, fmt.Errorf("edit: no project to pack")
+	}
 	p := project.Clone()
 	result := PackResult{PatternsBefore: len(p.Song.Patterns), SequencesBefore: p.Bank.SequenceCount}
 	if len(p.Song.Patterns) > model.MaxPatterns || p.Bank.SequenceCount < 1 || p.Bank.SequenceCount > model.MaxSequences {
@@ -22,21 +31,34 @@ func PackProject(project *model.Project) (PackResult, error) {
 	}
 	var patternMap [240]byte
 	var sourceRoles [240]byte
-	for _, order := range p.Song.Orders[:p.Song.Length] {
+	markRole := func(channel int, id byte) {
+		if int(id) >= len(p.Song.Patterns) {
+			return
+		}
+		if channel == 3 {
+			sourceRoles[id] |= 2
+		} else {
+			sourceRoles[id] |= 1
+		}
+	}
+	// Stored positions and both native editor snapshots can be used later,
+	// including when PCM is currently disabled. They retain their track roles.
+	for position, order := range p.Song.Orders {
 		for channel, id := range order {
-			if channel == 3 && p.Song.State[49] == 0 {
-				continue
+			if position < int(p.Song.Length) && (channel < 3 || p.Song.State[49] != 0) && id < 240 && int(id) >= len(p.Song.Patterns) {
+				return result, fmt.Errorf("edit: active song track refers to missing pattern %02X", id)
 			}
-			if id < 240 {
-				if int(id) >= len(p.Song.Patterns) {
-					return result, fmt.Errorf("edit: active song track refers to missing pattern %02X", id)
-				}
-				if channel == 3 {
-					sourceRoles[id] |= 2
-				} else {
-					sourceRoles[id] |= 1
-				}
-			}
+			markRole(channel, id)
+		}
+	}
+	for _, base := range []int{4, 52} {
+		for ch := 0; ch < 4; ch++ {
+			markRole(ch, p.Song.State[base+ch])
+		}
+	}
+	for _, selection := range selections {
+		for channel, id := range selection {
+			markRole(channel, id)
 		}
 	}
 	type patternKey struct {
@@ -109,27 +131,15 @@ func PackProject(project *model.Project) (PackResult, error) {
 	// A pattern shared between YM and PCM lanes is ambiguous: its bytes can
 	// be notes/samples in one lane and commands in another. Reject packing
 	// rather than changing a PCM sample ID that resembles a sequence command.
-	roles := map[byte]byte{}
-	for _, order := range p.Song.Orders[:p.Song.Length] {
-		for channel, id := range order {
-			if channel == 3 && p.Song.State[49] == 0 {
-				continue
-			}
-			if id >= 240 {
-				continue
-			}
-			role := byte(1)
-			if channel == 3 {
-				role = 2
-			}
-			roles[id] |= role
-		}
+	var roles [240]byte
+	for id := range project.Song.Patterns {
+		roles[patternMap[id]] |= sourceRoles[id]
 	}
 	for id := range p.Song.Patterns {
-		if roles[byte(id)]&2 != 0 {
-			if roles[byte(id)] == 3 {
+		if roles[id]&2 != 0 {
+			if roles[id] == 3 {
 				for _, cell := range p.Song.Patterns[id] {
-					if selectSequence(cell.Effect1) || selectSequence(cell.Effect2) {
+					if selectSequence(cell.Effect1) && sequenceMap[cell.Parameter1] != cell.Parameter1 || selectSequence(cell.Effect2) && sequenceMap[cell.Parameter2] != cell.Parameter2 {
 						return result, fmt.Errorf("edit: pattern %02X shares YM and PCM command data; separate it before packing", id)
 					}
 				}

@@ -75,7 +75,16 @@ func (a *App) patternAction(name string) bool {
 		}
 	case "project-pack":
 		e, _ := a.synth.Snapshot()
-		result, err := edit.PackProject(e.Project)
+		selected, queued := e.Patterns, e.Patterns
+		if a.channel >= 0 && a.channel < 4 && a.pattern >= 0 && a.pattern <= 255 {
+			selected[a.channel] = byte(a.pattern)
+		}
+		for channel := 0; channel < 4; channel++ {
+			if id, ok := e.QueuedPattern(channel); ok {
+				queued[channel] = id
+			}
+		}
+		result, err := edit.PackProjectWithSelections(e.Project, e.Patterns, selected, queued)
 		if err != nil {
 			a.status = err.Error()
 			return true

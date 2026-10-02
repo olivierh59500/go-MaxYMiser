@@ -43,6 +43,16 @@ the three supplied examples and isolated timer fixtures. The register checks
 cover only captured writes, with timer-owned registers inspected separately.
 See [replay verification](REPLAY_VERIFICATION.md).
 
+Project packing protects YM/PCM interpretation across all 256 stored positions,
+the current/saved native editor snapshots and independent edited, live or queued
+pattern selections. Disabling PCM does not make its stored sample references
+eligible for YM sequence remapping. Conflicting shared roles reject the operation
+without changing the project; unchanged shared sequence IDs remain usable.
+Regression checks include activating prepared PCM material after packing,
+native song save/reload and editor undo. The three supplied native examples also
+retain all 8,778 captured register calls after compaction and MYS/MYV save/reload;
+their sequence counts change from 136 to 6, 136 to 12 and 13 to 13 respectively.
+
 The individual MYI3 export has been opened in the original editor. Its instrument
 parameters, sequence remapping and embedded sample bytes were checked in memory.
 See [native formats](NATIVE_FORMATS.md) for layout and legacy loader details.
