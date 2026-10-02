@@ -116,3 +116,54 @@ func TestJamMarkersLoopTheSelectedSection(t *testing.T) {
 		t.Fatal("normal transport did not skip a jam marker")
 	}
 }
+
+func TestReusableSnapshotDoesNotAliasEditedSourceData(t *testing.T) {
+	p := model.Demo()
+	p.Bank.Samples[0].PCM = []byte{1, 2, 3}
+	s := NewSynth(New(p), 48000)
+	var view model.Project
+	first, _ := s.SnapshotInto(&view)
+	s.Edit(func(e *Engine) {
+		e.Project.Song.Patterns[0][0].Note = 70
+		e.Project.Bank.Sequences[3].Values[1] = 8
+		e.Project.Bank.Samples[0].PCM[0] = 9
+	})
+	if first.Project.Song.Patterns[0][0].Note == 70 || first.Project.Bank.Sequences[3].Values[1] == 8 || first.Project.Bank.Samples[0].PCM[0] == 9 {
+		t.Fatal("editor view retained mutable source data")
+	}
+	second, _ := s.SnapshotInto(&view)
+	if second.Project.Song.Patterns[0][0].Note != 70 || second.Project.Bank.Samples[0].PCM[0] != 9 {
+		t.Fatal("reused view did not refresh edited values")
+	}
+	if allocations := testing.AllocsPerRun(20, func() { s.SnapshotInto(&view) }); allocations != 0 {
+		t.Fatalf("steady-state editor snapshots allocate: %f", allocations)
+	}
+}
+
+func TestLiveInstrumentPreviewReloadsEditedParameters(t *testing.T) {
+	p := model.New()
+	e := New(p)
+	e.Trigger(0, 69, 1)
+	p.Bank.Instruments[0][33] = 64
+	e.Trigger(0, 69, 1)
+	if e.Voices[0].Parameters[17] != 64 {
+		t.Fatal("preview retained stale instrument settings")
+	}
+}
+
+func TestInstrumentRetriggerRestoresParametersChangedByEffects(t *testing.T) {
+	p := model.New()
+	p.Song.SetSpeed(1)
+	p.Song.Patterns[0][0] = model.Cell{Note: 69, Instrument: 1, Effect1: '9', Parameter1: 64}
+	p.Song.Patterns[0][1] = model.Cell{Note: 69, Instrument: 1}
+	e := New(p)
+	e.Play(false)
+	e.Tick()
+	if e.Voices[0].Parameters[17] != 64 {
+		t.Fatal("effect did not update pulse width")
+	}
+	e.Tick()
+	if e.Voices[0].Parameters[17] != p.Bank.Instruments[0][33] {
+		t.Fatal("same-instrument retrigger retained an effect-modified parameter")
+	}
+}

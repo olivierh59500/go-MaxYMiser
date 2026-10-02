@@ -53,6 +53,7 @@ type App struct {
 	copied                                                             model.Pattern
 	hasCopy                                                            bool
 	synth                                                              *replay.Synth
+	view                                                               model.Project
 	player                                                             *audio.Player
 	font                                                               *text.GoTextFaceSource
 	projectPath, status, tab                                           string
@@ -125,7 +126,7 @@ func (a *App) btn(dst *ebiten.Image, label string, x, y, w, h int, action string
 	a.buttons = append(a.buttons, button{x, y, w, h, action})
 }
 func (a *App) Draw(dst *ebiten.Image) {
-	e, wave := a.synth.Snapshot()
+	e, wave := a.synth.SnapshotInto(&a.view)
 	p := e.Project
 	a.buttons = a.buttons[:0]
 	dst.Fill(bg)
@@ -863,7 +864,9 @@ func (a *App) action(name string) {
 			}
 		})
 	case "pattern":
-		a.synth.CloseYM()
+		if _, ok := a.synth.Reference(); ok {
+			a.synth.SelectReference(false)
+		}
 		a.synth.Edit(func(e *replay.Engine) { e.Patterns[a.channel] = byte(a.pattern); e.Play(true) })
 	case "stop":
 		if r, ok := a.synth.Reference(); ok && r.Active {
@@ -985,6 +988,7 @@ func (a *App) applyModal() {
 		a.corpus = &corpus
 		a.status = fmt.Sprintf("Loaded %s corpus: %d recordings, %d recurring timbres", corpus.Author, corpus.Unique, len(corpus.Instruments))
 	case modal == "Instrument name":
+		a.remember()
 		a.synth.Edit(func(e *replay.Engine) { e.Project.Bank.Instruments[a.instrument].SetName(entry) })
 		a.dirty = true
 	case strings.HasPrefix(modal, "Import raw"):
@@ -1039,6 +1043,7 @@ func (a *App) applyModal() {
 			a.status = "Enter a hexadecimal number"
 			return
 		}
+		a.remember()
 		a.synth.Edit(func(e *replay.Engine) {
 			switch {
 			case modal == "Sequence length":

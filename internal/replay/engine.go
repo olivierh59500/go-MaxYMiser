@@ -3,6 +3,7 @@ package replay
 
 import (
 	"github.com/olivierh59500/go-MaxYMiser/internal/model"
+	"strings"
 )
 
 type Voice struct {
@@ -21,6 +22,7 @@ type Voice struct {
 	PWMOffset                          int16
 	PWMLocked                          bool
 	Triggered                          bool
+	ParametersDirty                    bool
 }
 type PCMVoice struct {
 	Sample, Note, Volume byte
@@ -151,6 +153,9 @@ func (e *Engine) Trigger(channel int, note, instrument byte) {
 	if channel < 0 || channel >= 3 {
 		return
 	}
+	if instrument > 0 {
+		e.Voices[channel].ParametersDirty = true
+	}
 	e.parse(channel, model.Cell{Note: note, Instrument: instrument}, false)
 	e.pending[channel] = true
 }
@@ -159,8 +164,9 @@ func (e *Engine) parse(ch int, cell model.Cell, muted bool) {
 	if !muted {
 		porta := cell.Effect1 == 'P' || cell.Effect2 == 'P'
 		if cell.Instrument > 0 && cell.Instrument <= 32 {
-			if v.Instrument != cell.Instrument {
+			if v.Instrument != cell.Instrument || v.ParametersDirty {
 				copy(v.Parameters[:], e.Project.Bank.Instruments[cell.Instrument-1][16:])
+				v.ParametersDirty = false
 			}
 			v.Instrument = cell.Instrument
 			oldSlide, oldPorta := v.Slide, v.Porta
@@ -217,6 +223,9 @@ func (e *Engine) parseDMA(c model.Cell) {
 func (e *Engine) effect(v *Voice, code, value byte, muted bool) {
 	if muted && code != 'B' && code != 'S' && code != 'U' && code != 'Y' && code != 'Z' && code != '7' {
 		return
+	}
+	if code >= '1' && code <= '6' || strings.ContainsRune("89ACDEFGILMNQRVW", rune(code)) {
+		v.ParametersDirty = true
 	}
 	if code >= '1' && code <= '6' {
 		index := int(code - '1')

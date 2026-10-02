@@ -2,6 +2,7 @@ package replay
 
 import (
 	"encoding/binary"
+	"github.com/olivierh59500/go-MaxYMiser/internal/model"
 	"github.com/olivierh59500/ym-player/pkg/stsound"
 	"io"
 	"math"
@@ -46,9 +47,27 @@ func NewSynth(e *Engine, rate int) *Synth {
 }
 func (s *Synth) Edit(fn func(*Engine)) { s.mu.Lock(); defer s.mu.Unlock(); fn(s.Engine) }
 func (s *Synth) Snapshot() (Engine, [512]float32) {
+	return s.SnapshotInto(nil)
+}
+
+// SnapshotInto reuses view storage while preserving a consistent, independent
+// copy. It avoids allocating the whole sample bank for every rendered frame.
+func (s *Synth) SnapshotInto(view *model.Project) (Engine, [512]float32) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	e := *s.Engine
+	if view == nil {
+		view = &model.Project{}
+	}
+	patterns := view.Song.Patterns
+	samples := view.Bank.Samples
+	*view = *s.Engine.Project
+	view.Song.Patterns = append(patterns[:0], s.Engine.Project.Song.Patterns...)
+	for i, sample := range s.Engine.Project.Bank.Samples {
+		view.Bank.Samples[i].PCM = append(samples[i].PCM[:0], sample.PCM...)
+		view.Bank.Samples[i].Trailer = append(samples[i].Trailer[:0], sample.Trailer...)
+	}
+	e.Project = view
 	var wave [512]float32
 	for i := range wave {
 		wave[i] = s.waveform[(s.waveAt+i)%len(wave)]

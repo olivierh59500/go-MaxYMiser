@@ -1,10 +1,13 @@
 package ui
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/olivierh59500/go-MaxYMiser/internal/model"
+	"github.com/olivierh59500/go-MaxYMiser/internal/project"
 )
 
 func TestExampleInstrumentViewsShowTheirLinkedSoundDefinitions(t *testing.T) {
@@ -47,9 +50,86 @@ func TestInstrumentSelectionOpensAndEditsTheCorrectSequence(t *testing.T) {
 	if e.Project.Bank.Sequences[3].Values[1] != 5 || e.Project.Bank.Sequences[0].Values[1] != 0 {
 		t.Fatal("editing a selected instrument changed another sequence")
 	}
+	app.restore(false)
+	e, _ = app.synth.Snapshot()
+	if e.Project.Bank.Sequences[3].Values[1] != 4 {
+		t.Fatal("instrument sequence edit could not be undone")
+	}
+	app.restore(true)
+	e, _ = app.synth.Snapshot()
+	if e.Project.Bank.Sequences[3].Values[1] != 5 {
+		t.Fatal("instrument sequence edit could not be redone")
+	}
 	app.action("instrument:2")
 	app.action("parameter:48")
 	if app.entry != "04" {
 		t.Fatalf("drum still shows the previous instrument's volume link: %q", app.entry)
+	}
+}
+
+func TestEditedInstrumentSavesAsAnEditableNativePair(t *testing.T) {
+	app, err := New(model.Demo(), "", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer app.Close()
+	app.action("instrument:1")
+	app.action("parameter:33")
+	app.entry = "40"
+	app.applyModal()
+	path := filepath.Join(t.TempDir(), "edited.mys")
+	app.save(path)
+	if app.dirty || app.projectPath != path {
+		t.Fatalf("save did not succeed: %s", app.status)
+	}
+	loaded, err := project.Load(path, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if loaded.Bank.Instruments[1][33] != 0x40 || loaded.Bank.Instruments[0][33] != 0 || loaded.Bank.Instruments[1][49] != 3 {
+		t.Fatal("selected instrument definition was not preserved in the native bank")
+	}
+}
+
+func TestYMReconstructionKeepsTheOriginalAvailableDuringPatternPlayback(t *testing.T) {
+	app, err := New(model.Demo(), "", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer app.Close()
+	const frames = 64
+	data := make([]byte, 4+frames*14)
+	copy(data, "YM3!")
+	for i := 0; i < frames; i++ {
+		data[4+i] = 28
+		data[4+frames+i] = 1
+		data[4+7*frames+i] = 62
+		data[4+8*frames+i] = 15
+		data[4+13*frames+i] = 255
+	}
+	ympath := filepath.Join(t.TempDir(), "reference.ym")
+	if err = os.WriteFile(ympath, data, 0600); err != nil {
+		t.Fatal(err)
+	}
+	app.projectPath = ympath
+	if err = app.LoadYM(ympath); err != nil {
+		t.Fatal(err)
+	}
+	if app.projectPath != "" {
+		t.Fatal("native save inherited the YM reference path")
+	}
+	app.action("ym:infer")
+	if app.ymReport == nil || len(app.ymData) != len(data) {
+		t.Fatalf("reconstruction lost its reference: %s", app.status)
+	}
+	app.action("pattern")
+	ref, ok := app.synth.Reference()
+	if !ok || ref.Active {
+		t.Fatal("pattern playback unloaded the original YM")
+	}
+	app.action("ym:reference")
+	ref, ok = app.synth.Reference()
+	if !ok || !ref.Active || !ref.Playing {
+		t.Fatal("original reference could not be selected again")
 	}
 }
