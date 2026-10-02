@@ -553,3 +553,27 @@ recording. Goldrunner's differently named candidate illustrates why comparing
 only filenames would miss useful evidence. Conversely, Warhawk / Warhawk remix
 currently yields no accepted phrases; the filename alone cannot confirm an
 alignment. Directory placement is not verified composer metadata.
+
+## Classic subtunes and global transpose
+
+The verified classic player also supports its native multi-song table. The
+zero-based `ympair -subtune` option selects that song's channel orders and initial
+speed; invalid table pointers or undeclared selections remain errors. The source
+inspector offers Previous/Next song while keeping the current composition and
+playback unchanged until an editable excerpt is imported. Selection failure
+retains the preceding inspection. The Last Ninja decoder still accepts only its
+verified first song.
+
+Classic command 89 changes a shared signed-byte transpose. Held notes on all
+three voices change pitch on the same replay call, including voices parsed
+before that command, without restarting their envelopes or modulation phase.
+Pitch-only source events preserve this distinction; generated tracker rows omit
+instrument retriggers for held notes. Tests cover multiple controls on one call,
+restoring the initial -12 offset and native-pair save/reload.
+
+Constructed native music executed by the original classic program verifies 24
+calls of global transposition across all three cached period outputs. A separate
+second-song fixture verifies another 24 calls, its independent three-call step
+speed and selected note periods. These compare source interpretation against
+the original period table; existing Go/source period-rounding and unsupported
+hardware-program limits remain unchanged. The executable remains local.

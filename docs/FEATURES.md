@@ -129,3 +129,11 @@ captured native calls, repeated for their regenerated SNDH exports after native
 pair save/reload. They exposed and corrected signed byte noise-transpose wrapping
 and the mixer behavior of a zero tone period. These checks establish main-call
 register results, with timer waveform and hardware timing still separate.
+
+The classic Mad Max source decoder now selects independent native song-table
+entries and their initial speed. The source inspector navigates these subtunes
+without replacing the current composition. Classic global transpose also
+retunes all held voices on the same call, with pitch-only events preserving
+envelope/modulation phase. Two constructed fixtures each retain 24 original
+native-call pitch-table comparisons. Other player families remain outside this
+verified source import, including additional Last Ninja subtunes.

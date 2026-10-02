@@ -2,6 +2,7 @@ package ymimport
 
 import (
 	"encoding/binary"
+	"reflect"
 	"testing"
 )
 
@@ -60,6 +61,32 @@ func TestClassicWaitAndLegatoRestRetainTheSoundingNote(t *testing.T) {
 	}
 	if len(score.Instruments) != 32 || len(score.Instruments[1].Arpeggio.Values) != 1 || score.Instruments[1].Arpeggio.Values[0] != 0 {
 		t.Fatal("program pointers were decoded using the music relocation base")
+	}
+}
+
+func TestClassicSubtuneUsesItsOwnSongTableAndInitialSpeed(t *testing.T) {
+	b, layout := classicTableFixture()
+	binary.BigEndian.PutUint32(b[0xa04:], layout.music.origin+0xa40)
+	for ch := 0; ch < 3; ch++ {
+		at := 0xa50 + ch*4
+		binary.BigEndian.PutUint32(b[0xa40+ch*4:], layout.music.origin+uint32(at))
+		copy(b[at:], []byte{1, 255})
+	}
+	binary.BigEndian.PutUint32(b[0x904:], layout.music.origin+0x1040)
+	copy(b[0x1040:], []byte{0xc1, 0xe0, 50, 52, 0x87})
+	b[layout.speed+1] = 5
+	before := append([]byte(nil), b...)
+	layout.subtune = 1
+	s, err := decodeSourceTables(b, layout, 11)
+	if err != nil || s.Subtune != 1 || s.Speed != 5 || len(s.Events) < 6 || s.Events[0].Note != 62 || s.Events[3].Frame != 5 || s.Events[3].Note != 64 {
+		t.Fatalf("selected subtune retained the first song or speed: %+v, %v", s, err)
+	}
+	if !reflect.DeepEqual(b, before) {
+		t.Fatal("subtune selection mutated native input")
+	}
+	binary.BigEndian.PutUint32(b[0xa04:], 0xffffffff)
+	if _, err := decodeSourceTables(b, layout, 11); err == nil {
+		t.Fatal("invalid selected song pointer was accepted")
 	}
 }
 
@@ -125,7 +152,7 @@ func TestClassicTablesRejectBadPointersAndUnknownCommandSets(t *testing.T) {
 			t.Fatalf("invalid classic table pointer at %#x was accepted", at)
 		}
 	}
-	for _, op := range []byte{0x91, 0x92, 0x85, 0x86, 0x89} {
+	for _, op := range []byte{0x91, 0x92, 0x85, 0x86} {
 		b, layout := classicTableFixture()
 		b[0x1000] = op
 		if _, err := decodeSourceTables(b, layout, 30); err == nil {

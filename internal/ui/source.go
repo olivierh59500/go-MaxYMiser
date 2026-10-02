@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -58,6 +59,29 @@ func (a *App) sourceAction(action string) bool {
 		if a.sourceScore != nil {
 			a.sourcePage = min(max(0, (len(a.sourceScore.Instruments)-1)/8), a.sourcePage+1)
 		}
+	case "source:previous-song", "source:next-song":
+		if a.sourceScore == nil {
+			return true
+		}
+		index := a.sourceScore.Subtune
+		if action == "source:previous-song" {
+			index--
+		} else {
+			index++
+		}
+		if index < 0 || index >= a.sourceScore.Subtunes {
+			return true
+		}
+		raw, err := os.ReadFile(a.sourcePath)
+		if err == nil {
+			var score ymimport.SourceScore
+			score, err = ymimport.DecodeSource(raw, index, a.sourceScore.Frames)
+			if err == nil {
+				a.inspectDecodedSource(score, a.sourcePath)
+				return true
+			}
+		}
+		a.status = "Source song retained: " + err.Error()
 	case "source:range":
 		if a.sourceReport != nil {
 			a.modal = fmt.Sprintf("Source excerpt start:end (0–%d frames)", a.sourceScore.Frames)
@@ -124,6 +148,11 @@ func (a *App) drawSource(dst *ebiten.Image) {
 		a.btn(dst, "Choose another excerpt", 260, 279, 254, 32, "source:range", false)
 	}
 	a.btn(dst, "Close source", 1060, 279, 160, 32, "source:close", false)
+	if score.Subtunes > 1 {
+		a.btn(dst, "Previous song", 540, 279, 150, 32, "source:previous-song", false)
+		a.btn(dst, "Next song", 704, 279, 128, 32, "source:next-song", false)
+		a.text(dst, fmt.Sprintf("Song %d / %d", score.Subtune+1, score.Subtunes), 850, 289, 12, accent)
+	}
 	a.text(dst, fmt.Sprintf("%d translated sounds · %d unsupported · %d affected note events", len(report.Bank.Converted), len(report.Bank.Unsupported), report.UnsupportedEvents), 42, 330, 13, purple)
 	detail := "Unsupported definitions stay silent. Pattern effects and some modulation are not converted."
 	if report.ModulationSegments > 0 {

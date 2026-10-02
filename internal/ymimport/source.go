@@ -18,6 +18,8 @@ type SourceScore struct {
 	Rate        int                `json:"rate"`
 	Speed       int                `json:"initial_ticks_per_step"`
 	Frames      int                `json:"decoded_source_frames"`
+	Subtune     int                `json:"source_subtune_index,omitempty"`
+	Subtunes    int                `json:"source_subtune_count,omitempty"`
 	Instruments []SourceInstrument `json:"instruments"`
 	Patterns    []SourcePattern    `json:"patterns"`
 	Orders      [3][]SourceOrder   `json:"orders"`
@@ -95,6 +97,7 @@ type SourceEvent struct {
 	Retrigger  bool `json:"retrigger"`
 	Rest       bool `json:"rest,omitempty"`
 	FixedPitch bool `json:"fixed_pitch,omitempty"`
+	PitchOnly  bool `json:"pitch_only,omitempty"`
 }
 
 const madMaxLastNinja = "mad-max-last-ninja-v1"
@@ -106,13 +109,14 @@ func DecodeSource(data []byte, subtune, frames int) (SourceScore, error) {
 	if err != nil {
 		return SourceScore{}, err
 	}
-	if subtune != 0 || frames < 1 || frames > 1000000 {
+	if subtune < 0 || subtune >= max(1, native.DeclaredSubtunes(plain)) || frames < 1 || frames > 1000000 {
 		return SourceScore{}, fmt.Errorf("source: invalid subtune or frame limit")
 	}
 	if layout, matched, err := detectMadMaxClassic(plain); matched {
 		if err != nil {
 			return SourceScore{}, err
 		}
+		layout.subtune = subtune
 		return decodeSourceTables(plain, layout, frames)
 	}
 	return decodeMadMaxLastNinja(plain, subtune, frames)
@@ -136,6 +140,9 @@ func (r sourceReader) pointer(at int) (int, error) {
 
 func decodeMadMaxLastNinja(data []byte, subtune, frames int) (SourceScore, error) {
 	var score SourceScore
+	if subtune != 0 {
+		return score, fmt.Errorf("source: additional subtunes are not verified for the Last Ninja player")
+	}
 	// These instructions identify note delays and the original song initializer.
 	// Absolute addresses are intentionally excluded from both signatures.
 	initSignature := []byte{0x2c, 0, 0xd0, 0x40, 0xd0, 0x40, 0x26, 0x7a, 1, 0xc6, 0xd7, 0xc0}
@@ -178,6 +185,7 @@ func decodeMadMaxLastNinja(data []byte, subtune, frames int) (SourceScore, error
 
 type sourceDataLayout struct {
 	player                                         string
+	subtune                                        int
 	music, program                                 sourceReader
 	patterns, instruments, songs, speed, arpeggios int
 	noise                                          [3]int
@@ -187,6 +195,9 @@ type sourceDataLayout struct {
 // verified player layout supplies these fields; metadata names do not select it.
 func decodeSourceTables(data []byte, layout sourceDataLayout, frames int) (SourceScore, error) {
 	var score SourceScore
+	if layout.subtune < 0 || layout.subtune > 98 {
+		return score, fmt.Errorf("source: invalid native table subtune")
+	}
 	r := layout.music
 	patternTable, err := r.pointer(layout.patterns)
 	if err != nil {
@@ -200,15 +211,15 @@ func decodeSourceTables(data []byte, layout sourceDataLayout, frames int) (Sourc
 	if err != nil {
 		return score, err
 	}
-	song, err := r.pointer(songTable)
+	song, err := r.pointer(songTable + layout.subtune*4)
 	if err != nil {
 		return score, err
 	}
-	if layout.speed < 0 || layout.speed >= len(data) || data[layout.speed] == 0 {
+	if layout.speed < 0 || layout.speed+layout.subtune >= len(data) || data[layout.speed+layout.subtune] == 0 {
 		return score, fmt.Errorf("source: missing initial replay speed")
 	}
 	hash := sha256.Sum256(data)
-	score = SourceScore{Player: layout.player, SHA256: hex.EncodeToString(hash[:]), Rate: 50, Speed: int(data[layout.speed]), Frames: frames}
+	score = SourceScore{Player: layout.player, SHA256: hex.EncodeToString(hash[:]), Rate: 50, Speed: int(data[layout.speed+layout.subtune]), Frames: frames, Subtune: layout.subtune, Subtunes: max(layout.subtune+1, native.DeclaredSubtunes(data))}
 	for id := 0; id < 32; id++ {
 		at, err := r.pointer(instrumentTable + id*4)
 		if err != nil || at < 6 {
@@ -306,9 +317,6 @@ func decodeSourceTables(data []byte, layout sourceDataLayout, frames int) (Sourc
 			if op == 0x85 || op == 0x86 {
 				return score, fmt.Errorf("source: per-step pitch command at %#x is not yet supported", at)
 			}
-			if op == 0x89 && layout.player == madMaxClassic {
-				return score, fmt.Errorf("source: classic global-transpose command at %#x is not yet supported", at)
-			}
 			length, ok := sourcePlayerOperandLength(layout.player, op)
 			if layout.player == madMaxClassic && op >= 0xc0 && op < 0xe0 && score.Instruments[int(op-0xc0)].Settings[0]&2 != 0 {
 				// The native fixed-pitch trigger consumes one following byte,
@@ -359,6 +367,14 @@ func sourceTimeline(score SourceScore, frames int) ([]SourceEvent, error) {
 }
 
 func sourceTimelineControls(score SourceScore, frames int) ([]SourceEvent, []SourceControl, error) {
+	events, controls, err := sourceTimelineRawControls(score, frames)
+	if err != nil || score.Player != madMaxClassic {
+		return events, controls, err
+	}
+	return classicGlobalTranspose(events, controls, frames), controls, nil
+}
+
+func sourceTimelineRawControls(score SourceScore, frames int) ([]SourceEvent, []SourceControl, error) {
 	patterns := map[int]SourcePattern{}
 	for _, p := range score.Patterns {
 		patterns[p.ID] = p

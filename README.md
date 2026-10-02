@@ -139,6 +139,10 @@ If the default excerpt exceeds native capacity or contains an unverified pitch,
 its source definitions remain visible and **Choose another excerpt** selects a
 convertible interval. Failed conversion preserves the current composition and
 never becomes an importable preview.
+Verified classic multi-song sources also expose **Previous song / Next song**;
+each song retains its own orders and initial speed. The `ympair -subtune` option
+uses zero-based indices. Classic global transpose retunes held voices without
+restarting their envelopes and becomes editable pitch-only tracker rows.
 Imported source notes use a one-frame grid with generated 64-row patterns.
 Unsupported sounds remain silent and named with `?`. Native vibrato and pitch
 slide are translated for ordinary tones with a constant zero arpeggio; other

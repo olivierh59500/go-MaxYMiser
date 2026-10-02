@@ -157,7 +157,9 @@ func sourcePitchDeltas(score SourceScore) ([][3]int16, error) {
 			}
 			note[channel] = event.Note - 24
 			eligible[channel] = definition.Settings[0] == 0 && sourceArpeggioIsZero(definition.Arpeggio)
-			state[channel].note(definition.Settings[4], event.Retrigger)
+			if !event.PitchOnly {
+				state[channel].note(definition.Settings[4], event.Retrigger)
+			}
 		}
 		for channel := range state {
 			delta := state[channel].periodDelta(note[channel])

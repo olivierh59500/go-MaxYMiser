@@ -55,6 +55,23 @@ func TestInspectingAndChangingASourceExcerptRetainsTheEditableComposition(t *tes
 	}
 }
 
+func TestFailedSourceSubtuneSelectionRetainsInspectionAndPlayback(t *testing.T) {
+	app := sourceInspectionApp(t)
+	app.sourceScore.Subtunes = 2
+	app.synth.Edit(func(e *replay.Engine) { e.Play(false) })
+	score, preview, report := app.sourceScore, app.sourcePreview, app.sourceReport
+	before, _ := app.synth.Snapshot()
+	app.action("source:next-song")
+	after, _ := app.synth.Snapshot()
+	if app.sourceScore != score || app.sourcePreview != preview || app.sourceReport != report || !after.Playing || after.Ticks != before.Ticks || app.dirty || app.projectPath != "current.mys" || !strings.Contains(app.status, "Source song retained") {
+		t.Fatal("failed source selection changed inspection, composition or transport")
+	}
+	app.action("source:previous-song")
+	if app.sourceScore != score || app.sourcePreview != preview {
+		t.Fatal("navigation outside source subtunes changed inspection")
+	}
+}
+
 func TestSourceImportCreatesAnIndependentEditablePairAndKeepsOriginalLabels(t *testing.T) {
 	app := sourceInspectionApp(t)
 	source := app.sourcePath

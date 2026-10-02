@@ -148,7 +148,7 @@ func preparePairs(songs []PairedSong) ([]preparedPair, error) {
 		ymID := registerIdentity(song.Trace)
 		ids := []string{"ym:" + ymID, "music:" + sourceCompositionIdentity(song.Score)}
 		if song.Score.SHA256 != "" {
-			ids = append(ids, "sndh:"+song.Score.SHA256)
+			ids = append(ids, fmt.Sprintf("sndh:%s:%d", song.Score.SHA256, song.Score.Subtune))
 		}
 		for _, id := range ids {
 			if previous, exists := identities[id]; exists && previous != song.Group {
