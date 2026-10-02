@@ -124,8 +124,16 @@ with six; Randomazer declares nine with eight.
 Selector aliases, cue positions or unsupported payloads require further native
 analysis. These collections are imported partially and recorded as such.
 
+Terraboink's entry point enters the native replay initializer directly and uses
+one bank/song pair. Local executions of declared choices 1 and 20 produce
+identical traces for 1,195 complete main calls. This confirms those two choices
+do not expose distinct initial playback in the supplied container; it does not
+justify synthesizing nineteen missing partitions or assert every other choice
+has been executed. The declared-count discrepancy remains visible in the audit.
+
 Randomazer's outer selector has nine pairs of relative SNDH offsets and playback
-rates. The ninth addresses a separate TC200 player without native MaxYMiser song
+rates. The ninth addresses Xmas-Medley, identified in its nested SNDH metadata
+as Music-Mon V2.5e, through a separate TC200 player without native MaxYMiser song
 or instrument tags; only the first eight songs have editable MaxYMiser payloads.
 The declared count is therefore not evidence of a missing ninth MaxYMiser bank.
 
