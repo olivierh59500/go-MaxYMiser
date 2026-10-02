@@ -11,6 +11,8 @@ import (
 	"github.com/olivierh59500/go-MaxYMiser/internal/ui"
 	"log"
 	"os"
+	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -22,9 +24,13 @@ func main() {
 	mute := flag.Bool("mute", false, "disable audio device")
 	info := flag.Bool("info", false, "print native project information")
 	flag.Parse()
+	if *song == "" && flag.NArg() > 0 {
+		*song = flag.Arg(0)
+	}
 	p := model.Demo()
 	var err error
-	if *song != "" || *bank != "" {
+	if *song != "" && strings.EqualFold(filepath.Ext(*song), ".ym") {
+	} else if *song != "" || *bank != "" {
 		p, err = project.Load(*song, *bank)
 		if err != nil {
 			log.Fatal(err)
@@ -46,6 +52,11 @@ func main() {
 		os.Exit(1)
 	}
 	defer app.Close()
+	if *song != "" && strings.EqualFold(filepath.Ext(*song), ".ym") {
+		if err = app.LoadYM(*song); err != nil {
+			log.Fatal(err)
+		}
+	}
 	ebiten.SetWindowTitle("MaxYMiser Go — YM2149 tracker")
 	ebiten.SetWindowSize(1280, 800)
 	ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)

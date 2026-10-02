@@ -11,16 +11,20 @@ import (
 // Synth owns the hardware state. Its lock separates the audio callback from
 // edits and transport commands without creating a new synthesizer every frame.
 type Synth struct {
-	mu        sync.Mutex
-	Engine    *Engine
-	Chip      *stsound.CYm2149Ex
-	Rate      int
-	untilTick float64
-	timers    [3]timer
-	pcm       [2]sampleVoice
-	scratch   [1]int16
-	waveform  [512]float32
-	waveAt    int
+	reference        *stsound.CYmMusic
+	referenceBuffer  []int16
+	referencePlaying bool
+	referenceActive  bool
+	mu               sync.Mutex
+	Engine           *Engine
+	Chip             *stsound.CYm2149Ex
+	Rate             int
+	untilTick        float64
+	timers           [3]timer
+	pcm              [2]sampleVoice
+	scratch          [1]int16
+	waveform         [512]float32
+	waveAt           int
 }
 type timer struct {
 	kind             byte
@@ -64,6 +68,9 @@ func (s *Synth) Reset() {
 func (s *Synth) Read(p []byte) (int, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.reference != nil && s.referenceActive {
+		return s.readReference(p)
+	}
 	frames := len(p) / 4
 	for i := 0; i < frames; i++ {
 		if s.untilTick <= 0 {
@@ -213,6 +220,24 @@ func timerFrequency(period uint16, kind byte, length int) float64 {
 func (s *Synth) runTimer(ch int) {
 	t := &s.timers[ch]
 	if t.frequency <= 0 {
+		return
+	}
+	if t.kind == 9 {
+		t.phase += t.frequency / 2 / float64(s.Rate)
+		t.phase -= math.Floor(t.phase)
+		v := s.Engine.Voices[ch]
+		width := int(v.Parameters[17]) + int(v.Values[6]&255)
+		if !v.PWMLocked {
+			width += int(v.PWMOffset)
+		}
+		duty := float64(256-max(-255, min(255, width))) / 512
+		volume := int(s.Engine.Registers[8+ch])
+		if t.phase >= duty {
+			volume = 0
+		}
+		if s.Chip.ReadRegister(stsound.YmInt(8+ch)) != stsound.YmInt(volume) {
+			s.Chip.WriteRegister(stsound.YmInt(8+ch), stsound.YmInt(volume))
+		}
 		return
 	}
 	t.phase += t.frequency / float64(s.Rate)

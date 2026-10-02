@@ -10,12 +10,15 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
 	"github.com/hajimehoshi/ebiten/v2/vector"
 	"github.com/olivierh59500/go-MaxYMiser/internal/export"
+	"github.com/olivierh59500/go-MaxYMiser/internal/midi"
 	"github.com/olivierh59500/go-MaxYMiser/internal/model"
 	"github.com/olivierh59500/go-MaxYMiser/internal/project"
 	"github.com/olivierh59500/go-MaxYMiser/internal/replay"
+	"github.com/olivierh59500/go-MaxYMiser/internal/ymimport"
 	"golang.org/x/image/font/gofont/gomono"
 	"image/color"
 	"io/fs"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -37,6 +40,15 @@ type button struct {
 	action     string
 }
 type App struct {
+	corpus                                                             *ymimport.Corpus
+	ymPath                                                             string
+	ymReport                                                           *ymimport.Report
+	midiInput                                                          *midi.Input
+	midiData                                                           chan []byte
+	midiDecoder                                                        midi.Decoder
+	undo, redo                                                         []*model.Project
+	copied                                                             model.Pattern
+	hasCopy                                                            bool
 	synth                                                              *replay.Synth
 	player                                                             *audio.Player
 	font                                                               *text.GoTextFaceSource
@@ -58,7 +70,7 @@ func New(p *model.Project, projectPath string, mute bool) (*App, error) {
 	if err != nil {
 		return nil, err
 	}
-	a := &App{synth: replay.NewSynth(replay.New(p), 48000), font: face, projectPath: projectPath, status: "Ready · Space plays · Enter edits · Ctrl+S saves", tab: "Patterns", octave: 4, step: 1, directory: "."}
+	a := &App{synth: replay.NewSynth(replay.New(p), 48000), font: face, projectPath: projectPath, status: "Ready · Space plays · Enter edits · Ctrl+S saves", tab: "Patterns", midiData: make(chan []byte, 64), octave: 4, step: 1, directory: "."}
 	if !mute {
 		context := audio.CurrentContext()
 		if context == nil {
@@ -74,6 +86,9 @@ func New(p *model.Project, projectPath string, mute bool) (*App, error) {
 	return a, nil
 }
 func (a *App) Close() {
+	if a.midiInput != nil {
+		a.midiInput.Close()
+	}
 	if a.player != nil {
 		a.player.Close()
 	}
@@ -120,9 +135,9 @@ func (a *App) Draw(dst *ebiten.Image) {
 	a.btn(dst, "Stop", 952, 20, 74, 36, "stop", false)
 	a.btn(dst, "Record", 1034, 20, 90, 36, "record", a.editing)
 	a.btn(dst, "Export", 1132, 20, 122, 36, "export", false)
-	tabs := []string{"Patterns", "Song", "Instruments", "Sequences", "Samples", "Settings", "Help"}
+	tabs := []string{"Patterns", "Song", "Instruments", "Sequences", "Samples", "YM", "Settings", "Help"}
 	for i, name := range tabs {
-		a.btn(dst, name, 24+i*174, 88, 164, 36, "tab:"+name, a.tab == name)
+		a.btn(dst, name, 24+i*154, 88, 144, 36, "tab:"+name, a.tab == name)
 	}
 	rect(dst, 24, 136, 1232, 44, panel)
 	a.text(dst, p.Title, 38, 147, 16, fg)
@@ -139,6 +154,8 @@ func (a *App) Draw(dst *ebiten.Image) {
 		a.drawSequences(dst, &e)
 	case "Samples":
 		a.drawSamples(dst, &e)
+	case "YM":
+		a.drawYM(dst)
 	case "Settings":
 		a.drawSettings(dst, &e)
 	case "Help":
@@ -190,6 +207,12 @@ func (a *App) drawPatterns(dst *ebiten.Image, e *replay.Engine) {
 	a.btn(dst, "+", 282, 199, 40, 32, "pat:+", false)
 	a.btn(dst, "Copy", 344, 199, 70, 32, "copy-pattern", false)
 	a.btn(dst, "Clear", 424, 199, 80, 32, "clear-pattern", false)
+	a.btn(dst, "YM", 658, 199, 70, 32, "mode:ym", a.channel < 3)
+	a.btn(dst, "DMA", 738, 199, 80, 32, "mode:dma", a.channel == 3)
+	if a.channel == 3 {
+		a.drawDMAPattern(dst, e)
+		return
+	}
 	for ch := 0; ch < 3; ch++ {
 		x := 88 + ch*272
 		a.text(dst, fmt.Sprintf("YM %c   NOTE IN V   FX1  FX2", 'A'+ch), float64(x), 248, 12, accent)
@@ -327,7 +350,7 @@ func (a *App) drawSamples(dst *ebiten.Image, e *replay.Engine) {
 			vector.StrokeLine(dst, float32(43+x), y0, float32(44+x), y1, 1, purple, false)
 		}
 	}
-	a.btn(dst, "Import raw PCM", 42, 570, 200, 38, "import-sample", false)
+	a.btn(dst, "Import PCM / WAV", 42, 570, 200, 38, "import-sample", false)
 	a.btn(dst, "Clear sample", 258, 570, 176, 38, "clear-sample", false)
 	a.text(dst, "STe has two independent sample voices; DigiDrums use the YM channel DAC.", 42, 636, 12, dim)
 }
@@ -342,6 +365,7 @@ func (a *App) drawSettings(dst *ebiten.Image, e *replay.Engine) {
 	}
 	a.text(dst, "Audio is rendered at 48 kHz. Sequencing follows the selected replay rate.", 670, 277, 13, fg)
 	a.text(dst, "The YM noise generator and envelope are shared between all three voices.", 670, 321, 12, dim)
+	a.btn(dst, "MIDI input", 670, 372, 180, 38, "midi", a.midiInput != nil)
 }
 func (a *App) drawHelp(dst *ebiten.Image) {
 	rect(dst, 24, 192, 1232, 482, panel)
@@ -361,6 +385,15 @@ func (a *App) drawModal(dst *ebiten.Image) {
 	a.btn(dst, "Apply", 918, 437, 114, 40, "modal:apply", true)
 }
 func (a *App) Update() error {
+	for {
+		select {
+		case data := <-a.midiData:
+			a.midiDecoder.Feed(data, func(message []byte) { a.synth.Edit(func(e *replay.Engine) { midi.Apply(e, message) }) })
+		default:
+			goto midiDone
+		}
+	}
+midiDone:
 	a.mouseX, a.mouseY = ebiten.CursorPosition()
 	a.ctrl = ebiten.IsKeyPressed(ebiten.KeyControl) || ebiten.IsKeyPressed(ebiten.KeyMeta)
 	if a.modal != "" {
@@ -403,6 +436,25 @@ func (a *App) keyboard() {
 		return
 	}
 	if a.ctrl {
+		if inpututil.IsKeyJustPressed(ebiten.KeyZ) {
+			a.restore(false)
+			return
+		}
+		if inpututil.IsKeyJustPressed(ebiten.KeyY) {
+			a.restore(true)
+			return
+		}
+		if inpututil.IsKeyJustPressed(ebiten.KeyC) {
+			a.synth.Edit(func(e *replay.Engine) { a.copied = e.Project.Song.Patterns[a.pattern]; a.hasCopy = true })
+			a.status = "Pattern copied"
+			return
+		}
+		if inpututil.IsKeyJustPressed(ebiten.KeyV) && a.hasCopy {
+			a.remember()
+			a.synth.Edit(func(e *replay.Engine) { e.Project.Song.Patterns[a.pattern] = a.copied })
+			a.dirty = true
+			return
+		}
 		if inpututil.IsKeyJustPressed(ebiten.KeyS) {
 			a.action("save")
 		}
@@ -426,7 +478,7 @@ func (a *App) keyboard() {
 		if shift {
 			delta = -1
 		}
-		a.channel = (a.channel + delta + 3) % 3
+		a.selectChannel((a.channel + delta + 4) % 4)
 	}
 	for key, delta := range map[ebiten.Key]int{ebiten.KeyArrowUp: -1, ebiten.KeyArrowDown: 1, ebiten.KeyPageUp: -16, ebiten.KeyPageDown: 16} {
 		if inpututil.IsKeyJustPressed(key) {
@@ -449,7 +501,7 @@ func (a *App) keyboard() {
 	}
 	keys := []ebiten.Key{ebiten.KeyZ, ebiten.KeyS, ebiten.KeyX, ebiten.KeyD, ebiten.KeyC, ebiten.KeyV, ebiten.KeyG, ebiten.KeyB, ebiten.KeyH, ebiten.KeyN, ebiten.KeyJ, ebiten.KeyM}
 	upper := []ebiten.Key{ebiten.KeyQ, ebiten.KeyDigit2, ebiten.KeyW, ebiten.KeyDigit3, ebiten.KeyE, ebiten.KeyR, ebiten.KeyDigit5, ebiten.KeyT, ebiten.KeyDigit6, ebiten.KeyY, ebiten.KeyDigit7, ebiten.KeyU}
-	if a.field == 0 {
+	if a.field == 0 || a.channel == 3 && a.field == 3 {
 		for n, key := range keys {
 			if inpututil.IsKeyJustPressed(key) {
 				a.enterNote(byte(12 + a.octave*12 + n))
@@ -468,13 +520,44 @@ func (a *App) keyboard() {
 	}
 }
 func (a *App) enterNote(note byte) {
-	a.synth.Edit(func(e *replay.Engine) { e.Trigger(a.channel, note, byte(a.instrument+1)) })
 	if a.editing {
-		a.editCell(func(c *model.Cell) { c.Note = note; c.Instrument = byte(a.instrument + 1) })
-		a.row = (a.row + a.step) % 64
+		a.remember()
+	}
+	playing := false
+	a.synth.Edit(func(e *replay.Engine) {
+		if a.channel < 3 {
+			e.Trigger(a.channel, note, byte(a.instrument+1))
+		}
+		playing = e.Playing
+		if a.editing {
+			pattern, row := a.pattern, a.row
+			if e.Playing {
+				pattern, row = int(e.Patterns[a.channel]), e.Row
+			}
+			if pattern < len(e.Project.Song.Patterns) {
+				cell := &e.Project.Song.Patterns[pattern][row]
+				if a.channel < 3 {
+					cell.Note = note
+					cell.Instrument = byte(a.instrument + 1)
+				} else if a.field >= 3 {
+					cell.Effect1 = note
+					cell.Parameter1 = byte(a.sample + 1)
+				} else {
+					cell.Note = note
+					cell.Instrument = byte(a.sample + 1)
+				}
+			}
+		}
+	})
+	if a.editing {
+		a.dirty = true
+		if !playing {
+			a.row = (a.row + a.step) % 64
+		}
 	}
 }
 func (a *App) editCell(fn func(*model.Cell)) {
+	a.remember()
 	a.synth.Edit(func(e *replay.Engine) {
 		if a.pattern < len(e.Project.Song.Patterns) {
 			fn(&e.Project.Song.Patterns[a.pattern][a.row])
@@ -550,9 +633,35 @@ func (a *App) action(name string) {
 		return
 	}
 	var x, y int
+	if _, err := fmt.Sscanf(name, "dma-cell:%d", &x); err == nil {
+		a.row = x
+		if a.mouseX >= 500 {
+			a.field = 3
+		} else {
+			a.field = 0
+		}
+		return
+	}
 	if _, err := fmt.Sscanf(name, "cell:%d:%d", &x, &y); err == nil {
-		a.channel, a.row = x, y
-		a.field = max(0, min(6, (a.mouseX-(88+x*272))/36))
+		a.selectChannel(x)
+		a.row = y
+		character := int(float64(a.mouseX-(88+x*272)) / 7.8)
+		switch {
+		case character < 4:
+			a.field = 0
+		case character < 7:
+			a.field = 1
+		case character < 11:
+			a.field = 2
+		case character < 12:
+			a.field = 3
+		case character < 16:
+			a.field = 4
+		case character < 17:
+			a.field = 5
+		default:
+			a.field = 6
+		}
 		return
 	}
 	if _, err := fmt.Sscanf(name, "instrument:%d", &x); err == nil {
@@ -586,17 +695,77 @@ func (a *App) action(name string) {
 		return
 	}
 	switch name {
+	case "ym:infer":
+		data, err := os.ReadFile(a.ymPath)
+		if err != nil {
+			a.status = err.Error()
+			return
+		}
+		trace, err := ymimport.Decode(data)
+		if err != nil {
+			a.status = err.Error()
+			return
+		}
+		candidate, report, err := ymimport.Reconstruct(trace)
+		if err != nil {
+			a.status = err.Error()
+			return
+		}
+		a.remember()
+		a.synth.Edit(func(e *replay.Engine) { e.Project = candidate; e.Reset() })
+		if a.corpus != nil {
+			report.AuthorProfile = a.corpus.Author
+			report.Evidence = a.corpus.Evidence(trace)
+		}
+		a.ymReport = &report
+		a.pattern, a.row, a.channel = 0, 0, 0
+		a.projectPath = ""
+		a.dirty = true
+		a.status = fmt.Sprintf("Reconstructed candidate: %d instruments, %d patterns. Compare with the original YM.", report.Instruments, report.Patterns)
+	case "ym:profile":
+		a.modal = "Load composer profile (.json)"
+		a.entry = ""
+	case "ym:reference":
+		a.synth.SelectReference(true)
+	case "ym:score":
+		a.synth.SelectReference(false)
+	case "midi":
+		if a.midiInput != nil {
+			a.midiInput.Close()
+			a.midiInput = nil
+			a.status = "MIDI input disconnected"
+		} else {
+			input, err := midi.Open(func(data []byte) {
+				select {
+				case a.midiData <- data:
+				default:
+				}
+			})
+			if err != nil {
+				a.status = err.Error()
+			} else {
+				a.midiInput = input
+				a.status = "MIDI input connected · channels 1–3 control YM A–C"
+			}
+		}
+	case "mode:ym":
+		a.selectChannel(0)
+	case "mode:dma":
+		a.selectChannel(3)
 	case "bank:0":
 		a.instrument = a.instrument % 16
 	case "bank:1":
 		a.instrument = 16 + a.instrument%16
 	case "new":
+		if _, ok := a.synth.Reference(); ok {
+			a.synth.SelectReference(false)
+		}
 		a.synth.Edit(func(e *replay.Engine) { e.Stop(); e.Project = model.New(); e.Reset() })
 		a.projectPath = ""
 		a.dirty = false
 		a.status = "New project"
 	case "open":
-		a.modal = "Open native song (.mys)"
+		a.modal = "Open music (.mys / .snd / .ym)"
 		a.entry = a.projectPath
 	case "save":
 		if a.projectPath == "" {
@@ -606,6 +775,10 @@ func (a *App) action(name string) {
 			a.save(a.projectPath)
 		}
 	case "play":
+		if r, ok := a.synth.Reference(); ok && r.Active {
+			a.synth.ToggleYM()
+			return
+		}
 		a.synth.Edit(func(e *replay.Engine) {
 			if e.Playing {
 				e.Stop()
@@ -614,8 +787,13 @@ func (a *App) action(name string) {
 			}
 		})
 	case "pattern":
+		a.synth.CloseYM()
 		a.synth.Edit(func(e *replay.Engine) { e.Patterns[a.channel] = byte(a.pattern); e.Play(true) })
 	case "stop":
+		if r, ok := a.synth.Reference(); ok && r.Active {
+			a.synth.StopYM()
+			return
+		}
 		a.synth.Edit(func(e *replay.Engine) { e.Stop() })
 	case "record":
 		a.editing = !a.editing
@@ -659,7 +837,7 @@ func (a *App) action(name string) {
 		a.modal = "Instrument name"
 		a.entry = e.Project.Bank.Instruments[a.instrument].Name()
 	case "import-sample":
-		a.modal = "Import signed 8-bit raw sample"
+		a.modal = "Import raw PCM or WAV sample"
 		a.entry = ""
 	case "clear-sample":
 		a.synth.Edit(func(e *replay.Engine) { e.Project.Bank.Samples[a.sample] = model.Sample{} })
@@ -701,7 +879,14 @@ func (a *App) applyModal() {
 	a.modal = ""
 	var x, y int
 	switch {
-	case strings.HasPrefix(modal, "Open native"):
+	case strings.HasPrefix(modal, "Open music"):
+		if strings.EqualFold(filepath.Ext(entry), ".ym") {
+			if err := a.LoadYM(entry); err != nil {
+				a.status = err.Error()
+			}
+			return
+		}
+		a.synth.CloseYM()
 		p, err := project.Load(entry, "")
 		if err != nil {
 			a.status = err.Error()
@@ -715,10 +900,18 @@ func (a *App) applyModal() {
 		a.status = "Loaded " + filepath.Base(entry)
 	case strings.HasPrefix(modal, "Save project"):
 		a.save(entry)
+	case modal == "Load composer profile (.json)":
+		corpus, err := ymimport.LoadCorpus(entry)
+		if err != nil {
+			a.status = err.Error()
+			return
+		}
+		a.corpus = &corpus
+		a.status = fmt.Sprintf("Loaded %s corpus: %d recordings, %d recurring timbres", corpus.Author, corpus.Unique, len(corpus.Instruments))
 	case modal == "Instrument name":
 		a.synth.Edit(func(e *replay.Engine) { e.Project.Bank.Instruments[a.instrument].SetName(entry) })
 		a.dirty = true
-	case strings.HasPrefix(modal, "Import signed"):
+	case strings.HasPrefix(modal, "Import raw"):
 		var err error
 		a.synth.Edit(func(e *replay.Engine) { err = project.ImportSample(&e.Project.Bank, a.sample, entry) })
 		if err != nil {
@@ -793,3 +986,120 @@ func (a *App) CaptureState() string {
 
 // SetTab selects the initial workspace, also used by the capture command.
 func (a *App) SetTab(name string) { a.tab = name }
+
+func (a *App) selectChannel(channel int) {
+	a.channel = channel
+	e, _ := a.synth.Snapshot()
+	pattern := int(e.Project.Song.Orders[e.Position][channel])
+	if pattern < len(e.Project.Song.Patterns) {
+		a.pattern = pattern
+	}
+}
+func (a *App) remember() {
+	a.synth.Edit(func(e *replay.Engine) { a.undo = append(a.undo, e.Project.Clone()) })
+	if len(a.undo) > 32 {
+		a.undo = a.undo[len(a.undo)-32:]
+	}
+	a.redo = nil
+}
+func (a *App) restore(redo bool) {
+	source, dest := &a.undo, &a.redo
+	if redo {
+		source, dest = &a.redo, &a.undo
+	}
+	if len(*source) == 0 {
+		return
+	}
+	value := (*source)[len(*source)-1]
+	*source = (*source)[:len(*source)-1]
+	a.synth.Edit(func(e *replay.Engine) {
+		*dest = append(*dest, e.Project.Clone())
+		e.Stop()
+		e.Project = value
+		e.Reset()
+	})
+	a.dirty = true
+	a.status = "Edit restored"
+}
+
+func (a *App) drawDMAPattern(dst *ebiten.Image, e *replay.Engine) {
+	p := e.Project
+	pattern := a.pattern
+	if e.Playing {
+		pattern = int(e.Patterns[3])
+	}
+	a.text(dst, "STe A     NOTE SAMPLE VOL", 94, 248, 13, accent)
+	a.text(dst, "STe B     NOTE SAMPLE VOL", 516, 248, 13, purple)
+	start := max(0, min(44, a.row-10))
+	if e.Playing && !a.editing {
+		start = max(0, min(44, e.Row-10))
+	}
+	for visible := 0; visible < 20; visible++ {
+		row := start + visible
+		y := 280 + visible*19
+		if row%4 == 0 {
+			rect(dst, 36, float32(y), 876, 19, color.RGBA{27, 35, 49, 255})
+		}
+		if row == a.row {
+			rect(dst, 36, float32(y), 876, 19, color.RGBA{57, 43, 80, 255})
+		}
+		a.text(dst, fmt.Sprintf("%02X", row), 42, float64(y+2), 12, dim)
+		var c model.Cell
+		if pattern < len(p.Song.Patterns) {
+			c = p.Song.Patterns[pattern][row]
+		}
+		a.text(dst, fmt.Sprintf("%s    %s     %s", noteName(c.Note), hexOrDash(c.Instrument), hexOrDash(c.Volume)), 94, float64(y+1), 14, fg)
+		a.text(dst, fmt.Sprintf("%s    %s     %s", noteName(c.Effect1), hexOrDash(c.Parameter1), hexOrDash(c.Effect2)), 516, float64(y+1), 14, fg)
+		a.buttons = append(a.buttons, button{88, y, 806, 19, fmt.Sprintf("dma-cell:%d", row)})
+	}
+	a.text(dst, "SAMPLE BANK", 954, 206, 12, dim)
+	for i := 0; i < 8; i++ {
+		a.btn(dst, fmt.Sprintf("%d   %d bytes", i+1, len(p.Bank.Samples[i].PCM)), 954, 245+i*40, 286, 34, fmt.Sprintf("sample:%d", i), i == a.sample)
+	}
+	a.text(dst, "Select a sample and enter notes.", 954, 600, 11, dim)
+}
+
+func (a *App) LoadYM(path string) error {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	if err = a.synth.LoadYM(data); err != nil {
+		return err
+	}
+	a.tab = "YM"
+	a.ymPath = path
+	a.ymReport = nil
+	a.status = "YM reference loaded · register stream, not tracker patterns"
+	return nil
+}
+func (a *App) drawYM(dst *ebiten.Image) {
+	rect(dst, 24, 192, 1232, 482, panel)
+	r, ok := a.synth.Reference()
+	if !ok {
+		a.text(dst, "Open a .ym file to listen and inspect the YM2149 registers.", 42, 222, 16, fg)
+		return
+	}
+	a.text(dst, r.Name, 42, 211, 22, fg)
+	a.text(dst, r.Author+" · "+r.Format, 42, 248, 13, dim)
+	a.btn(dst, "Composer profile", 520, 246, 180, 34, "ym:profile", a.corpus != nil)
+	a.btn(dst, "Reconstruct", 710, 246, 156, 34, "ym:infer", false)
+	a.btn(dst, "Listen YM", 876, 246, 152, 34, "ym:reference", r.Active)
+	a.btn(dst, "Listen score", 1038, 246, 194, 34, "ym:score", !r.Active)
+	a.text(dst, fmt.Sprintf("%d:%02d / %d:%02d", r.Position/60000, (r.Position/1000)%60, r.Duration/60000, (r.Duration/1000)%60), 968, 217, 18, accent)
+	labels := []string{"Tone A low", "Tone A high", "Tone B low", "Tone B high", "Tone C low", "Tone C high", "Noise period", "Mixer", "Volume A", "Volume B", "Volume C", "Envelope low", "Envelope high", "Envelope shape"}
+	for reg, label := range labels {
+		x := 42 + (reg%2)*590
+		y := 298 + (reg/2)*43
+		a.text(dst, fmt.Sprintf("R%02d  %s", reg, label), float64(x), float64(y+8), 14, dim)
+		a.text(dst, fmt.Sprintf("%02X", r.Registers[reg]), float64(x+262), float64(y+8), 18, accent)
+	}
+	if a.ymReport != nil {
+		label := fmt.Sprintf("Candidate: %d instruments · %d patterns · %d positions", a.ymReport.Instruments, a.ymReport.Patterns, a.ymReport.Positions)
+		if a.corpus != nil {
+			label += fmt.Sprintf(" · %d corpus matches", len(a.ymReport.Evidence))
+		}
+		a.text(dst, label, 42, 626, 13, purple)
+	}
+	a.text(dst, "Reconstruction infers a candidate score; original instrument definitions and pattern boundaries are not stored in YM.", 42, 652, 11, dim)
+}

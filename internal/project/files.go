@@ -17,6 +17,15 @@ func Load(songPath, bankPath string) (*model.Project, error) {
 		if err != nil {
 			return nil, err
 		}
+		if strings.EqualFold(filepath.Ext(songPath), ".snd") || strings.EqualFold(filepath.Ext(songPath), ".sndh") {
+			embedded, err := native.DecodeContainer(b)
+			if err != nil {
+				return nil, err
+			}
+			p.Song, p.Bank = embedded.Song, embedded.Bank
+			p.Title, p.Author = embedded.Title, embedded.Author
+			return p, nil
+		}
 		song, err := native.DecodeSong(b)
 		if err != nil {
 			return nil, err
@@ -87,6 +96,10 @@ func ImportSample(bank *model.VoiceBank, index int, path string) error {
 		return fmt.Errorf("project: invalid sample bank")
 	}
 	b, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	b, err = DecodeSample(b)
 	if err != nil {
 		return err
 	}
