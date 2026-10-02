@@ -111,6 +111,8 @@ recording with the reconstructed candidate.
 
 The headless command requires no graphics window. WAV export produces stereo
 16-bit PCM at 48 kHz and refuses to overwrite an existing output file.
+The graphical editor renders WAVs in the background; choose the duration in
+**Settings → WAV export seconds** (up to one hour).
 
 ## YM reconstruction and composer profiles
 

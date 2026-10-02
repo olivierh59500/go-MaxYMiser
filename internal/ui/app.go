@@ -44,6 +44,8 @@ type button struct {
 type App struct {
 	ymData                                                             []byte
 	exportResults                                                      chan error
+	exportDuration                                                     time.Duration
+	exporting                                                          bool
 	corpus                                                             *ymimport.Corpus
 	ymPath                                                             string
 	ymReport                                                           *ymimport.Report
@@ -85,6 +87,7 @@ func New(p *model.Project, projectPath string, mute bool) (*App, error) {
 	a := &App{synth: replay.NewSynth(replay.New(p), 48000), font: face, projectPath: projectPath, status: "Ready · Space plays · Enter edits · Ctrl+S saves", tab: "Patterns", midiData: make(chan []byte, 64), exportResults: make(chan error, 1), octave: 4, step: 1, directory: "."}
 	a.generatorLow, a.generatorHigh, a.generatorCycles = "0000", "000F", "1"
 	a.generatorShape, a.morphDestination = edit.Ramp, "03"
+	a.exportDuration = 30 * time.Second
 	a.blockLast, a.pasteMode, a.columnMask = 63, edit.Overwrite, edit.AllColumns
 	if !mute {
 		context := audio.CurrentContext()
@@ -416,6 +419,8 @@ func (a *App) drawSettings(dst *ebiten.Image, e *replay.Engine) {
 	a.btn(dst, modes[mode], 850, 426, 280, 38, "pcm-mode", false)
 	a.text(dst, "PCM attenuation limit", 670, 492, 13, dim)
 	a.btn(dst, fmt.Sprint(e.Project.Song.State[56]), 950, 480, 180, 38, "setting:pcm-limit", false)
+	a.text(dst, "WAV export seconds", 670, 546, 13, dim)
+	a.btn(dst, strconv.FormatFloat(a.exportDuration.Seconds(), 'f', -1, 64), 950, 534, 180, 38, "setting:export-duration", false)
 }
 func (a *App) drawHelp(dst *ebiten.Image) {
 	rect(dst, 24, 192, 1232, 482, panel)
@@ -437,6 +442,7 @@ func (a *App) drawModal(dst *ebiten.Image) {
 func (a *App) Update() error {
 	select {
 	case result := <-a.exportResults:
+		a.exporting = false
 		if result != nil {
 			a.status = result.Error()
 		} else {
@@ -1145,19 +1151,34 @@ func (a *App) applyModal() {
 			a.status = "Sample imported"
 		}
 	case modal == "Export WAV":
+		if a.exporting {
+			a.status = "A WAV export is already running"
+			return
+		}
 		var snapshot *model.Project
 		a.synth.Edit(func(e *replay.Engine) { snapshot = e.Project.Clone() })
 		a.status = "Rendering WAV audio…"
 		reference, active := a.synth.Reference()
 		raw := append([]byte(nil), a.ymData...)
+		duration := a.exportDuration
+		a.exporting = true
 		go func() {
 			if active && reference.Active {
-				a.exportResults <- export.YM(raw, entry, 30*time.Second)
+				a.exportResults <- export.YM(raw, entry, duration)
 			} else {
-				a.exportResults <- export.WAV(snapshot, entry, 30*time.Second)
+				a.exportResults <- export.WAV(snapshot, entry, duration)
 			}
 		}()
 	case strings.HasPrefix(modal, "Setting "):
+		if modal == "Setting export-duration" {
+			seconds, err := strconv.ParseFloat(entry, 64)
+			if err != nil || seconds <= 0 || seconds > 3600 {
+				a.status = "Enter an export duration from greater than 0 to 3600 seconds"
+			} else {
+				a.exportDuration = time.Duration(seconds * float64(time.Second))
+			}
+			return
+		}
 		n, err := strconv.Atoi(entry)
 		if err != nil {
 			a.status = "Enter a decimal number"
