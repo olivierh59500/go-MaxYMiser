@@ -96,7 +96,23 @@ the source note/control timing. The alternate instrument-bank command and
 additional subtunes are rejected until their layouts are verified.
 Instrument extraction retains the six base settings, the volume sequence and
 the signed arpeggio sequence, including its cadence and hold/repeat behavior.
-The separate noise and hardware-effect programs are not yet fully translated.
+It also retains the validated noise-attack programs described below. Other
+hardware-program layouts still require their own extraction and translation.
+
+An audit of the supplied Mad Max SNDH directory checked all 357 files, each with
+a distinct unpacked payload, against the source decoder with a 6,000-frame
+analysis limit. Only `Last_Ninja.sndh` and `SID/Last_Ninja.sndh` decoded; both
+yielded 32 translated instrument definitions. The remaining 355 files were
+rejected at player-layout recognition. These counts describe source extraction
+coverage, not full audio fidelity or cross-song model accuracy. Related parser
+instructions occur in other files, but those short signatures do not establish
+compatible tables, commands or replay behavior.
+
+Expanding paired learning therefore requires verified source decoders for more
+players, checked SNDH/YM alignment and validation on entire compositions absent
+from the training set. Instrument IDs must remain local to each source bank;
+combining identically numbered instruments from unrelated songs would create
+incorrect training labels.
 
 Native execution under Hatari provided 298 note events with their source
 offsets, instrument IDs, timing and legato flags. Every event agreed with the
@@ -141,8 +157,8 @@ inspection. Dropped source SNDH files use the same inspection workflow.
 For the first 6,000 standard Last Ninja frames, conversion produces 86 generated
 patterns, 94 order positions and 45 sequences. Saving and reloading the native
 pair retains all 1,561 note/rest events, including their source instrument IDs
-and timestamps, with an exact 120-second excerpt traversal. Of these events,
-No note events in this excerpt use an unsupported instrument. Pattern commands 82 and 84
+and timestamps, with an exact 120-second excerpt traversal. No note events in
+this excerpt use an unsupported instrument. Pattern commands 82 and 84
 are translated for ordinary tone programs with a constant zero arpeggio. These
 data checks do not establish complete sound fidelity:
 unsupported definitions stay silent and marked `?`, while the translated sounds
