@@ -15,7 +15,7 @@ replay validation and hardware-specific integration.
 | YM | YM Player reference playback, register inspector, candidate score with selection ranges/explicit grids, onset-alignment proposals, composer corpus, cross-arrangement comparison, verified source-labelled SNDH/YM profiles, source envelope/arpeggio banks, measured instrument recipes and browsable source-pattern candidates | More source-player decoders, cross-song validation, arrangement recovery, continuous modulation and hardware-program reconstruction |
 | Replay | Sequences, commands, native frequency/DAC tables, timer waveforms, PCM note rates/modes | Broader full-song and mixed-timer evidence; sample-grid timer scheduling remains distinct from cycle-exact hardware |
 | MIDI | macOS notes, program changes, native controller enable/scales and editable bank changes, complete MMC play/stop, external clock/SPP, channel/sound/DD mapping, duplicate-channel allocation, live PCM transpose/attenuation and selected CoreMIDI output ports | Physical Sync24 hardware; tighter output timestamp scheduling |
-| Workflow | Resizable modern interface, drag/drop, file browser, native save, asynchronous WAV export, selectable help for keyboard/effects/instruments/formats/MIDI | Platform-specific device and clipboard conveniences |
+| Workflow | Resizable interface, drag/drop, file browser, Save as, staged native pair saves with rollback and case/permission preservation, asynchronous WAV export and selectable help | Platform-specific device and clipboard conveniences |
 
 Native register evidence currently includes 8,778 complete replay calls across
 the three supplied examples and isolated timer fixtures. The register checks

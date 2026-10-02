@@ -7,12 +7,16 @@ import (
 	"github.com/olivierh59500/go-MaxYMiser/internal/native"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"time"
 )
 
 func Load(songPath, bankPath string) (*model.Project, error) {
+	if bankPath == "" && strings.EqualFold(filepath.Ext(songPath), ".mys") {
+		bankPath = existingNativeCompanion(strings.TrimSuffix(songPath, filepath.Ext(songPath)), ".myv")
+	}
 	return loadWithReader(songPath, bankPath, os.ReadFile)
 }
 
@@ -37,6 +41,18 @@ func LoadSubtune(path string, index int) (*model.Project, error) {
 // LoadFS uses the same native decoding and paired-bank lookup for dropped
 // files or embedded filesystems. Both payloads are validated before returning.
 func LoadFS(files fs.FS, songPath, bankPath string) (*model.Project, error) {
+	if bankPath == "" && strings.EqualFold(path.Ext(songPath), ".mys") {
+		directory := path.Dir(songPath)
+		name := strings.TrimSuffix(path.Base(songPath), path.Ext(songPath)) + ".myv"
+		if entries, err := fs.ReadDir(files, directory); err == nil {
+			for _, entry := range entries {
+				if strings.EqualFold(entry.Name(), name) {
+					bankPath = path.Join(directory, entry.Name())
+					break
+				}
+			}
+		}
+	}
 	return loadWithReader(songPath, bankPath, func(path string) ([]byte, error) { return fs.ReadFile(files, path) })
 }
 
@@ -99,7 +115,6 @@ func SavePacked(p *model.Project, path string, packed bool) error {
 	if strings.EqualFold(filepath.Ext(path), ".snd") || strings.EqualFold(filepath.Ext(path), ".sndh") {
 		return SaveSNDHPacked(p, path, 0, packed)
 	}
-	stem := strings.TrimSuffix(path, filepath.Ext(path))
 	song, err := native.EncodeSong(p.Song)
 	if err != nil {
 		return err
@@ -107,6 +122,12 @@ func SavePacked(p *model.Project, path string, packed bool) error {
 	bank, err := native.EncodeVoiceBank(p.Bank)
 	if err != nil {
 		return err
+	}
+	if _, err := native.DecodeSong(song); err != nil {
+		return fmt.Errorf("project: encoded song is not reloadable: %w", err)
+	}
+	if _, err := native.DecodeVoiceBank(bank); err != nil {
+		return fmt.Errorf("project: encoded voice bank is not reloadable: %w", err)
 	}
 	if packed {
 		song, err = native.PackICE(song)
@@ -118,10 +139,8 @@ func SavePacked(p *model.Project, path string, packed bool) error {
 			return err
 		}
 	}
-	if err = atomicWrite(stem+".mys", song); err != nil {
-		return err
-	}
-	return atomicWrite(stem+".myv", bank)
+	songPath, bankPath := nativePairPaths(path)
+	return writeNativePair(songPath, song, bankPath, bank)
 }
 
 func SaveSNDH(p *model.Project, path string, duration time.Duration) error {

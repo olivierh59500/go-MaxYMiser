@@ -102,6 +102,7 @@ files use **Save as** rather than treating virtual paths as filesystem targets.
 | Lower note keyboard | Z S X D C V G B H N J M |
 | Upper note keyboard | Q 2 W 3 E R 5 T 6 Y 7 U |
 | Open / save | Ctrl+O / Ctrl+S |
+| Save as | Ctrl+Shift+S |
 | Undo / redo | Ctrl+Z / Ctrl+Y |
 | Jam mode | F10 |
 | Disable Jam | Shift+F10 |
@@ -151,6 +152,12 @@ remapping operate on both sample voices and preserve their volume columns.
 including reserved state, RLE pattern rows, instrument parameters, sequences,
 sample offsets and sample tails. Save writes the corresponding native pair.
 The three supplied example song/bank pairs round-trip byte for byte.
+Both native payloads are encoded, validated, staged and synced before replacing
+the saved pair. A failed replacement restores the preceding files, including
+when the second file fails. Original filename case and file permissions are
+retained. This protects against write/rename failures; it is not a filesystem
+transaction that guarantees both files switch together during power loss.
+The **As** button beside Save, or Ctrl+Shift+S, chooses a new native destination.
 
 Unpacked `.SND`/`.SNDH` files created by MaxYMiser can be opened as editable
 projects by extracting their native song and voice-bank payloads. This import

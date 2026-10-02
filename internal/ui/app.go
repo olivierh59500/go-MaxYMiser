@@ -189,7 +189,8 @@ func (a *App) Draw(dst *ebiten.Image) {
 	a.text(dst, "YM2149 + STe sample tracker", 25, 51, 12, dim)
 	a.btn(dst, "New", 510, 20, 64, 36, "new", false)
 	a.btn(dst, "Open", 582, 20, 72, 36, "open", false)
-	a.btn(dst, "Save", 662, 20, 72, 36, "save", a.dirty)
+	a.btn(dst, "Save", 662, 20, 56, 36, "save", a.dirty)
+	a.btn(dst, "As", 726, 20, 32, 36, "save-as", false)
 	a.btn(dst, "Song", 764, 20, 78, 36, "play", e.Playing && !e.PatternMode)
 	a.btn(dst, "Pattern", 850, 20, 94, 36, "pattern", e.Playing && e.PatternMode)
 	a.btn(dst, "Stop", 952, 20, 74, 36, "stop", false)
@@ -674,7 +675,11 @@ func (a *App) keyboard() {
 			return
 		}
 		if inpututil.IsKeyJustPressed(ebiten.KeyS) {
-			a.action("save")
+			if ebiten.IsKeyPressed(ebiten.KeyShift) {
+				a.action("save-as")
+			} else {
+				a.action("save")
+			}
 		}
 		if inpututil.IsKeyJustPressed(ebiten.KeyO) {
 			a.action("open")
@@ -1172,6 +1177,14 @@ func (a *App) action(name string) {
 		} else {
 			a.save(a.projectPath)
 		}
+	case "save-as":
+		name := "untitled.mys"
+		if a.projectPath != "" {
+			name = filepath.Base(a.projectPath)
+		} else if len(a.subtunes) > 1 {
+			name = fmt.Sprintf("subtune-%02d.mys", a.subtuneIndex+1)
+		}
+		a.beginFileBrowser("Save project as (.mys + .myv)", name, true)
 	case "play":
 		if r, ok := a.synth.Reference(); ok && r.Active {
 			a.synth.ToggleYM()

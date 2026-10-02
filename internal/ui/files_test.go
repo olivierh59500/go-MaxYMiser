@@ -63,3 +63,47 @@ func TestFileBrowserSaveResolvesRelativeNamesInChosenDirectory(t *testing.T) {
 		t.Fatalf("relative save did not use browser directory: %v", err)
 	}
 }
+
+func TestSaveAsChoosesANewPairWithoutOverwritingTheCurrentDestination(t *testing.T) {
+	root := t.TempDir()
+	original := filepath.Join(root, "original.mys")
+	if err := project.Save(model.Demo(), original); err != nil {
+		t.Fatal(err)
+	}
+	app, err := New(model.Demo(), original, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer app.Close()
+	app.action("save-as")
+	app.entry = "variation.mys"
+	app.applyModal()
+	if app.projectPath != filepath.Join(root, "variation.mys") {
+		t.Fatal("Save as did not set the new native pair destination")
+	}
+	if _, err := os.Stat(original); err != nil {
+		t.Fatal("Save as removed the original song")
+	}
+}
+
+func TestFailedSaveKeepsTheEditorDirtyAndItsCurrentDestination(t *testing.T) {
+	root := t.TempDir()
+	original := filepath.Join(root, "original.mys")
+	app, err := New(model.Demo(), original, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer app.Close()
+	app.dirty = true
+	target := filepath.Join(root, "blocked.mys")
+	if err := os.Mkdir(filepath.Join(root, "blocked.myv"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	app.save(target)
+	if !app.dirty || app.projectPath != original {
+		t.Fatal("failed native save cleared unsaved edits or changed the current destination")
+	}
+	if _, err := os.Stat(target); !os.IsNotExist(err) {
+		t.Fatal("failed save left a partial song file")
+	}
+}
