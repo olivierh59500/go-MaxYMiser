@@ -1164,6 +1164,9 @@ func (a *App) loadYMBytes(data []byte) error {
 		return err
 	}
 	a.ymData = append([]byte(nil), data...)
+	if strings.EqualFold(filepath.Ext(a.projectPath), ".ym") {
+		a.projectPath = ""
+	}
 	a.tab = "YM"
 	a.ymReport = nil
 	a.status = "YM reference loaded · register stream, not tracker patterns"

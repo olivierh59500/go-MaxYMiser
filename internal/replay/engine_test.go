@@ -78,3 +78,41 @@ func TestAudioReaderProducesRealPCMAndStableClock(t *testing.T) {
 		t.Fatalf("silent output or wrong tick rate: peak=%d ticks=%d", peak, e.Ticks)
 	}
 }
+
+func TestStopAndResetDiscardPendingPreviewTriggers(t *testing.T) {
+	e := New(model.New())
+	e.Trigger(0, 69, 1)
+	e.Stop()
+	e.Tick()
+	if e.Voices[0].Triggered || e.Registers[8] != 0 {
+		t.Fatal("stopped preview was triggered again")
+	}
+	e.Trigger(0, 69, 1)
+	e.Reset()
+	e.Tick()
+	if e.Voices[0].Triggered || e.Registers[8] != 0 {
+		t.Fatal("reset retained a preview from the previous project")
+	}
+}
+
+func TestJamMarkersLoopTheSelectedSection(t *testing.T) {
+	p := model.New()
+	p.Song.Length = 5
+	p.Song.Orders[1] = [4]byte{model.LoopPattern, 255, 255, 255}
+	p.Song.Orders[2] = [4]byte{2, 255, 255, 255}
+	p.Song.Orders[3] = [4]byte{1, 255, 255, 255}
+	p.Song.Orders[4] = [4]byte{model.LoopPattern, 255, 255, 255}
+	e := New(p)
+	e.Jam = true
+	e.Position = 4
+	e.Play(false)
+	if e.Position != 2 || e.Patterns[0] != 2 {
+		t.Fatalf("jam marker did not return to its section: position=%d patterns=%v", e.Position, e.Patterns)
+	}
+	e.Jam = false
+	e.Position = 1
+	e.Play(false)
+	if e.Position != 2 {
+		t.Fatal("normal transport did not skip a jam marker")
+	}
+}

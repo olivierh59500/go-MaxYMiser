@@ -8,6 +8,7 @@ import (
 	"github.com/olivierh59500/go-MaxYMiser/internal/export"
 	"github.com/olivierh59500/go-MaxYMiser/internal/model"
 	"github.com/olivierh59500/go-MaxYMiser/internal/project"
+	"github.com/olivierh59500/go-MaxYMiser/internal/replay"
 	"github.com/olivierh59500/go-MaxYMiser/internal/ui"
 	"log"
 	"os"
@@ -37,7 +38,21 @@ func main() {
 		}
 	}
 	if *info {
-		fmt.Printf("%s: %d positions, %d patterns, %d sequences, %d Hz, speed %d\n", p.Title, p.Song.Length, len(p.Song.Patterns), p.Bank.SequenceCount, p.Song.TickRate(), p.Song.Speed())
+		if isYM {
+			raw, e := os.ReadFile(*song)
+			if e != nil {
+				log.Fatal(e)
+			}
+			synth := replay.NewSynth(replay.New(model.New()), 48000)
+			if e = synth.LoadYM(raw); e != nil {
+				log.Fatal(e)
+			}
+			r, _ := synth.Reference()
+			synth.CloseYM()
+			fmt.Printf("%s: %s, %s, %.2f seconds; original register recording\n", filepath.Base(*song), r.Name, r.Format, float64(r.Duration)/1000)
+		} else {
+			fmt.Printf("%s: %d positions, %d patterns, %d sequences, %d Hz, speed %d\n", p.Title, p.Song.Length, len(p.Song.Patterns), p.Bank.SequenceCount, p.Song.TickRate(), p.Song.Speed())
+		}
 		return
 	}
 	if *wav != "" {

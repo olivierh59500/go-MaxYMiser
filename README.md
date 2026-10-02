@@ -108,6 +108,16 @@ reconstruction. The profile records matches, occurrences and source examples.
 The recording itself remains the comparison reference. See
 [YM reconstruction](docs/YM_RECONSTRUCTION.md) for the corpus method and its limits.
 
+Different arrangements of a composition can also be compared across composers:
+
+```sh
+ go run ./cmd/ymcompare -left /path/to/first-composer \
+   -right /path/to/second-composer -output comparison.json
+```
+
+The report separates title hints, transposition/tempo-normalized musical
+phrases and timbre differences, with source times for checking each example.
+
 ## Implementation status
 
 This is a developer edition. The pattern engine includes sequence playback,
@@ -133,6 +143,8 @@ editing are not included in this edition.
 Checks cover native round trips, truncation rejection, notes and periods,
 sequence/effect behaviour, PCM timing, live note triggering, MIDI framing,
 YM-reference playback, reconstruction and duplicate-aware corpus evidence.
+Cross-composer checks cover tempo changes, transposition, channel reassignment,
+noise-only events and misleading filenames.
 
 ## Credits
 

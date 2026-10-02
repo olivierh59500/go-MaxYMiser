@@ -7,6 +7,7 @@ import (
 	"github.com/olivierh59500/go-MaxYMiser/internal/export"
 	"github.com/olivierh59500/go-MaxYMiser/internal/model"
 	"github.com/olivierh59500/go-MaxYMiser/internal/project"
+	"github.com/olivierh59500/go-MaxYMiser/internal/replay"
 	"log"
 	"os"
 	"path/filepath"
@@ -20,6 +21,9 @@ func main() {
 	wav := flag.String("wav", "", "new WAV output path")
 	duration := flag.Duration("duration", 30*time.Second, "render duration")
 	flag.Parse()
+	if *song == "" && flag.NArg() > 0 {
+		*song = flag.Arg(0)
+	}
 	p := model.Demo()
 	var err error
 	isYM := *song != "" && strings.EqualFold(filepath.Ext(*song), ".ym")
@@ -29,14 +33,25 @@ func main() {
 			log.Fatal(err)
 		}
 	}
-	fmt.Printf("%s: %d positions, %d patterns, %d sequences, %d Hz, speed %d\n", p.Title, p.Song.Length, len(p.Song.Patterns), p.Bank.SequenceCount, p.Song.TickRate(), p.Song.Speed())
+	var ymData []byte
+	if isYM {
+		ymData, err = os.ReadFile(*song)
+		if err != nil {
+			log.Fatal(err)
+		}
+		synth := replay.NewSynth(replay.New(model.New()), 48000)
+		if err = synth.LoadYM(ymData); err != nil {
+			log.Fatal(err)
+		}
+		r, _ := synth.Reference()
+		synth.CloseYM()
+		fmt.Printf("%s: %s, %s, %.2f seconds; original register recording\n", filepath.Base(*song), r.Name, r.Format, float64(r.Duration)/1000)
+	} else {
+		fmt.Printf("%s: %d positions, %d patterns, %d sequences, %d Hz, speed %d\n", p.Title, p.Song.Length, len(p.Song.Patterns), p.Bank.SequenceCount, p.Song.TickRate(), p.Song.Speed())
+	}
 	if *wav != "" {
 		if isYM {
-			raw, e := os.ReadFile(*song)
-			if e != nil {
-				log.Fatal(e)
-			}
-			err = export.YM(raw, *wav, *duration)
+			err = export.YM(ymData, *wav, *duration)
 		} else {
 			err = export.WAV(p, *wav, *duration)
 		}

@@ -52,6 +52,7 @@ func New(p *model.Project) *Engine {
 func (e *Engine) Reset() {
 	e.Voices = [3]Voice{}
 	e.DMA = [2]PCMVoice{}
+	e.pending = [3]bool{}
 	e.Registers = [14]byte{}
 	e.Registers[7] = 255
 	e.Position, e.Row, e.TickInRow = 0, 0, 0
@@ -62,6 +63,8 @@ func (e *Engine) Reset() {
 	e.MasterVolume, e.Pan, e.Bass, e.Treble = 127, 0, 6, 6
 	e.Loops = 0
 	e.Ticks = 0
+	e.EnvelopeWrite = false
+	e.Zync = 0
 	e.Patterns = e.Project.Song.Orders[0]
 }
 func (e *Engine) Play(pattern bool) {
@@ -75,6 +78,7 @@ func (e *Engine) Play(pattern bool) {
 }
 func (e *Engine) Stop() {
 	e.Playing = false
+	e.pending = [3]bool{}
 	e.Voices = [3]Voice{}
 	e.DMA = [2]PCMVoice{}
 	e.Registers[7] = 255
@@ -506,6 +510,14 @@ func (e *Engine) configure() {
 
 func (e *Engine) loadPosition() {
 	length := int(e.Project.Song.Length)
+	if length == 0 {
+		e.Position = 0
+		e.Patterns = [4]byte{255, 255, 255, 255}
+		return
+	}
+	if e.Position < 0 || e.Position >= length {
+		e.Position = min(int(e.Project.Song.Repeat), length-1)
+	}
 	for checked := 0; checked < length; checked++ {
 		order := e.Project.Song.Orders[e.Position]
 		loop := false
