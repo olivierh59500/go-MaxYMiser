@@ -24,6 +24,13 @@ the remaining four stay inspectable and support shorter valid selections.
 Other layouts, unverified pitch mappings
 and native capacity limits remain explicit. See
 [YM reconstruction](YM_RECONSTRUCTION.md) for the measured scope.
+`ympaircorpus` now trains from explicit SNDH/YM pairs while keeping instrument
+identities independent of bank-local numbers. Whole-composition validation
+reports unfamiliar-definition acceptance and independently detected YM onsets.
+The initial five-composition result still lacks reliable rejection of unfamiliar
+definitions; imported corpus labels therefore remain experimental candidates.
+Native save/reload of three blind imports retains the preceding transcription
+when no learned recipe improves its measured output.
 Long ordinary-tone envelopes use native pattern volume without consuming an
 effect column. Their bank definitions retain the other converted sound settings;
 the report identifies definitions that need the generated score for playback.

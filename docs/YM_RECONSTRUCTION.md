@@ -117,6 +117,82 @@ from the training set. Instrument IDs must remain local to each source bank;
 combining identically numbered instruments from unrelated songs would create
 incorrect training labels.
 
+### Corpus profiles and whole-composition evaluation
+
+`ympaircorpus` reads an explicit manifest of candidate pairs. Paths may be
+absolute or relative to the manifest. Every pair must pass pitch/timing alignment
+before training. Use one profile per verified player family, frame rate and chip
+clock. The manifest's `composition_group` keeps every recording and arrangement
+of the same composition together:
+
+```json
+{
+  "version": 1,
+  "pairs": [
+    {"composition_group": "song-a", "sndh": "song-a.sndh", "ym": "song-a.ym"},
+    {"composition_group": "song-b", "sndh": "song-b.sndh", "ym": "song-b.ym"}
+  ]
+}
+```
+
+```sh
+go run ./cmd/ympaircorpus -manifest pairs.json -frames 6000 \
+  -output cross-song-report.json -model corpus-profile.json
+
+go run ./cmd/ymimport -input another-song.ym -end-frame 1200 \
+  -paired-profile corpus-profile.json -output candidate.mys
+```
+
+The evaluation leaves out a complete composition group at a time, including all
+of its variants. Duplicate unpacked source hashes, decoded register streams and
+normalized source-note timelines cannot be assigned to different groups. These
+checks do not replace deliberate grouping of arrangements that change timing.
+The default analysis covers the first 6,000 decoded frames of each source; it
+does not measure complete-song fidelity.
+
+Instrument classes compare the retained definition, player and frame rate.
+File offsets and local instrument numbers are excluded; an arpeggio's local
+index is replaced by its resolved values, cadence and repeat. Noise programs and
+volume settings remain part of the identity. A similar audible fragment does
+not establish that two complete native definitions are identical.
+
+The report separates classification using known source-note boundaries from
+recognition using independently detected YM events. The latter predicts from
+YM data alone, then scores one-to-one source onset matches within two frames.
+Unknown definitions, missed notes and accepted additional segments are counted
+explicitly. Accepted additional segments can include native legato changes;
+they are not automatically evidence of an incorrect sounding note.
+
+A first evaluation pairs **Ace 2, Commando, Warhawk, Crazy Comets and Human
+Race** from the verified classic family with their supplied YM recordings. Across
+the five excluded-composition folds, 207 of 7,367 eligible events use definitions
+present in the training music. Classification at source boundaries labels 89 of
+these correctly, abstains on 118 and accepts 643 events whose complete native
+definition was not in training. The independently detected YM onsets match
+5,684 source events, correctly label 193 of the 207 known-definition events,
+accept 326 unknown-definition events and produce 352 accepted additional
+segments. These results demonstrate limited transfer and inadequate rejection
+of unfamiliar definitions, not reliable recovery of arbitrary original banks.
+
+The model trained on all five compositions contains 51 observed definitions,
+553 feature prototypes and 1,112 editable synthesis recipes. It remains an
+experimental similarity model. The tracker loads it through **YM → Paired
+source profile**, identifies its labels as **Corpus candidates**, and retains
+the independent YM reference. Original pattern IDs and score timelines are not
+merged into this model. Its training groups also appear in reconstruction
+reports, so a target included in training cannot be presented as an unseen test.
+
+Recipe pitch trajectories are fitted to the target's first observed tone;
+absolute vibrato corrections are recalculated for that pitch. Independent
+regressions verify octave changes while keeping volume and the learned recipe
+unchanged. A fitted recipe is still accepted only when its measured register
+error improves the proposed passage without degrading volume. Blind 1,200-frame
+imports of Warhawk, Commando and Crazy Comets, each trained on the other four
+compositions, accept no substitutions at present. They preserve the existing
+transcription, with identical register playback after native MYS/MYV save and
+reload. Improving useful transfer remains separate from merely adding corpus
+files or reporting a high precision on already-known sounds.
+
 Native execution under Hatari provided 298 note events with their source
 offsets, instrument IDs, timing and legato flags. Every event agreed with the
 Go source decoder. Original binaries, captured memory and learned music data

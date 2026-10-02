@@ -15,6 +15,7 @@ type Report struct {
 	GridCandidates                           []GridCandidate
 	SourceLabels                             []SourceEvidence
 	SourcePlayer                             string
+	SourceCorpusGroups                       []string
 	SourceLabelRate                          int
 	RecipeApplications                       []RecipeApplication
 	SourcePatterns                           []PatternEvidence

@@ -36,6 +36,7 @@ type PairedProfile struct {
 	PatternValidation PatternValidation  `json:"pattern_validation"`
 	ReferenceIdentity string             `json:"reference_register_identity,omitempty"`
 	ReferencePatterns []PatternEvidence  `json:"reference_source_patterns,omitempty"`
+	Corpus            *PairedCorpusInfo  `json:"paired_corpus,omitempty"`
 }
 
 type PairValidation struct {
@@ -335,6 +336,9 @@ func (p PairedProfile) MatchSource(features []int16) (int, float64, float64, boo
 // The native score is not consulted to assign event IDs in the target trace.
 func (p PairedProfile) SourceEvidence(trace Trace) []SourceEvidence {
 	var results []SourceEvidence
+	if p.Corpus != nil && (trace.Rate != p.Source.Rate || trace.Clock != p.Corpus.Clock) {
+		return results
+	}
 	for ch := 0; ch < 3; ch++ {
 		for _, e := range ExtractEvents(trace, ch) {
 			id, distance, margin, ok := p.MatchSource(e.Features)
@@ -398,6 +402,18 @@ func LoadPairedProfile(path string) (PairedProfile, error) {
 			if s.Length < 1 || s.Length > 63 || s.Repeat >= s.Length {
 				return p, fmt.Errorf("pair: invalid instrument recipe sequence")
 			}
+		}
+	}
+	if p.Corpus != nil {
+		if p.Corpus.Clock == 0 || len(p.Corpus.Groups) < 2 || len(p.Corpus.Groups) > 256 || len(p.Corpus.InstrumentKeys) != len(p.Source.Instruments) || len(p.Corpus.Sources) < 2 || len(p.Corpus.Sources) > 1024 || p.ReferenceIdentity != "" || len(p.ReferencePatterns) != 0 || len(p.Patterns) != 0 || len(p.Source.Events) != 0 {
+			return p, fmt.Errorf("pair: invalid corpus provenance or source-specific timeline")
+		}
+		seen := map[string]bool{}
+		for i, key := range p.Corpus.InstrumentKeys {
+			if key != sourceInstrumentIdentity(p.Source.Player, p.Source.Rate, p.Source.Instruments[i]) || seen[key] {
+				return p, fmt.Errorf("pair: invalid or duplicate corpus instrument identity")
+			}
+			seen[key] = true
 		}
 	}
 	return p, nil

@@ -68,7 +68,10 @@ trying the editor. External MaxYMiser files are not needed to launch it.
   undo/redo. They affect only the currently selected subtune.
 - **YM**: original YM playback, live register inspection and proposed tracker
   reconstruction, with optional composer-corpus evidence and source-labelled
-  profiles learned from verified SNDH/YM pairs. On the one-frame grid, labelled
+  profiles learned from verified SNDH/YM pairs. Experimental corpus profiles
+  group retained instrument definitions across recordings and include a separate
+  evaluation excluding complete compositions; similarity candidates remain
+  distinct from known source IDs. On the one-frame grid, labelled
   instrument recipes are retained where their measured replay improves the
   candidate while preserving its volume accuracy.
 - **Settings**: playback rate, speed, edit step, octave, volume, timer mask,

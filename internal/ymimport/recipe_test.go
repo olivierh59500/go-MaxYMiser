@@ -1,11 +1,65 @@
 package ymimport
 
 import (
+	"math"
 	"testing"
 
 	"github.com/olivierh59500/go-MaxYMiser/internal/model"
 	"github.com/olivierh59500/go-MaxYMiser/internal/replay"
 )
+
+func TestPairedRecipeFitsLearnedPeriodTrajectoryAtOtherOctaves(t *testing.T) {
+	for _, scale := range []float64{0.5, 2} {
+		trace, _ := Decode(simpleYM3(8))
+		r := InstrumentRecipe{SourceInstrument: 0, Frames: 8, Note: 69, Instrument: model.Instrument{17: 4, 18: 4, 19: 4, 32: 1}}
+		for i := range r.Sequences {
+			r.Sequences[i].Length, r.Sequences[i].Repeat = 8, 7
+		}
+		for frame := 0; frame < 8; frame++ {
+			vibrato := frame%4 - 4
+			original := int(replay.TonePeriod(69)) - vibrato
+			period := int(math.Round(float64(original) * scale))
+			trace.Frames[frame][0], trace.Frames[frame][1] = byte(period), byte(period>>8)
+			r.Sequences[0].Values[frame] = 15
+			r.Sequences[2].Values[frame] = uint16(int16(vibrato))
+			r.Sequences[3].Values[frame] = 0x100
+		}
+		events := ExtractEvents(trace, 0)
+		profile := PairedProfile{Source: SourceScore{Player: "pitch-trajectory", Rate: 50, Instruments: []SourceInstrument{{ID: 0}}}, Prototypes: []PairedPrototype{{Instrument: 0, Features: events[0].Features}}, Recipes: []InstrumentRecipe{r}}
+		p, report, err := ReconstructSelection(trace, ReconstructionOptions{FramesPerRow: 1})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := ApplyPairedRecipes(p, &report, trace, profile); err != nil {
+			t.Fatal(err)
+		}
+		if len(report.RecipeApplications) != 1 {
+			t.Fatalf("scaled trajectory was not accepted for scale %.1f", scale)
+		}
+		after, _ := reconstructionFrames(p, len(trace.Frames))
+		for i := range after {
+			if after[i][0] != trace.Frames[i][0] || after[i][1] != trace.Frames[i][1] || after[i][8] != 15 {
+				t.Fatalf("scale %.1f changed the pitch/level at frame %d: %v != %v", scale, i, after[i], trace.Frames[i])
+			}
+		}
+		if profile.Recipes[0].Note != 69 || profile.Recipes[0].Sequences[2].Values[0] != uint16(65532) {
+			t.Fatal("fitting modified the learned recipe")
+		}
+	}
+}
+
+func TestRecipePitchFittingRejectsUnsupportedNotesAndPeriods(t *testing.T) {
+	r := InstrumentRecipe{Note: 69, Sequences: [5]model.Sequence{{Length: 1}, {Length: 1}, {Length: 1}, {Values: [63]uint16{0x100}, Length: 1}, {Length: 1}}}
+	for _, input := range [][2]int{{1, 284}, {128, 284}, {69, 0}, {69, 4096}} {
+		if _, ok := fitRecipePitch(r, input[0], input[1]); ok {
+			t.Fatalf("unsupported pitch fit accepted: %v", input)
+		}
+	}
+	r.Sequences[1].Values[0] = 100
+	if _, ok := fitRecipePitch(r, 69, 284); ok {
+		t.Fatal("out-of-range arpeggio was clamped into a different sound")
+	}
+}
 
 func TestPairedRecipesImprovePitchWithoutChangingLevelOrSharedOccurrences(t *testing.T) {
 	trace, _ := Decode(simpleYM3(128))

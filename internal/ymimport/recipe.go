@@ -14,6 +14,7 @@ import (
 type InstrumentRecipe struct {
 	SourceInstrument int               `json:"source_instrument"`
 	SourceFrame      int               `json:"training_source_frame"`
+	TrainingSource   string            `json:"training_source_identity,omitempty"`
 	Note             int               `json:"training_midi_note"`
 	Frames           int               `json:"training_frames"`
 	Features         []int16           `json:"training_features"`

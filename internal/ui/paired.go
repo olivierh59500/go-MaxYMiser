@@ -12,7 +12,11 @@ func (a *App) LoadPairedProfile(path string) error {
 		return err
 	}
 	a.pairedProfile = &profile
-	a.status = fmt.Sprintf("Loaded %s labelled profile; %d/%d held-out source labels correct", profile.Source.Player, profile.Validation.Correct, profile.Validation.Known)
+	if profile.Corpus != nil {
+		a.status = fmt.Sprintf("Experimental corpus: %d compositions, %d sound definitions; labels remain candidates", len(profile.Corpus.Groups), len(profile.Source.Instruments))
+	} else {
+		a.status = fmt.Sprintf("Loaded %s labelled profile; %d/%d held-out source labels correct", profile.Source.Player, profile.Validation.Correct, profile.Validation.Known)
+	}
 	return nil
 }
 

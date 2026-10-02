@@ -1821,7 +1821,11 @@ func (a *App) drawYM(dst *ebiten.Image) {
 			label += fmt.Sprintf(" · %d corpus matches", len(a.ymReport.Evidence))
 		}
 		if a.pairedProfile != nil {
-			label += fmt.Sprintf(" · %d source labels · %d improved passages", len(a.ymReport.SourceLabels), len(a.ymReport.RecipeApplications))
+			kind := "source labels"
+			if len(a.ymReport.SourceCorpusGroups) > 0 {
+				kind = "sound candidates"
+			}
+			label += fmt.Sprintf(" · %d %s · %d improved passages", len(a.ymReport.SourceLabels), kind, len(a.ymReport.RecipeApplications))
 		}
 		a.text(dst, label, 42, 626, 13, purple)
 	}
@@ -1833,7 +1837,11 @@ func (a *App) drawYM(dst *ebiten.Image) {
 				labels[evidence.Channel] = fmt.Sprintf("%02X", evidence.Instrument)
 			}
 		}
-		a.text(dst, fmt.Sprintf("Paired source IDs: A %s · B %s · C %s · ? = unresolved", labels[0], labels[1], labels[2]), 42, 599, 12, accent)
+		kind := "Paired source IDs"
+		if len(a.ymReport.SourceCorpusGroups) > 0 {
+			kind = "Corpus candidates"
+		}
+		a.text(dst, fmt.Sprintf("%s: A %s · B %s · C %s · ? = unresolved", kind, labels[0], labels[1], labels[2]), 42, 599, 12, accent)
 	}
 	a.text(dst, "Reconstruction infers a candidate score; original instrument definitions and pattern boundaries are not stored in YM.", 42, 652, 11, dim)
 }

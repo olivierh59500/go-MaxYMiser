@@ -34,6 +34,10 @@ func ApplyPairedRecipes(project *model.Project, report *Report, trace Trace, pro
 		labels[i].End += report.StartFrame
 	}
 	report.SourcePlayer, report.SourceLabelRate, report.SourceLabels = profile.Source.Player, trace.Rate, labels
+	if profile.Corpus != nil {
+		report.SourceCorpusGroups = append([]string(nil), profile.Corpus.Groups...)
+		report.Warnings = appendUnique(report.Warnings, "Corpus sound labels are experimental similarity candidates; an unseen native definition can resemble a stored sound.")
+	}
 	known, matched := profile.KnownPatternEvidence(trace, report.StartFrame, report.EndFrame)
 	if matched {
 		report.SourcePatterns = known
@@ -82,8 +86,10 @@ func ApplyPairedRecipes(project *model.Project, report *Report, trace Trace, pro
 		candidate := InstrumentRecipe{}
 		after := math.Inf(1)
 		for _, r := range ranked[:min(16, len(ranked))] {
-			r.Note = note - int(int16(r.Sequences[1].Values[0]))
-			if r.Note < 2 || r.Note > 127 {
+			period := int(trace.Frames[label.Start][label.Channel*2]) | int(trace.Frames[label.Start][label.Channel*2+1]&15)<<8
+			var ok bool
+			r, ok = fitRecipePitch(r, note-int(int16(r.Sequences[1].Values[0])), period)
+			if !ok {
 				continue
 			}
 			error := recipeError(r, trace, label.Channel, label.Start, label.Start+length)
@@ -114,7 +120,7 @@ func ApplyPairedRecipes(project *model.Project, report *Report, trace Trace, pro
 		if len(project.Song.Patterns)+needed > model.MaxPatterns {
 			continue
 		}
-		programKey := fmt.Sprint(recipe.SourceInstrument, ":", recipe.SourceFrame)
+		programKey := fmt.Sprint(recipe.SourceInstrument, ":", recipe.TrainingSource, ":", recipe.SourceFrame, ":", recipe.Instrument, ":", recipe.Sequences)
 		id, exists := allocated[programKey]
 		if !exists {
 			if used >= model.MaxInstruments || project.Bank.SequenceCount+5 > model.MaxSequences {
@@ -189,6 +195,44 @@ func ApplyPairedRecipes(project *model.Project, report *Report, trace Trace, pro
 		report.Warnings = appendUnique(report.Warnings, "Source-labelled instrument recipes were accepted only where their measured register error improved the candidate; other passages keep the frame transcription.")
 	}
 	return nil
+}
+
+// fitRecipePitch preserves the learned relative period trajectory, anchored to
+// the target's first observed tone. Absolute vibrato words are recalculated for
+// the target note instead of copying a correction measured at another pitch.
+// The caller still measures the complete candidate against the target passage.
+func fitRecipePitch(r InstrumentRecipe, note, period int) (InstrumentRecipe, bool) {
+	if note < 2 || note > 127 || period < 1 || period > 4095 || r.Sequences[2].Length < 1 || r.Sequences[2].Length > 63 || r.Sequences[3].Values[0]&0x100 == 0 {
+		return r, false
+	}
+	firstNote := r.Note + int(int16(r.Sequences[1].Values[0]))
+	if firstNote < 2 || firstNote > 127 {
+		return r, false
+	}
+	firstPeriod := int(replay.TonePeriod(firstNote)) - int(int16(r.Sequences[2].Values[0]))
+	if firstPeriod < 1 || firstPeriod > 4095 {
+		return r, false
+	}
+	for i := 0; i < int(r.Sequences[2].Length); i++ {
+		if r.Sequences[3].Values[i]&0x100 == 0 {
+			continue
+		}
+		arp := int(int16(r.Sequences[1].Values[i]))
+		if r.Note+arp < 2 || r.Note+arp > 127 || note+arp < 2 || note+arp > 127 {
+			return r, false
+		}
+		original := int(replay.TonePeriod(r.Note+arp)) - int(int16(r.Sequences[2].Values[i]))
+		if original < 1 || original > 4095 {
+			return r, false
+		}
+		wanted := int(math.Round(float64(original) * float64(period) / float64(firstPeriod)))
+		if wanted < 1 || wanted > 4095 {
+			return r, false
+		}
+		r.Sequences[2].Values[i] = uint16(int16(int(replay.TonePeriod(note+arp)) - wanted))
+	}
+	r.Note = note
+	return r, true
 }
 
 func recipePreservesLevel(recipe InstrumentRecipe, trace Trace, baseline [][14]byte, ch, start, end, selectionStart int) bool {
