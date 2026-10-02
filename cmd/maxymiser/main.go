@@ -4,6 +4,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/olivierh59500/go-MaxYMiser/internal/buildinfo"
 	"github.com/olivierh59500/go-MaxYMiser/internal/export"
 	"github.com/olivierh59500/go-MaxYMiser/internal/model"
 	"github.com/olivierh59500/go-MaxYMiser/internal/project"
@@ -16,6 +17,7 @@ import (
 )
 
 func main() {
+	version := flag.Bool("version", false, "print the application version")
 	song := flag.String("song", "", "native MYS file")
 	bank := flag.String("bank", "", "native MYV bank")
 	wav := flag.String("wav", "", "WAV output path; existing regular files are replaced after complete rendering")
@@ -27,6 +29,10 @@ func main() {
 	songDuration := flag.Bool("song-duration", false, "derive export duration from one arranged traversal")
 	defaultsDirectory := flag.String("defaults", "", "directory containing MYM.CNF and DEFAULT native startup files")
 	flag.Parse()
+	if *version {
+		fmt.Println("Go MaxYMiser " + buildinfo.Version)
+		return
+	}
 	if *song == "" && flag.NArg() > 0 {
 		*song = flag.Arg(0)
 	}

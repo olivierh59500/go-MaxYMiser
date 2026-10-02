@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/olivierh59500/go-MaxYMiser/internal/buildinfo"
 	"github.com/olivierh59500/go-MaxYMiser/internal/export"
 	"github.com/olivierh59500/go-MaxYMiser/internal/model"
 	"github.com/olivierh59500/go-MaxYMiser/internal/project"
@@ -18,6 +19,7 @@ import (
 )
 
 func main() {
+	version := flag.Bool("version", false, "print the application version")
 	song := flag.String("song", "", "native MYS file")
 	bank := flag.String("bank", "", "native MYV voice bank")
 	wav := flag.String("wav", "", "render to a new WAV file")
@@ -29,6 +31,10 @@ func main() {
 	pairedProfile := flag.String("paired-profile", "", "verified source-labelled SNDH/YM profile JSON")
 	defaultsDirectory := flag.String("defaults", "", "directory containing MYM.CNF and DEFAULT native startup files")
 	flag.Parse()
+	if *version {
+		fmt.Println("Go MaxYMiser " + buildinfo.Version)
+		return
+	}
 	if *song == "" && flag.NArg() > 0 {
 		*song = flag.Arg(0)
 	}

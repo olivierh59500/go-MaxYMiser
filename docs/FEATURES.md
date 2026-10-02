@@ -147,3 +147,16 @@ Corpus sound labels now retain independent-composition support and an optional
 minimum threshold, with the same policy in complete held-out evaluation. The
 five-composition strict result abstains on every known definition; its loss of
 coverage remains explicit rather than being reported as improved accuracy.
+
+The 0.1.0 workflow regression creates a new song through the interface, enters
+three notes, edits an instrument parameter, saves a paired native project,
+reopens it and produces a correctly sized, non-silent stereo WAV. Serialized
+song/bank equality and editor save state are checked across that complete path.
+The complete race-enabled suite and `go vet` pass; source-subtune and recurring
+YM phrase captures verify the corresponding controls and readable labels.
+
+Chom adds another complete native-rate PCM arrangement: 26,977 captured main
+calls match for both original and regenerated exports after native-pair reload.
+The comparison corrected signed low-word overflow in negatively detuned
+portamento. Combined with Colony and 0ompa main, 64,562 captured main calls are
+retained per original/export set; mixed PCM waveform/filter parity is separate.
