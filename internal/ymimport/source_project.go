@@ -50,7 +50,7 @@ func SourceProject(score SourceScore, start, end int) (*model.Project, SourcePro
 	for _, pattern := range score.Patterns {
 		for _, command := range pattern.Commands {
 			op := command.Opcode
-			if op >= 128 && op < 0xb8 && op != 0x80 && op != 0x87 && op != 0x8e && op != 0x90 && op != 0x91 {
+			if op >= 128 && op < 0xb8 && op != 0x80 && op != 0x87 && op != 0x8e && (op != 0x90 || score.Player == madMaxClassic) && op != 0x91 {
 				report.UntranslatedCommands[op]++
 			}
 		}

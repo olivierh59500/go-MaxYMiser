@@ -100,13 +100,15 @@ It also retains the validated noise-attack programs described below. Other
 hardware-program layouts still require their own extraction and translation.
 
 An audit of the supplied Mad Max SNDH directory checked all 357 files, each with
-a distinct unpacked payload, against the source decoder with a 6,000-frame
-analysis limit. Only `Last_Ninja.sndh` and `SID/Last_Ninja.sndh` decoded; both
-yielded 32 translated instrument definitions. The remaining 355 files were
-rejected at player-layout recognition. These counts describe source extraction
-coverage, not full audio fidelity or cross-song model accuracy. Related parser
-instructions occur in other files, but those short signatures do not establish
-compatible tables, commands or replay behavior.
+a distinct unpacked payload, against the source decoders with a 6,000-frame
+analysis limit. The current decoders extract 48 files: the two Last Ninja
+versions and 46 classic files from the Best in Galaxy collection. Of these,
+45 produce an editable 6,000-frame excerpt. Two excerpts contain note commands
+without an assigned source instrument; one exceeds the native 240-pattern
+capacity and needs a shorter range. A further classic file has an invalid
+arpeggio definition; 308 files use other player layouts. These counts describe
+source extraction and conversion coverage, not full audio fidelity or cross-song
+model accuracy.
 
 Expanding paired learning therefore requires verified source decoders for more
 players, checked SNDH/YM alignment and validation on entire compositions absent
@@ -118,6 +120,37 @@ Native execution under Hatari provided 298 note events with their source
 offsets, instrument IDs, timing and legato flags. Every event agreed with the
 Go source decoder. Original binaries, captured memory and learned music data
 remain external local inputs; they are not included in the repository.
+
+### Classic player family
+
+`mad-max-classic-1988-v1` identifies a complete 5,452-byte program by its
+normalized digest, with independent music/program relocation bases and checked
+initializer references. A short parser signature or matching title does not
+select this decoder. The source code contains the digest and pointer layout;
+the original executable and its music remain external inputs.
+
+The decoder retains the classic command set: `8C` has no operand, `90` consumes
+one byte and schedules a step without stopping the sounding note, and a legato
+`80` leaves the envelope active. Fixed-pitch instrument selection consumes one
+opaque following byte and triggers native note 16; later ordinary note commands
+retain their source bytes while identifying the imposed pitch. An order `FE`
+stops all channels together. Later-player commands `91`/`92`, per-step pitch
+commands and unverified global transpose changes are rejected.
+
+Native execution verifies 223 Ace 2 and 289 Commando note triggers across 1,200
+calls each, including their timestamps, source offsets, instrument IDs and
+legato flags. Commando includes 27 fixed-pitch triggers. Sanxion Title stops at
+frame 8,628 in both implementations, with all following native volume registers
+zero. A separate pitch comparison checks 1,200 Ace 2 vibrato deltas after a
+native save/reload; it isolates modulation using a controlled constant-volume
+voice because that source instrument's long envelope is not yet converted.
+
+The Ace 2 SNDH/YM pair aligns at two YM frames with 518/518 eligible tonal events
+agreeing. In the held-out chronological section, 228 of 302 known instrument
+events are labelled correctly, 73 remain unresolved and one accepted label is
+incorrect. This remains a same-song evaluation. Long envelopes, fixed-pitch
+hardware programs and additional mixer/noise effects can remain unconverted;
+recognized source notes do not imply complete editable sound reproduction.
 
 ```sh
  go run ./cmd/ympair -sndh /path/to/Last_Ninja.sndh \
@@ -154,8 +187,8 @@ save destination and retain no foreign executable as a MaxYMiser export template
 Opening an unrelated native project, a YM or a new project clears the old source
 inspection. Dropped source SNDH files use the same inspection workflow.
 
-For the first 6,000 standard Last Ninja frames, conversion produces 86 generated
-patterns, 94 order positions and 45 sequences. Saving and reloading the native
+For the first 6,000 standard Last Ninja frames, conversion produces 114 generated
+patterns and 94 order positions. Saving and reloading the native
 pair retains all 1,561 note/rest events, including their source instrument IDs
 and timestamps, with an exact 120-second excerpt traversal. No note events in
 this excerpt use an unsupported instrument. Pattern commands 82 and 84
@@ -180,11 +213,13 @@ retain their distinct phase changes.
 The excerpt exporter writes these period deltas as editable MaxYMiser vibrato
 sequences, split before instrument retriggers and at the 63-word sequence limit.
 Rendering checks cover sequence/pattern boundaries and native bank round trips.
-The 6,000-frame example contains 1,157 assigned pitch segments, reusing sequence
+The 6,000-frame example contains 1,159 assigned pitch segments, reusing sequence
 definitions. Hardware/noise programs and nonconstant source arpeggios remain
 outside this pitch conversion, and native period-table rounding still differs
 from MaxYMiser's base pitch table. These checks establish the modulation values
 and timing, not complete audio parity with the original song.
+Repeated zero arpeggio words are treated as a constant zero arpeggio too; their
+presence does not disable otherwise supported vibrato or pitch-slide conversion.
 
 With `-ym`, it first aligns source notes with the register recording. The
 search supports a recording lead-in and a constant pitch transposition, and

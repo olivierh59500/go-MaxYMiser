@@ -33,6 +33,30 @@ func TestSourceVibratoDelayMatchesNativeFirstActiveCall(t *testing.T) {
 	}
 }
 
+func TestRepeatedZeroArpeggioRetainsNativeVibrato(t *testing.T) {
+	score := SourceScore{Player: madMaxClassic, Rate: 50, Speed: 3, Frames: 30,
+		Instruments: []SourceInstrument{{ID: 0, Settings: []byte{0, 0, 1, 3, 6, 1}, VolumeSequence: []byte{15}, Arpeggio: SourceSequence{Values: []int{0, 0, 0, 0}, StepFrames: 1, Repeat: 3}}},
+		Events:      []SourceEvent{{Channel: 0, Frame: 0, Note: 40, Instrument: 0, Retrigger: true}},
+		Controls:    []SourceControl{{Channel: 0, Frame: 0, Opcode: 0x82}, {Channel: 0, Frame: 0, Opcode: 0xc0}},
+	}
+	p, _, err := SourceProject(score, 0, 30)
+	if err != nil {
+		t.Fatal(err)
+	}
+	e := replay.New(p)
+	e.Play(false)
+	// Classic native calls on note 40: six delayed calls, then the triangle
+	// with a low-end hold and octave-scaled 8-period steps.
+	want := []int{0, 0, 0, 0, 0, 0, -8, -16, -24, -24, -16, -8, 0, 8, 16, 24, 16, 8, 0, -8}
+	for frame, delta := range want {
+		e.Tick()
+		period := int(e.Registers[0]) | int(e.Registers[1])<<8
+		if period != int(replay.TonePeriod(40))+delta {
+			t.Fatalf("repeated-zero arpeggio lost native vibrato at frame %d: period=%d", frame, period)
+		}
+	}
+}
+
 func TestSourceSlideInitialDelayAndSignedAccumulatorMatchNativeCalls(t *testing.T) {
 	for _, test := range []struct {
 		delay byte

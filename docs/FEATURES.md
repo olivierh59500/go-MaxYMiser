@@ -17,6 +17,12 @@ replay validation and hardware-specific integration.
 | MIDI | macOS notes, program changes, native controller enable/scales and editable bank changes, verified STe Microwire controller quantization, complete MMC play/stop, external clock/SPP with full replay cadence, Start/Continue latency compensation, channel/sound/DD mapping, duplicate-channel allocation, live PCM transpose/attenuation, selected CoreMIDI output ports, external-clock relay and native note/legato ordering | Physical Sync24 hardware; tighter output timestamp scheduling and physical-device timing measurements |
 | Workflow | Resizable interface, visually checked editor/source/file panels, Unicode field erasure, drag/drop, Save as, rollback-protected native pair saving, repeatable staged sound/configuration/SNDH saves with preserved permissions, asynchronous robust WAV export, measured arrangement durations and selectable help | Platform-specific device and clipboard conveniences |
 
+Source extraction covers the verified Last Ninja and classic Best in Galaxy
+player families. The current Mad Max audit decodes 48/357 supplied SNDH files;
+45 produce an editable 6,000-frame excerpt. Other layouts, unassigned initial
+instruments and native capacity limits remain explicit. See
+[YM reconstruction](YM_RECONSTRUCTION.md) for the measured scope.
+
 Native register evidence currently includes 8,778 complete replay calls across
 the three supplied examples and isolated timer fixtures. The register checks
 cover only captured writes, with timer-owned registers inspected separately.

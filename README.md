@@ -85,10 +85,11 @@ and replaces the instrument/pattern view. An unsupported SNDH shows a visible
 explanation and preserves the current composition and playback. SNDH files using
 other replay formats do not carry editable MaxYMiser instruments or patterns.
 Their own music data can still support reconstruction after the player format
-has been decoded. The first paired source decoder covers the Mad Max Last Ninja
-player; see [YM reconstruction](docs/YM_RECONSTRUCTION.md) for commands,
+has been decoded. Source decoders cover the Mad Max Last Ninja player and a
+verified classic player used by Best in Galaxy; see
+[YM reconstruction](docs/YM_RECONSTRUCTION.md) for commands,
 verification results and the current scope.
-Opening a SNDH recognized by this source decoder displays its original note and
+Opening a convertible SNDH recognized by these source decoders displays its original note and
 instrument identifiers in **YM → SNDH source data**. Inspection preserves the
 current composition and playback. The view lists translated definitions,
 unsupported synthesis and untranslated pattern commands before **Import editable

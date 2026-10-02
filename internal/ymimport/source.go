@@ -23,6 +23,14 @@ type SourceScore struct {
 	Orders      [3][]SourceOrder   `json:"orders"`
 	Events      []SourceEvent      `json:"events"`
 	Controls    []SourceControl    `json:"controls,omitempty"`
+	Stops       []SourceStop       `json:"order_stops,omitempty"`
+}
+
+// SourceStop marks an order boundary that silences the complete native player.
+type SourceStop struct {
+	Channel int `json:"channel"`
+	Order   int `json:"before_order"`
+	Offset  int `json:"source_offset"`
 }
 
 // SourceControl retains a verified effect command's exact source execution
@@ -86,6 +94,7 @@ type SourceEvent struct {
 	Instrument int  `json:"instrument"`
 	Retrigger  bool `json:"retrigger"`
 	Rest       bool `json:"rest,omitempty"`
+	FixedPitch bool `json:"fixed_pitch,omitempty"`
 }
 
 const madMaxLastNinja = "mad-max-last-ninja-v1"
@@ -96,6 +105,15 @@ func DecodeSource(data []byte, subtune, frames int) (SourceScore, error) {
 	plain, err := native.UnpackICE(data)
 	if err != nil {
 		return SourceScore{}, err
+	}
+	if subtune != 0 || frames < 1 || frames > 1000000 {
+		return SourceScore{}, fmt.Errorf("source: invalid subtune or frame limit")
+	}
+	if layout, matched, err := detectMadMaxClassic(plain); matched {
+		if err != nil {
+			return SourceScore{}, err
+		}
+		return decodeSourceTables(plain, layout, frames)
 	}
 	return decodeMadMaxLastNinja(plain, subtune, frames)
 }
@@ -149,31 +167,48 @@ func decodeMadMaxLastNinja(data []byte, subtune, frames int) (SourceScore, error
 		return score, fmt.Errorf("source: invalid Mad Max relocation origin")
 	}
 	r := sourceReader{data, original - uint32(leaTarget)}
-	patternTable, err := r.pointer(0x1ee4 + shift)
+	return decodeSourceTables(data, sourceDataLayout{
+		player: madMaxLastNinja, music: r, program: r,
+		patterns: 0x1ee4 + shift, instruments: 0x1ee0 + shift,
+		songs: 0x1ee8 + shift, speed: init + (0x1dbc - 0x1d1a) + 2 + 0x502,
+		arpeggios: 0x824 + shift,
+		noise:     [3]int{0x16d4 + shift, 0x16f0 + shift, 0x170c + shift},
+	}, frames)
+}
+
+type sourceDataLayout struct {
+	player                                         string
+	music, program                                 sourceReader
+	patterns, instruments, songs, speed, arpeggios int
+	noise                                          [3]int
+}
+
+// Music and program pointers can use independent relocation bases. Only a
+// verified player layout supplies these fields; metadata names do not select it.
+func decodeSourceTables(data []byte, layout sourceDataLayout, frames int) (SourceScore, error) {
+	var score SourceScore
+	r := layout.music
+	patternTable, err := r.pointer(layout.patterns)
 	if err != nil {
 		return score, err
 	}
-	instrumentTable, err := r.pointer(0x1ee0 + shift)
+	instrumentTable, err := r.pointer(layout.instruments)
 	if err != nil {
 		return score, err
 	}
-	songTable, err := r.pointer(0x1ee8 + shift)
+	songTable, err := r.pointer(layout.songs)
 	if err != nil {
 		return score, err
 	}
-	if subtune != 0 || frames < 1 || frames > 1000000 {
-		return score, fmt.Errorf("source: invalid subtune or frame limit")
-	}
-	song, err := r.pointer(songTable + subtune*4)
+	song, err := r.pointer(songTable)
 	if err != nil {
 		return score, err
 	}
-	speedAt := init + (0x1dbc - 0x1d1a) + 2 + 0x502 + subtune
-	if speedAt >= len(data) || data[speedAt] == 0 {
+	if layout.speed < 0 || layout.speed >= len(data) || data[layout.speed] == 0 {
 		return score, fmt.Errorf("source: missing initial replay speed")
 	}
 	hash := sha256.Sum256(data)
-	score = SourceScore{Player: madMaxLastNinja, SHA256: hex.EncodeToString(hash[:]), Rate: 50, Speed: int(data[speedAt]), Frames: frames}
+	score = SourceScore{Player: layout.player, SHA256: hex.EncodeToString(hash[:]), Rate: 50, Speed: int(data[layout.speed]), Frames: frames}
 	for id := 0; id < 32; id++ {
 		at, err := r.pointer(instrumentTable + id*4)
 		if err != nil || at < 6 {
@@ -188,20 +223,20 @@ func decodeMadMaxLastNinja(data []byte, subtune, frames int) (SourceScore, error
 		}
 		instrument := SourceInstrument{ID: id, Offset: at - 6, Settings: append([]byte(nil), data[at-6:at]...), VolumeSequence: append([]byte(nil), data[at:end]...)}
 		if instrument.Settings[1] < 128 {
-			instrument.Arpeggio, err = decodeSourceArpeggio(r, 0x824+shift, int(instrument.Settings[1]))
+			instrument.Arpeggio, err = decodeSourceArpeggio(layout.program, layout.arpeggios, int(instrument.Settings[1]))
 			if err != nil {
 				return score, fmt.Errorf("source: instrument %d arpeggio: %w", id, err)
 			}
 		}
 		if flags := instrument.Settings[0] & 0x1c; flags != 0 {
-			field := 0x16d4 + shift
+			field := layout.noise[0]
 			if flags&8 != 0 {
-				field = 0x16f0 + shift
+				field = layout.noise[1]
 			}
 			if flags&16 != 0 {
-				field = 0x170c + shift
+				field = layout.noise[2]
 			}
-			at, e := r.pointer(field)
+			at, e := layout.program.pointer(field)
 			if e != nil {
 				return score, fmt.Errorf("source: invalid noise-program pointer for instrument %d", id)
 			}
@@ -227,7 +262,10 @@ func decodeMadMaxLastNinja(data []byte, subtune, frames int) (SourceScore, error
 			at++
 			if v == 255 || v == 254 {
 				if v == 254 {
-					return score, fmt.Errorf("source: stop command in channel %d is not yet supported", ch)
+					if layout.player != madMaxClassic {
+						return score, fmt.Errorf("source: stop command in channel %d is not yet supported", ch)
+					}
+					score.Stops = append(score.Stops, SourceStop{Channel: ch, Order: len(score.Orders[ch]), Offset: at - 1})
 				}
 				break
 			}
@@ -262,13 +300,21 @@ func decodeMadMaxLastNinja(data []byte, subtune, frames int) (SourceScore, error
 				return score, fmt.Errorf("source: unterminated pattern %d", id)
 			}
 			op := data[at]
-			if op == 0x83 {
+			if op == 0x83 && layout.player != madMaxClassic {
 				return score, fmt.Errorf("source: alternate instrument-bank command at %#x is not yet supported", at)
 			}
 			if op == 0x85 || op == 0x86 {
 				return score, fmt.Errorf("source: per-step pitch command at %#x is not yet supported", at)
 			}
-			length, ok := sourceOperandLength(op)
+			if op == 0x89 && layout.player == madMaxClassic {
+				return score, fmt.Errorf("source: classic global-transpose command at %#x is not yet supported", at)
+			}
+			length, ok := sourcePlayerOperandLength(layout.player, op)
+			if layout.player == madMaxClassic && op >= 0xc0 && op < 0xe0 && score.Instruments[int(op-0xc0)].Settings[0]&2 != 0 {
+				// The native fixed-pitch trigger consumes one following byte,
+				// regardless of that byte's value or normal command meaning.
+				length = 1
+			}
 			if !ok || at+1+length > len(data) {
 				return score, fmt.Errorf("source: invalid pattern %d command %#x at %#x", id, op, at)
 			}
@@ -318,6 +364,13 @@ func sourceTimelineControls(score SourceScore, frames int) ([]SourceEvent, []Sou
 		patterns[p.ID] = p
 	}
 	var voices [3]sourceVoice
+	stops := map[int]SourceStop{}
+	for _, stop := range score.Stops {
+		if stop.Channel < 0 || stop.Channel >= 3 || stop.Order < 1 || stop.Order > len(score.Orders[stop.Channel]) {
+			return nil, nil, fmt.Errorf("source: invalid order-stop boundary")
+		}
+		stops[stop.Channel] = stop
+	}
 	for ch := range voices {
 		if len(score.Orders[ch]) == 0 {
 			return nil, nil, fmt.Errorf("source: channel %d has no patterns", ch)
@@ -339,6 +392,7 @@ func sourceTimelineControls(score SourceScore, frames int) ([]SourceEvent, []Sou
 				continue
 			}
 			v.legato = false
+		commands:
 			for count := 0; ; count++ {
 				if count >= 4096 || v.command >= len(v.pattern.Commands) {
 					return nil, nil, fmt.Errorf("source: invalid channel %d command flow", ch)
@@ -346,13 +400,27 @@ func sourceTimelineControls(score SourceScore, frames int) ([]SourceEvent, []Sou
 				c := v.pattern.Commands[v.command]
 				v.command++
 				op := c.Opcode
+				classic := score.Player == madMaxClassic
+				if classic && op >= 0x80 && op <= 0x90 && op != 0x87 && op != 0x8e {
+					controls = append(controls, SourceControl{Channel: ch, Frame: frame, Offset: c.Offset, Opcode: op, Operand: append([]byte(nil), c.Operand...)})
+				}
+				if classic && (op == 0x90 || op == 0x80 && v.legato) {
+					// Classic 90 schedules another step without a note-off.
+					// A legato 80 also leaves the sounding envelope untouched.
+					v.delay = v.duration
+					break
+				}
 				if op < 128 || op == 0x80 || op == 0x90 {
 					if op < 128 {
 						note := int(op) + score.Orders[ch][v.order].Transpose
-						if v.instrument >= 0 && v.instrument < len(score.Instruments) && score.Instruments[v.instrument].Settings[0]&2 != 0 {
-							return nil, nil, fmt.Errorf("source: fixed-pitch sample instrument %d is not yet supported", v.instrument)
+						fixed := v.instrument >= 0 && v.instrument < len(score.Instruments) && score.Instruments[v.instrument].Settings[0]&2 != 0
+						if fixed {
+							if !classic {
+								return nil, nil, fmt.Errorf("source: fixed-pitch sample instrument %d is not yet supported", v.instrument)
+							}
+							note = 16 + score.Orders[ch][v.order].Transpose
 						}
-						events = append(events, SourceEvent{Channel: ch, Frame: frame, Pattern: v.pattern.ID, Order: v.order, Offset: c.Offset, NativeNote: int(op), Note: note + 12, Instrument: v.instrument, Retrigger: !v.legato})
+						events = append(events, SourceEvent{Channel: ch, Frame: frame, Pattern: v.pattern.ID, Order: v.order, Offset: c.Offset, NativeNote: int(op), Note: note + 12, Instrument: v.instrument, Retrigger: !v.legato, FixedPitch: fixed})
 					} else {
 						events = append(events, SourceEvent{Channel: ch, Frame: frame, Pattern: v.pattern.ID, Order: v.order, Offset: c.Offset, Instrument: v.instrument, Rest: true})
 					}
@@ -361,8 +429,22 @@ func sourceTimelineControls(score SourceScore, frames int) ([]SourceEvent, []Sou
 				}
 				switch {
 				case op == 0x81 || op == 0x82 || op == 0x84:
-					controls = append(controls, SourceControl{Channel: ch, Frame: frame, Offset: c.Offset, Opcode: op, Operand: append([]byte(nil), c.Operand...)})
+					if !classic {
+						controls = append(controls, SourceControl{Channel: ch, Frame: frame, Offset: c.Offset, Opcode: op, Operand: append([]byte(nil), c.Operand...)})
+					}
 				case op == 0x87:
+					if stop, ok := stops[ch]; ok && v.order+1 == stop.Order {
+						// The native active flag mutes every voice on this call.
+						// Notes parsed earlier in the call therefore stay inaudible.
+						for len(events) > 0 && events[len(events)-1].Frame == frame {
+							events = events[:len(events)-1]
+						}
+						for channel := range voices {
+							events = append(events, SourceEvent{Channel: channel, Frame: frame, Offset: stop.Offset, Instrument: voices[channel].instrument, Rest: true})
+						}
+						controls = append(controls, SourceControl{Channel: ch, Frame: frame, Offset: stop.Offset, Opcode: 0xfe})
+						return events, controls, nil
+					}
 					v.order = (v.order + 1) % len(score.Orders[ch])
 					v.pattern, v.command = patterns[score.Orders[ch][v.order].Pattern], 0
 				case op == 0x8e:
@@ -374,6 +456,14 @@ func sourceTimelineControls(score SourceScore, frames int) ([]SourceEvent, []Sou
 				case op >= 0xc0:
 					v.instrument = int(op - 0xc0)
 					controls = append(controls, SourceControl{Channel: ch, Frame: frame, Offset: c.Offset, Opcode: op})
+					if classic && score.Instruments[v.instrument].Settings[0]&2 != 0 {
+						if len(c.Operand) != 1 {
+							return nil, nil, fmt.Errorf("source: truncated fixed-pitch trigger")
+						}
+						events = append(events, SourceEvent{Channel: ch, Frame: frame, Pattern: v.pattern.ID, Order: v.order, Offset: c.Offset + 1, NativeNote: 16, Note: 28 + score.Orders[ch][v.order].Transpose, Instrument: v.instrument, Retrigger: !v.legato, FixedPitch: true})
+						v.delay = v.duration
+						break commands
+					}
 				case op >= 0xb8:
 					speed = int(op-0xb8) + 1
 				}

@@ -156,7 +156,7 @@ func sourcePitchDeltas(score SourceScore) ([][3]int16, error) {
 				programAge[channel] = 0
 			}
 			note[channel] = event.Note - 24
-			eligible[channel] = definition.Settings[0] == 0 && len(definition.Arpeggio.Values) == 1 && definition.Arpeggio.Values[0] == 0
+			eligible[channel] = definition.Settings[0] == 0 && sourceArpeggioIsZero(definition.Arpeggio)
 			state[channel].note(definition.Settings[4], event.Retrigger)
 		}
 		for channel := range state {
@@ -230,7 +230,7 @@ func applySourceModulation(score SourceScore, rows [][3]model.Cell, bank *model.
 		}
 	}
 	for _, definition := range score.Instruments {
-		if definition.Settings[0] == 0 && len(definition.Arpeggio.Values) == 1 && definition.Arpeggio.Values[0] == 0 {
+		if definition.Settings[0] == 0 && sourceArpeggioIsZero(definition.Arpeggio) {
 			bank.Instruments[definition.ID][18] |= 4
 		}
 	}
