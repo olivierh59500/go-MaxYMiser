@@ -51,6 +51,8 @@ func allowedFile(modal, name string) bool {
 		return ext == ".mys" || ext == ".myv" || ext == ".snd" || ext == ".sndh" || ext == ".ym"
 	case modal == "Load SNDH replay template":
 		return ext == ".snd" || ext == ".sndh"
+	case modal == "Export complete SNDH collection":
+		return ext == ".snd" || ext == ".sndh"
 	case strings.Contains(modal, "instrument"):
 		return ext == ".myi"
 	case strings.Contains(modal, "profile"):

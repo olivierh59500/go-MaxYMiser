@@ -74,6 +74,7 @@ type App struct {
 	subtunes                                                           []native.EmbeddedProject
 	subtuneIndex                                                       int
 	subtuneWorkspaces                                                  []subtuneWorkspace
+	collectionSource                                                   []byte
 	midiData                                                           chan []byte
 	midiDecoder                                                        midi.Decoder
 	undo, redo                                                         []*model.Project
@@ -371,6 +372,7 @@ func (a *App) drawSong(dst *ebiten.Image, e *replay.Engine) {
 		}
 	}
 	if len(a.subtunes) > 1 {
+		a.btn(dst, "Export collection", 942, 594, 284, 30, "subtune-export-all", false)
 		a.btn(dst, fmt.Sprintf("Subtune %d / %d", a.subtuneIndex+1, len(a.subtunes)), 942, 636, 198, 28, "subtune-select", false)
 		a.btn(dst, "Next", 1150, 636, 76, 28, "subtune-next", false)
 	}
@@ -1238,6 +1240,7 @@ func (a *App) action(name string) {
 	case "bank:1":
 		a.instrument = 16 + a.instrument%16
 	case "new":
+		a.collectionSource = nil
 		a.sourceScore, a.sourcePreview, a.sourceReport = nil, nil, nil
 		a.sourcePath = ""
 		a.subtunes = nil

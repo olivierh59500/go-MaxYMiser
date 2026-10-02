@@ -58,6 +58,7 @@ func (a *App) acceptVoiceBank(bank model.VoiceBank, path string) {
 }
 
 func (a *App) acceptProject(p *model.Project, path, savePath string) {
+	a.collectionSource = nil
 	a.sourceScore, a.sourcePreview, a.sourceReport = nil, nil, nil
 	a.sourcePath = ""
 	reloaded := a.reloadConfiguration(&p.Song)
@@ -69,6 +70,9 @@ func (a *App) acceptProject(p *model.Project, path, savePath string) {
 	a.synth.CloseYM()
 	a.synth.Edit(func(e *replay.Engine) { e.Stop(); e.Project = p; e.Reset() })
 	a.subtunes, a.subtuneIndex = subtunes, 0
+	if len(subtunes) > 1 {
+		a.collectionSource = append([]byte(nil), p.ReplaySource...)
+	}
 	a.projectPath, a.directory = savePath, filepath.Dir(path)
 	a.instrument, a.sequence, a.sample = 0, 0, 0
 	a.pattern, a.row, a.channel = 0, 0, 0

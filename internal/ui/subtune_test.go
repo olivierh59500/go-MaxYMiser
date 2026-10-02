@@ -109,6 +109,27 @@ func TestChangingOneSubtuneReplayTemplateDoesNotReplaceItsSiblingTemplate(t *tes
 	if string(e.Project.ReplaySource) != "selected single-song template" {
 		t.Fatal("selected subtune lost its own export template")
 	}
+	if string(app.collectionSource) != "original collection" {
+		t.Fatal("collection export inherited a selected song's replacement template")
+	}
+}
+
+func TestCollectionExportRejectsAnUnverifiedWrapperWithoutChangingEdits(t *testing.T) {
+	first, second := model.New(), model.New()
+	first.ReplaySource = []byte("unknown selector")
+	app, err := New(first, "", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer app.Close()
+	app.subtunes = []native.EmbeddedProject{{Song: first.Song, Bank: first.Bank}, {Song: second.Song, Bank: second.Bank}}
+	app.initializeSubtuneWorkspaces()
+	app.editCell(func(c *model.Cell) { c.Note = 75 })
+	app.action("subtune-export-all")
+	e, _ := app.synth.Snapshot()
+	if app.browser != nil || app.modal != "" || !app.dirty || e.Project.Song.Patterns[0][0].Note != 75 {
+		t.Fatal("unknown collection wrapper opened an unsafe export or changed edits")
+	}
 }
 
 func TestSubtuneSelectorUsesOneBasedNumbersAndRejectsMissingSongs(t *testing.T) {

@@ -168,6 +168,26 @@ func SaveSNDHPacked(p *model.Project, path string, duration time.Duration, packe
 	}
 	return atomicWrite(path, data)
 }
+
+// SaveCollectionSNDH exports all slots using a locally supplied complete native
+// selector template. It does not substitute a single-song executable prefix.
+func SaveCollectionSNDH(source []byte, projects []*model.Project, path string, durations []time.Duration, packed bool) error {
+	template, err := native.ParseMultiSNDHTemplate(source)
+	if err != nil {
+		return err
+	}
+	data, err := native.EncodeMultiSNDH(template, projects, durations)
+	if err != nil {
+		return err
+	}
+	if packed {
+		data, err = native.PackICE(data)
+		if err != nil {
+			return err
+		}
+	}
+	return atomicWrite(path, data)
+}
 func atomicWrite(path string, data []byte) error {
 	dir := filepath.Dir(path)
 	f, err := os.CreateTemp(dir, ".maxymiser-save-")

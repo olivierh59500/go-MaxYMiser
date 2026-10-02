@@ -112,6 +112,31 @@ editor: title/author, arrangement length and instrument names were verified in
 memory. A separate native replay harness executed its entry points; all captured
 register writes and envelope-write flags matched Go for 600 complete calls.
 
+## Native multi-song export
+
+`ParseMultiSNDHTemplate` recognizes the documented native wrapper that writes
+voice offset, song offset and song byte length into the common binary replayer's
+three pointer cells. Each selector slot must decode as a complete native bank
+and song. The following song-rate address instruction must resolve to that
+song's saved replay frequency. The header's declared count must equal the decoded
+slot count; mixed players and partial collections are rejected.
+
+`EncodeMultiSNDH` retains the runtime executable prefix and reconstructs every
+voice bank and song. It patches all three selector operands and the song-rate
+address, updates the complete TIME array, and preserves the three entry points.
+Collection title/author/year come from the first project. Individual song rates
+remain in their song data; the native wrapper's 200 Hz interpolation header is
+preserved. The original executable is still an external local template.
+
+The supplied two-song MULTSNDH example was re-exported with changed pattern and
+sample sizes and rates 50/100 Hz. Both editable payloads round-trip unchanged.
+Under Hatari in STe mode, executing the resulting original selector initializes
+slot one with rebuilt offsets 12/23380 and length 1818, and slot two with offsets
+25202/44750 and length 1882. The native rate cells contain 50 and 100 respectively,
+and both deinitialization calls return normally. These checks prove selector
+relocation and initialization for that wrapper; broader collection playback
+parity still requires replay traces.
+
 ## YM recordings
 
 The inspection decoder accepts YM2, YM3, YM3b, YM5 and YM6 register recordings,

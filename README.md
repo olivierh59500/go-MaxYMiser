@@ -216,6 +216,13 @@ single-song replay template; a multi-song selector cannot be retained while
 discarding the payloads it references. Shared-bank containers such as Yoomp
 expose each stored song independently. Declared songs without a decoded payload
 are reported explicitly rather than assigned invented data.
+**Song → Export collection** exports every edited subtune using the original
+complete selector when it matches the verified relative-offset wrapper. Voice,
+song, song-length and per-song rate references are rebuilt together. The current
+Settings export duration is written for every song, and ICE packing applies to
+the resulting executable too. Collection export keeps each song's independent
+native-pair save destination and undo history. Mixed-player, partial and other
+selector layouts remain explicitly unsupported.
 
 YM files are played by YM Player, including its compressed-file support and
 chip effects. Their register data is retained separately from the native

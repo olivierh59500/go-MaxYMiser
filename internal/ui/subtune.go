@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/olivierh59500/go-MaxYMiser/internal/model"
 	"github.com/olivierh59500/go-MaxYMiser/internal/native"
+	"github.com/olivierh59500/go-MaxYMiser/internal/project"
 	"github.com/olivierh59500/go-MaxYMiser/internal/replay"
 )
 
@@ -23,6 +25,9 @@ func (a *App) initializeSubtuneWorkspaces() {
 	a.subtuneWorkspaces = nil
 	var source []byte
 	a.synth.Edit(func(e *replay.Engine) { source = e.Project.ReplaySource })
+	if len(a.subtunes) > 1 && len(a.collectionSource) == 0 {
+		a.collectionSource = append([]byte(nil), source...)
+	}
 	if len(a.subtunes) < 2 {
 		if native.DeclaredSubtunes(source) > 1 {
 			a.projectPath = ""
@@ -86,6 +91,18 @@ func (a *App) SelectSubtune(index int) error {
 }
 
 func (a *App) subtuneAction(action string) bool {
+	if action == "subtune-export-all" {
+		if len(a.subtunes) < 2 || len(a.collectionSource) == 0 {
+			a.status = "Load a complete native multi-song collection first"
+			return true
+		}
+		if _, err := native.ParseMultiSNDHTemplate(a.collectionSource); err != nil {
+			a.status = err.Error()
+			return true
+		}
+		a.beginFileBrowser("Export complete SNDH collection", "collection.snd", true)
+		return true
+	}
 	if action != "subtune-select" {
 		return false
 	}
@@ -94,6 +111,26 @@ func (a *App) subtuneAction(action string) bool {
 }
 
 func (a *App) subtuneModal(modal, entry string) bool {
+	if modal == "Export complete SNDH collection" {
+		var current *model.Project
+		a.synth.Edit(func(e *replay.Engine) { current = e.Project.Clone() })
+		var projects []*model.Project
+		var durations []time.Duration
+		for index, value := range a.subtunes {
+			p := (&model.Project{Title: value.Title, Author: value.Author, Year: value.Year, Song: value.Song, Bank: value.Bank}).Clone()
+			if index == a.subtuneIndex {
+				p = current
+			}
+			projects = append(projects, p)
+			durations = append(durations, a.exportDuration)
+		}
+		if err := project.SaveCollectionSNDH(a.collectionSource, projects, entry, durations, a.icePacking); err != nil {
+			a.status = err.Error()
+		} else {
+			a.status = "Complete SNDH collection exported; native selector and independent edits retained"
+		}
+		return true
+	}
 	if !strings.HasPrefix(modal, "Select subtune (") {
 		return false
 	}
