@@ -21,6 +21,7 @@ type MultiSNDHTemplate struct {
 	Prefix   []byte
 	pointers int
 	slots    []multiSlot
+	projects []EmbeddedProject
 }
 
 func ParseMultiSNDHTemplate(data []byte) (MultiSNDHTemplate, error) {
@@ -29,12 +30,8 @@ func ParseMultiSNDHTemplate(data []byte) (MultiSNDHTemplate, error) {
 	if err != nil {
 		return template, err
 	}
-	projects, err := DecodeContainers(plain)
-	if err != nil {
-		return template, err
-	}
 	count := DeclaredSubtunes(plain)
-	if count < 2 || count != len(projects) {
+	if count < 2 {
 		return template, fmt.Errorf("native: complete native multi-song source required")
 	}
 	for at := 16; at+10 <= min(len(plain), 2048); at += 2 {
@@ -46,6 +43,7 @@ func ParseMultiSNDHTemplate(data []byte) (MultiSNDHTemplate, error) {
 			continue
 		}
 		var slots []multiSlot
+		var projects []EmbeddedProject
 		firstBank := len(plain)
 		seen := map[int]bool{}
 		for code := 16; code+34 <= min(int(base), 2048); code += 2 {
@@ -60,18 +58,15 @@ func ParseMultiSNDHTemplate(data []byte) (MultiSNDHTemplate, error) {
 				slots = nil
 				break
 			}
-			bank, e := DecodeVoiceBank(plain[int(bankAt):int(songAt)])
+			bank, song, e := decodeSelectedProject(plain[int(bankAt):int(songAt)], plain[int(songAt):int(songAt+length)])
 			if e != nil {
-				slots = nil
-				break
-			}
-			if _, e := DecodeSong(plain[int(songAt):int(songAt+length)]); e != nil {
 				slots = nil
 				break
 			}
 			seen[int(bankAt)] = true
 			firstBank = min(firstBank, int(bankAt))
 			slots = append(slots, multiSlot{code, code + 28, bank.Version})
+			projects = append(projects, EmbeddedProject{Song: song, Bank: bank, Title: containerText(plain, "TITL"), Author: containerText(plain, "COMM"), Year: containerText(plain, "YEAR"), Subtune: len(projects) + 1, Subtunes: count})
 		}
 		if len(slots) != count || firstBank != int(base)+12 {
 			continue
@@ -86,7 +81,7 @@ func ParseMultiSNDHTemplate(data []byte) (MultiSNDHTemplate, error) {
 				return template, fmt.Errorf("native: multi-song entry leaves its executable prefix")
 			}
 		}
-		return MultiSNDHTemplate{Prefix: append([]byte(nil), plain[:firstBank]...), pointers: int(base), slots: slots}, nil
+		return MultiSNDHTemplate{Prefix: append([]byte(nil), plain[:firstBank]...), pointers: int(base), slots: slots, projects: projects}, nil
 	}
 	return template, fmt.Errorf("native: multi-song selector layout is not a verified relative-offset wrapper")
 }
@@ -147,16 +142,12 @@ func EncodeMultiSNDH(template MultiSNDHTemplate, projects []*model.Project, dura
 			return nil, err
 		}
 	}
-	end := bytes.Index(out[:len(template.Prefix)], []byte("HDNS"))
-	at := sndhHeaderTag(out, "TIME", end)
-	if end < 16 || end > 512 || at < 0 || at+4+len(projects)*2 > end {
-		return nil, fmt.Errorf("native: multi-song template lacks its complete duration array")
+	rate, err := sndhDurationRate(out[:len(template.Prefix)])
+	if err != nil {
+		return nil, err
 	}
-	for slot, duration := range durations {
-		if duration < 0 || duration/time.Second > 65535 {
-			return nil, fmt.Errorf("native: invalid multi-song duration")
-		}
-		binary.BigEndian.PutUint16(out[at+4+slot*2:], uint16(duration/time.Second))
+	if err := setSNDHDurations(out[:len(template.Prefix)], durations, rate); err != nil {
+		return nil, err
 	}
 	if _, err := ParseMultiSNDHTemplate(out); err != nil {
 		return nil, fmt.Errorf("native: generated multi-song selector: %w", err)

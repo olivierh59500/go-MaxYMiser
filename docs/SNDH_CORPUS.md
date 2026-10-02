@@ -5,7 +5,7 @@ SNDH files. Of these, 704 contain MaxYMiser native instrument signatures.
 The other files contain different replay routines and are not editable MaxYMiser
 projects merely because they share the SNDH container format.
 
-The current audit imports 689 files containing 869 editable native subtunes.
+The current audit imports 690 files containing 879 editable native subtunes.
 658 files use supported single-song replay templates. All 658 export/reload checks
 preserve serialized song data, voice banks and title/author metadata exactly.
 This verifies editable data handling, not audio fidelity across those songs.
@@ -22,7 +22,7 @@ The collection exposed independent INST/DIGI versions, alternate bank/song/sampl
 ordering, multiple native subtunes and metadata words that resemble SNDH tags.
 Regression fixtures cover these cases without copying the source compositions.
 
-The current report contains 50 issues: 15 import failures, 31 unsupported
+The current report contains 50 issues: 14 import failures, 32 unsupported
 single-song export templates, and four declared-count discrepancies. These
 categories can refer to the same container. Issues include:
 
@@ -58,6 +58,36 @@ initial state accounts for unused tone registers retained from the Atari
 environment. Other recovered files are covered by decode/export/reload checks;
 this one playback comparison is not evidence for complete audio parity of all
 thirteen songs.
+
+## Displaced empty sample blocks in native collections
+
+**Tony Montezumas Gold** contains ten separate native banks and songs. Its
+relative selector supplies exact voice starts, song starts, copied lengths and
+song-rate pointers. Each bank retains complete instruments/sequences and declares
+eight zero-length samples, but its sample pointers retain their old positions.
+The actual DIGI tag, eight empty guards and two opaque suffix bytes follow the
+song patterns within the selector's copied span.
+
+The importer follows this verified selector, validates the complete pattern
+stream before the trailing block, and rebuilds pointers to the existing empty
+guards. It preserves the actual INST/DIGI versions and trailing bytes. Recovery
+requires zero sample lengths, aligned complete sequence records and the exact
+bounded trailer; missing nonempty waveforms and invalid lengths remain errors.
+Standalone MYV decoding remains strict.
+
+All ten banks and songs save/reload as native MYS/MYV without data changes.
+Each original subtune also matches 497 captured complete native replay calls,
+for a total of 4,970 calls. Regenerated collection slots match another 4,973
+captured native calls. Comparisons cover captured main-register writes and
+envelope flags; they do not establish complete analog or timer-waveform parity.
+The trace boundaries account for Start Sync's repeated tone writes rather than
+discarding those calls from comparison.
+
+This collection uses FRMS metadata instead of TIME. Export updates its complete
+frame-duration array using the outer TC200 call rate. The individual songs'
+internal rates remain independent. A complete multi-song collection still cannot
+be exported through a single-song template, so this newly importable collection
+moves from the import-failure category to the single-template rejection category.
 
 The same rule now supports an empty trailing suffix after physically present
 waveforms. Each normalized slot must declare zero length, all later slots must

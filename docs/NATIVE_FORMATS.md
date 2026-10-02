@@ -102,6 +102,12 @@ An unresolved, duplicate or out-of-file target leaves the generic decoded
 ordering unchanged. Native payload counts and header-declared song counts
 remain distinct, especially for collections mixing several replay formats.
 
+Verified relative selectors also delimit optimized banks whose empty DIGI tag
+and guards follow the song, with stale sample pointers into its pattern data.
+Only complete sequence records and eight explicitly zero sample lengths qualify
+for this layout. The actual DIGI version and opaque trailer are retained when
+rebuilding the bank; no missing nonempty waveform is synthesized.
+
 ### Native SNDH export
 
 The exporter reuses an existing MaxYMiser replay prefix selected at runtime.
@@ -132,7 +138,15 @@ slot count; mixed players and partial collections are rejected.
 
 `EncodeMultiSNDH` retains the runtime executable prefix and reconstructs every
 voice bank and song. It patches all three selector operands and the song-rate
-address, updates the complete TIME array, and preserves the three entry points.
+address, updates the complete TIME/FRMS arrays, and preserves the three entry points.
+
+FRMS stores 32-bit counts of calls to the outer SNDH play entry; TIME stores
+16-bit seconds. When both are present, export updates both. Collection frame
+counts use the wrapper's header rate, independently of each selected song's
+internal rate. Zero requests indefinite playback; fractional frame counts round
+up. Truncated arrays, negative durations and representational overflow are
+rejected before changing duration fields. The frame interpretation follows the
+[SNDH player's FRMS reader](https://github.com/arnaud-carre/sndh-player/blob/main/AtariAudio/SndhFile.cpp).
 Collection title/author/year come from the first project. Individual song rates
 remain in their song data; the native wrapper's 200 Hz interpolation header is
 preserved. The original executable is still an external local template.

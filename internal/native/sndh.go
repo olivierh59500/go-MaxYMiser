@@ -118,14 +118,8 @@ func EncodeSNDH(template SNDHTemplate, project *model.Project, duration time.Dur
 	if err := setSNDHRate(out, project.Song.TickRate()); err != nil {
 		return nil, err
 	}
-	headerEnd := bytes.Index(out, []byte("HDNS"))
-	if headerEnd < 16 || headerEnd > 512 {
-		return nil, fmt.Errorf("native: SNDH template lacks a bounded header")
-	}
-	if at := sndhHeaderTag(out, "TIME", headerEnd); at >= 0 && at+6 <= headerEnd {
-		binary.BigEndian.PutUint16(out[at+4:], uint16(duration/time.Second))
-	} else if duration != 0 {
-		return nil, fmt.Errorf("native: SNDH template has no TIME field")
+	if err := setSNDHDurations(out, []time.Duration{duration}, project.Song.TickRate()); err != nil {
+		return nil, err
 	}
 	songAt := template.bankAt + digi
 	binary.BigEndian.PutUint32(out[template.pointers+4:], uint32(songAt-(template.pointers+4)))

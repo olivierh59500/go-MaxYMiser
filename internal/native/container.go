@@ -37,6 +37,11 @@ func DecodeContainers(data []byte) ([]EmbeddedProject, error) {
 	if len(plain) < 16 || !bytes.Equal(plain[12:16], []byte("SNDH")) {
 		return nil, fmt.Errorf("native: not a MaxYMiser SNDH container")
 	}
+	// A verified relative selector provides exact bank/song boundaries and
+	// original slot order, including exports with a displaced empty DIGI block.
+	if template, err := ParseMultiSNDHTemplate(plain); err == nil {
+		return template.projects, nil
+	}
 	var insts, songs []int
 	for at := 0; at+8 <= len(plain); at++ {
 		if bytes.Equal(plain[at:at+3], []byte("MYM")) {
