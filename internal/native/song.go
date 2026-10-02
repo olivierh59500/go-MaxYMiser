@@ -11,6 +11,11 @@ const songHeader = 8 + 64 + 256*4 + 2
 
 func DecodeSong(data []byte) (model.Song, error) {
 	var song model.Song
+	var err error
+	data, err = UnpackICE(data)
+	if err != nil {
+		return song, err
+	}
 	if len(data) < songHeader || !bytes.Equal(data[:3], []byte("MYM")) || !bytes.Equal(data[4:8], []byte("TRAK")) {
 		return song, fmt.Errorf("native: invalid MYS header")
 	}

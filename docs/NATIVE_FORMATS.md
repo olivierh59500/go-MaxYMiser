@@ -2,6 +2,19 @@
 
 All native multi-byte values are big-endian.
 
+## ICE wrappers
+
+MYS, MYV, MYI and own SNDH imports accept Pack-Ice wrappers before validating the
+native payload. The decoder reads backwards, checks literal/reference bounds,
+limits output to 16 MiB, and supports the optional ST bitplane transform.
+Compatibility fixtures include original synthetic data compressed by the native
+editor. A supplied example also decompressed to its exact 2,194-byte source.
+Native compression of a 3,800-byte bank, a 1,086-byte MYI3 instrument and a
+41,938-byte SNDH was also decoded byte for byte and accepted by their respective
+Go native importers. The parser rejects malformed lengths and offsets;
+bounded fuzzing covers unexpected streams without panics.
+Saving currently writes unpacked files.
+
 ## Song
 
 `MYM0TRAK` is followed by 64 bytes of tracker/editor state, 256 four-byte order

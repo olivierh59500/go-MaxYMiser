@@ -11,6 +11,11 @@ const bankHeader = 32 + 8 + 32*64 + 8*4
 
 func DecodeVoiceBank(data []byte) (model.VoiceBank, error) {
 	var bank model.VoiceBank
+	var err error
+	data, err = UnpackICE(data)
+	if err != nil {
+		return bank, err
+	}
 	if len(data) < bankHeader+8 || !bytes.Equal(data[32:35], []byte("MYM")) || !bytes.Equal(data[36:40], []byte("INST")) {
 		return bank, fmt.Errorf("native: invalid MYV header")
 	}

@@ -17,6 +17,11 @@ type EmbeddedProject struct {
 // exports. It does not execute a 68000 program or accept unrelated SNDH players.
 func DecodeContainer(data []byte) (EmbeddedProject, error) {
 	var result EmbeddedProject
+	var err error
+	data, err = UnpackICE(data)
+	if err != nil {
+		return result, err
+	}
 	if len(data) < 16 || !bytes.Equal(data[12:16], []byte("SNDH")) {
 		return result, fmt.Errorf("native: not an unpacked MaxYMiser container")
 	}

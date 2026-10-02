@@ -25,6 +25,11 @@ var legacyDACPCM = [16]byte{128, 129, 130, 132, 133, 135, 138, 142, 148, 157, 17
 
 func DecodeInstrument(data []byte) (InstrumentFile, error) {
 	var file InstrumentFile
+	var err error
+	data, err = UnpackICE(data)
+	if err != nil {
+		return file, err
+	}
 	if len(data) < 56 || !bytes.Equal(data[:3], []byte("MYM")) || !bytes.Equal(data[4:8], []byte(".MYI")) || data[3] < '0' || data[3] > '3' {
 		return file, fmt.Errorf("native: invalid MYI header")
 	}

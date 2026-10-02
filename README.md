@@ -96,6 +96,8 @@ The three supplied example song/bank pairs round-trip byte for byte.
 Unpacked `.SND`/`.SNDH` files created by MaxYMiser can be opened as editable
 projects by extracting their native song and voice-bank payloads. This import
 is specific to MaxYMiser exports; it is not a general 68000 SNDH player.
+Native formats also accept ICE-compressed wrappers. The Go decoder is checked
+against streams produced by the original editor's compressor. Saves are unpacked.
 
 YM files are played by YM Player, including its compressed-file support and
 chip effects. Their register data is retained separately from the native
@@ -161,8 +163,8 @@ Subsample timing, oscillator synchronisation, mixed timer combinations and STe
 mixing have not yet been validated against a complete Atari recording matrix;
 they should not be described as bit-exact hardware emulation. MIDI input is
 available on macOS, including notes, program changes, controllers and transport.
-MIDI clock output, Sync24 hardware and packed ICE SNDH
-editing are not included in this edition.
+MIDI clock output, Sync24 hardware, native SNDH export and ICE packing are not
+included in this edition.
 
 ## Verification
 
