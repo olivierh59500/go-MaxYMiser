@@ -94,3 +94,13 @@ Native pattern-boundary parsing also recovers both PHF Rally 2 songs, including
 their sequence alignment word and longer empty-sample suffix. The two source
 projects save/reload without changes to their musical data; original and
 regenerated collections each add 994 captured native-call comparisons.
+
+The optional `-defaults` directory implements reusable native startup loading
+for the GUI and headless command: CNF, SND/SNDH, a complete song/bank pair,
+bank-only or individual MYI fallback. Explicit command-line files take precedence.
+Native reload preferences are remembered independently of a song's settings and
+remain active after later opens. Missing/corrupt candidates are reported, with
+no partial song/bank replacement or source-file changes. Regression fixtures
+check precedence, fallback, case-insensitive names, ambiguous names and editor
+reload behavior; supplied native examples also load and render WAV through the
+actual command, including explicit-file precedence.

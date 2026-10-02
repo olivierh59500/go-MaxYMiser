@@ -27,15 +27,26 @@ func main() {
 	config := flag.String("config", "", "native MYM.CNF configuration")
 	ymLibrary := flag.String("ym-library", "", "directory containing YM recordings for SNDH alternatives")
 	pairedProfile := flag.String("paired-profile", "", "verified source-labelled SNDH/YM profile JSON")
+	defaultsDirectory := flag.String("defaults", "", "directory containing MYM.CNF and DEFAULT native startup files")
 	flag.Parse()
 	if *song == "" && flag.NArg() > 0 {
 		*song = flag.Arg(0)
 	}
 	p := model.Demo()
 	var err error
+	var defaults *project.Defaults
+	if *defaultsDirectory != "" && *song == "" && *bank == "" {
+		loaded, e := project.LoadDefaults(*defaultsDirectory)
+		if e != nil {
+			log.Fatal(e)
+		}
+		defaults = &loaded
+		p = loaded.Project
+		*song = loaded.ProjectPath
+	}
 	inspectSourceAtStartup := false
 	isYM := *song != "" && strings.EqualFold(filepath.Ext(*song), ".ym")
-	if !isYM && (*song != "" || *bank != "") {
+	if defaults == nil && !isYM && (*song != "" || *bank != "") {
 		p, err = project.Load(*song, *bank)
 		if err != nil {
 			if !*info && *wav == "" && *bank == "" && (strings.EqualFold(filepath.Ext(*song), ".sndh") || strings.EqualFold(filepath.Ext(*song), ".snd")) {
@@ -88,6 +99,9 @@ func main() {
 		os.Exit(1)
 	}
 	defer app.Close()
+	if defaults != nil {
+		app.SetDefaultsConfiguration(*defaults)
+	}
 	if inspectSourceAtStartup {
 		if err := app.OpenMusic(*song); err != nil {
 			log.Fatal(err)

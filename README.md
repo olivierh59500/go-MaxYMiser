@@ -12,10 +12,28 @@ Go 1.26 or newer is required.
  go run .
  go run . -song /path/to/song.mys -bank /path/to/voices.myv
  go run . /path/to/music.ym
+ go run . -defaults /path/to/native-workspace
 ```
 
 The initial project, **First signal**, is an original composition included for
 trying the editor. External MaxYMiser files are not needed to launch it.
+
+`-defaults /path/to/native-workspace` prepares a reusable startup workspace using
+the original native filenames. It reads `MYM.CNF`, then tries `DEFAULT.SND` or
+`DEFAULT.SNDH`, a complete `DEFAULT.MYS`/`DEFAULT.MYV` pair, a standalone
+`DEFAULT.MYV`, and finally `DEFAULT.MYI`. Names are case insensitive. A bank or
+instrument starts an empty arrangement and requires a new song save destination.
+Failed candidates are reported while later fallbacks remain available. An
+explicit positional music file, `-song` or `-bank` takes precedence over this
+directory. The native CNF reload preference determines whether saved song
+settings are replaced; its other preferences remain available for subsequent
+file openings. An explicit `-config` still applies the selected configuration.
+The same defaults directory is supported by the headless inspection/WAV command:
+
+```sh
+go run ./cmd/maxymiser -defaults /path/to/native-workspace \
+  -wav /path/to/presentation.wav -duration 30s
+```
 
 ## Workspaces
 

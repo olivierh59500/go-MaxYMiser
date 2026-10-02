@@ -25,14 +25,36 @@ func main() {
 	duration := flag.Duration("duration", 30*time.Second, "render duration")
 	subtune := flag.Int("subtune", 1, "one-based native SNDH subtune")
 	songDuration := flag.Bool("song-duration", false, "derive export duration from one arranged traversal")
+	defaultsDirectory := flag.String("defaults", "", "directory containing MYM.CNF and DEFAULT native startup files")
 	flag.Parse()
 	if *song == "" && flag.NArg() > 0 {
 		*song = flag.Arg(0)
 	}
 	p := model.Demo()
 	var err error
+	loadedDefaults := false
+	if *defaultsDirectory != "" && *song == "" && *bank == "" {
+		loaded, e := project.LoadDefaults(*defaultsDirectory)
+		if e != nil {
+			log.Fatal(e)
+		}
+		p = loaded.Project
+		loadedDefaults = true
+		for _, message := range loaded.Messages {
+			fmt.Fprintln(os.Stderr, "Defaults:", message)
+		}
+		if len(p.ReplaySource) > 0 && *subtune != 1 {
+			p, e = project.LoadSubtune(loaded.SourcePath, *subtune)
+			if e != nil {
+				log.Fatal(e)
+			}
+			if loaded.Configuration != nil && loaded.Configuration[10] != 0 {
+				loaded.Configuration.Apply(&p.Song)
+			}
+		}
+	}
 	isYM := *song != "" && strings.EqualFold(filepath.Ext(*song), ".ym")
-	if !isYM && (*song != "" || *bank != "") {
+	if !loadedDefaults && !isYM && (*song != "" || *bank != "") {
 		if strings.EqualFold(filepath.Ext(*song), ".snd") || strings.EqualFold(filepath.Ext(*song), ".sndh") {
 			p, err = project.LoadSubtune(*song, *subtune)
 		} else {
