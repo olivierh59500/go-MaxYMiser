@@ -254,7 +254,10 @@ func (a *App) soundModal(modal, entry string) bool {
 			return true
 		}
 		a.remember()
-		a.synth.Edit(func(e *replay.Engine) { edit.CopyInstrument(&e.Project.Bank, a.instrument, int(to)-1) })
+		a.synth.Edit(func(e *replay.Engine) {
+			edit.CopyInstrument(&e.Project.Bank, a.instrument, int(to)-1)
+			e.InvalidateInstrument(int(to) - 1)
+		})
 		a.dirty, a.status = true, "Instrument copied with shared sequence links"
 	case "Load instrument (.myi)":
 		raw, err := os.ReadFile(entry)

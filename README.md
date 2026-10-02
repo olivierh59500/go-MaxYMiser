@@ -56,6 +56,8 @@ go run ./cmd/maxymiser -defaults /path/to/native-workspace \
   or live voices, including deliberately empty definitions. Allocation failure
   retains the preceding bank and score; successful import supports undo.
   **Copy** duplicates a sound while retaining its shared sequence/sample links.
+  A copied destination reloads its parameters on the next sequenced trigger;
+  an already sounding note retains its parameters and sequence phase.
   The Square/Buzzer/Timer matrix toggles effect masks directly. **Preview** and
   note keys in Instruments/Sequences audition sounds without writing the score.
   Edited parameters update voices using that instrument without restarting the

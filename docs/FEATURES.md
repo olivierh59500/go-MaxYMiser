@@ -113,3 +113,8 @@ no partial song/bank replacement or source-file changes. Regression fixtures
 check precedence, fallback, case-insensitive names, ambiguous names and editor
 reload behavior; supplied native examples also load and render WAV through the
 actual command, including explicit-file precedence.
+
+Instrument copying retains a sounding destination's parameters and sequence
+phase, then reloads its replaced bank definition on the next sequenced trigger.
+Regression checks exercise consecutive score rows, unrelated sounding voices
+and undo, so an unchanged instrument number cannot retain stale parameters.

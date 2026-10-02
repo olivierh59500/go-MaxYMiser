@@ -95,6 +95,41 @@ func TestMYIImportRetainsScoreOnlySequenceAndLiveSampleReferences(t *testing.T) 
 	}
 }
 
+func TestInstrumentCopyRefreshesTheDestinationOnItsNextNoteAndSupportsUndo(t *testing.T) {
+	p := model.New()
+	p.Bank.Instruments[1] = p.Bank.Instruments[0]
+	p.Bank.Instruments[1].SetName("Destination")
+	p.Bank.Instruments[0].SetName("Copied sound")
+	p.Bank.Instruments[0][38] = 4
+	p.Song.SetSpeed(1)
+	p.Song.Patterns[0][0] = model.Cell{Note: 69, Instrument: 2}
+	p.Song.Patterns[0][1] = model.Cell{Note: 69, Instrument: 2}
+	app, err := New(p, "", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer app.Close()
+	app.synth.Edit(func(e *replay.Engine) { e.Play(false); e.Tick() })
+	before, _ := app.synth.Snapshot()
+	app.SelectInstrument(0)
+	app.modal, app.entry = "Copy instrument (destination 01–20)", "02"
+	app.applyModal()
+	after, _ := app.synth.Snapshot()
+	if !app.dirty || after.Project.Bank.Instruments[1].Name() != "Copied sound" || after.Voices[0].Parameters != before.Voices[0].Parameters || after.Ticks != before.Ticks {
+		t.Fatal("instrument copy changed transport/current sound or omitted the copied definition")
+	}
+	app.synth.Edit(func(e *replay.Engine) { e.Tick() })
+	after, _ = app.synth.Snapshot()
+	if after.Registers[8] != 11 {
+		t.Fatal("copied destination was not used on the next note")
+	}
+	app.restore(false)
+	after, _ = app.synth.Snapshot()
+	if after.Project.Bank.Instruments[1].Name() != "Destination" || after.Project.Bank.Instruments[1][38] != 0 {
+		t.Fatal("undo did not restore the destination sound")
+	}
+}
+
 func TestGeneratorAndMorphUpdateSelectedSequencesAndUndo(t *testing.T) {
 	p := model.Demo()
 	p.Bank.Sequences[7] = model.Sequence{Length: 6, Repeat: 5, Values: [63]uint16{3, 3, 3, 3, 3, 3}}

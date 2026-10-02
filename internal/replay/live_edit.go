@@ -1,5 +1,18 @@
 package replay
 
+// InvalidateInstrument refreshes a replaced definition on its next trigger.
+// The current voice, pattern overrides and sequence phase remain unchanged.
+func (e *Engine) InvalidateInstrument(instrument int) {
+	if instrument < 0 || instrument >= len(e.Project.Bank.Instruments) {
+		return
+	}
+	for i := range e.Voices {
+		if int(e.Voices[i].Instrument) == instrument+1 {
+			e.Voices[i].ParametersDirty = true
+		}
+	}
+}
+
 // RefreshSequence lets the editor replace a shared definition while preserving
 // each sounding voice's sequence phase. Held tails become readable again at
 // their current step; shortened sequences clamp to their new end.

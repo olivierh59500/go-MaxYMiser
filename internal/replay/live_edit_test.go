@@ -70,3 +70,29 @@ func TestInstrumentBankEditUpdatesALiveSoundWithoutRestartingTheScore(t *testing
 		t.Fatal("new sequence link was inaudible or omitted from native serialization")
 	}
 }
+
+func TestReplacingAnInstrumentUpdatesItsNextTriggerAndRetainsCurrentPlayback(t *testing.T) {
+	p := model.New()
+	p.Bank.Instruments[1] = p.Bank.Instruments[0]
+	p.Song.SetSpeed(1)
+	p.Song.Patterns[0][0] = model.Cell{Note: 69, Instrument: 2}
+	p.Song.Patterns[0][2] = model.Cell{Note: 69, Instrument: 2}
+	e := New(p)
+	e.Play(false)
+	e.Trigger(1, 72, 1)
+	e.Tick()
+	before := e.Voices[0]
+	p.Bank.Instruments[1][38] = 4
+	e.InvalidateInstrument(1)
+	if e.Voices[0].Parameters != before.Parameters || e.Voices[0].SeqIndex != before.SeqIndex || e.Voices[0].PreviewTriggers != before.PreviewTriggers || e.Voices[1].ParametersDirty {
+		t.Fatal("bank replacement changed a sounding note or unrelated voice")
+	}
+	e.Tick()
+	if e.Registers[8] != 15 {
+		t.Fatal("copy changed the already sounding note")
+	}
+	e.Tick()
+	if e.Registers[8] != 11 || e.Registers[9] != 15 {
+		t.Fatal("same instrument number retained the replaced bank's stale parameters")
+	}
+}
