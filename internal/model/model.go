@@ -83,6 +83,8 @@ func New() *Project {
 	p.Song.State[37] = 0
 	p.Song.State[49] = 2
 	p.Song.State[56] = 7
+	p.Song.State[32], p.Song.State[33], p.Song.State[34], p.Song.State[35], p.Song.State[50] = 1, 1, 1, 1, 1
+	p.Song.State[40], p.Song.State[41], p.Song.State[42], p.Song.State[43], p.Song.State[51] = 0, 1, 2, 3, 4
 	p.Song.SetSpeed(6)
 	p.Song.SetTickRate(50)
 	for i := range p.Song.Orders {

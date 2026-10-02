@@ -35,6 +35,10 @@ func (d *Decoder) Feed(data []byte, emit func([]byte)) {
 		if b&128 != 0 {
 			d.Status = b
 			d.Count = 0
+			if b == 0xf6 || b == 0xf7 {
+				emit([]byte{b})
+				d.Status = 0
+			}
 			continue
 		}
 		if d.Status == 0 {
@@ -46,10 +50,16 @@ func (d *Decoder) Feed(data []byte, emit func([]byte)) {
 		if d.Status&0xf0 == 0xc0 || d.Status&0xf0 == 0xd0 {
 			length = 1
 		}
+		if d.Status == 0xf1 || d.Status == 0xf3 {
+			length = 1
+		}
 		if d.Count == length {
 			message := append([]byte{d.Status}, d.Data[:length]...)
 			emit(message)
 			d.Count = 0
+			if d.Status >= 0xf0 {
+				d.Status = 0
+			}
 		}
 	}
 }
@@ -60,6 +70,8 @@ func Apply(e *replay.Engine, message []byte) {
 	status := message[0]
 	if status >= 0xf8 {
 		switch status {
+		case 0xf8:
+			e.ClockPulse()
 		case 0xfa:
 			e.Reset()
 			e.Play(false)
@@ -67,6 +79,12 @@ func Apply(e *replay.Engine, message []byte) {
 			e.Playing = true
 		case 0xfc:
 			e.Stop()
+		}
+		return
+	}
+	if status == 0xf2 {
+		if len(message) == 3 {
+			e.SetSongPointer(int(message[1]&127) | int(message[2]&127)<<7)
 		}
 		return
 	}
@@ -82,7 +100,11 @@ func Apply(e *replay.Engine, message []byte) {
 		return
 	}
 	channel := int(status & 15)
+	if channel >= 5 {
+		return
+	}
 	if channel >= 3 {
+		ApplyPCM(e, channel-3, message)
 		return
 	}
 	switch status & 0xf0 {
@@ -114,6 +136,104 @@ func Apply(e *replay.Engine, message []byte) {
 	case 0xb0:
 		if len(message) >= 3 {
 			controller(e, channel, message[1], message[2])
+		}
+	}
+}
+
+func ApplyPCM(e *replay.Engine, channel int, message []byte) {
+	if channel < 0 || channel >= 2 || len(message) < 2 {
+		return
+	}
+	switch message[0] & 0xf0 {
+	case 0x90:
+		if len(message) < 3 {
+			return
+		}
+		if message[2] == 0 {
+			e.TriggerSample(channel, 1, 0)
+		} else {
+			slot := 35
+			if channel == 1 {
+				slot = 50
+			}
+			sample := e.Project.Song.State[slot]
+			e.TriggerSample(channel, message[1], sample)
+			e.DMA[channel].Volume = byte(7 - int(message[2]>>4))
+		}
+	case 0x80:
+		note := message[1]
+		for note >= 68 && e.Project.Song.State[49] != 4 {
+			note -= 12
+		}
+		if e.DMA[channel].Note == note {
+			e.TriggerSample(channel, 1, 0)
+		}
+	case 0xc0:
+		slot := 35
+		if channel == 1 {
+			slot = 50
+		}
+		e.Project.Song.State[slot] = message[1]%8 + 1
+	}
+}
+
+// ApplyMapped uses the five native MIDI channel assignments. Duplicate
+// assignments select a free voice first, then reuse one deterministically.
+func ApplyMapped(e *replay.Engine, message []byte) {
+	if len(message) == 0 || message[0] >= 0xf0 {
+		Apply(e, message)
+		return
+	}
+	channel := message[0] & 15
+	status := message[0] & 0xf0
+	var tracks []int
+	for track, offset := range []int{40, 41, 42, 43, 51} {
+		if e.Project.Song.State[offset]&15 != channel {
+			continue
+		}
+		instOffset := []int{32, 33, 34, 35, 50}[track]
+		if e.Project.Song.State[instOffset] != 0 {
+			tracks = append(tracks, track)
+		}
+	}
+	if len(tracks) == 0 {
+		if status == 0xb0 && len(message) >= 3 && message[1] >= 16 && message[1] <= 51 {
+			controller(e, 0, message[1], message[2])
+		}
+		return
+	}
+	if status == 0x90 && len(message) >= 3 && message[2] > 0 {
+		chosen := tracks[0]
+		for _, track := range tracks {
+			free := track < 3 && e.Voices[track].Note <= 1 || track >= 3 && e.DMA[track-3].Note <= 1
+			if free {
+				chosen = track
+				break
+			}
+		}
+		tracks = []int{chosen}
+	}
+	for _, track := range tracks {
+		mapped := append([]byte(nil), message...)
+		mapped[0] = status | byte(track)
+		if track < 3 {
+			if status == 0x90 && len(mapped) >= 3 && mapped[2] > 0 {
+				note, instrument := mapped[1], e.Project.Song.State[32+track]
+				if instrument == 255 {
+					instrument, note = note%32+1, 48
+				}
+				if instrument <= 32 {
+					e.Trigger(track, note, instrument)
+				}
+				e.Voices[track].ColumnVolume = 15 - int(mapped[2]>>3)
+			} else {
+				Apply(e, mapped)
+				if status == 0xc0 && len(mapped) >= 2 {
+					e.Project.Song.State[32+track] = mapped[1]%32 + 1
+				}
+			}
+		} else {
+			Apply(e, mapped)
 		}
 	}
 }
@@ -160,7 +280,7 @@ func controller(e *replay.Engine, ch int, code, value byte) {
 	case code >= 39 && code <= 41:
 		e.Voices[code-39].TrackVolume = 15 - int(value>>3)
 	case code >= 44 && code <= 47:
-		e.Patterns[code-44] = value
+		e.QueuePattern(int(code-44), value)
 	case code >= 60 && code <= 67:
 		offset := int(code-60) + 32
 		if code == 67 {

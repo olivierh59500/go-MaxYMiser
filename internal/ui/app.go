@@ -413,7 +413,8 @@ func (a *App) drawSettings(dst *ebiten.Image, e *replay.Engine) {
 	}
 	a.text(dst, "Audio is rendered at 48 kHz. Sequencing follows the selected replay rate.", 670, 277, 13, fg)
 	a.text(dst, "The YM noise generator and envelope are shared between all three voices.", 670, 321, 12, dim)
-	a.btn(dst, "Jam mode", 860, 372, 180, 38, "jam", e.Jam)
+	a.btn(dst, "Jam mode", 860, 372, 156, 38, "jam", e.Jam)
+	a.btn(dst, "MIDI clock", 1030, 372, 168, 38, "midi-clock", e.ExternalClock)
 	a.btn(dst, "MIDI input", 670, 372, 180, 38, "midi", a.midiInput != nil)
 	modes := []string{"Disabled", "One voice", "Two voices", "Native STe rate", "MIDI output"}
 	mode := int(e.Project.Song.State[49])
@@ -428,6 +429,10 @@ func (a *App) drawSettings(dst *ebiten.Image, e *replay.Engine) {
 	a.btn(dst, strconv.FormatFloat(a.exportDuration.Seconds(), 'f', -1, 64), 950, 534, 180, 38, "setting:export-duration", false)
 	a.btn(dst, "Load SNDH replay", 670, 588, 250, 36, "sndh-template", len(e.Project.ReplaySource) > 0)
 	a.btn(dst, "Export SNDH", 936, 588, 232, 36, "sndh-export", false)
+	for track, offset := range []int{40, 41, 42, 43, 51} {
+		x := 670 + track*106
+		a.btn(dst, fmt.Sprintf("%s %02X", []string{"A", "B", "C", "D", "E"}[track], e.Project.Song.State[offset]&15), x, 636, 94, 28, fmt.Sprintf("midi-channel:%d", track), false)
+	}
 }
 func (a *App) drawHelp(dst *ebiten.Image) {
 	rect(dst, 24, 192, 1232, 482, panel)
@@ -468,7 +473,7 @@ func (a *App) Update() error {
 	for {
 		select {
 		case data := <-a.midiData:
-			a.midiDecoder.Feed(data, func(message []byte) { a.synth.Edit(func(e *replay.Engine) { midi.Apply(e, message) }) })
+			a.midiDecoder.Feed(data, func(message []byte) { a.synth.Edit(func(e *replay.Engine) { midi.ApplyMapped(e, message) }) })
 		default:
 			goto midiDone
 		}
@@ -868,6 +873,13 @@ func (a *App) action(name string) {
 		a.synth.Edit(func(e *replay.Engine) { e.Mutes ^= 1 << x; e.Project.Song.State[37] = e.Mutes })
 		return
 	}
+	if _, err := fmt.Sscanf(name, "midi-channel:%d", &x); err == nil {
+		if x >= 0 && x < 5 {
+			e, _ := a.synth.Snapshot()
+			a.modal, a.entry = fmt.Sprintf("MIDI track %d channel", x), fmt.Sprintf("%X", e.Project.Song.State[[]int{40, 41, 42, 43, 51}[x]])
+		}
+		return
+	}
 	if _, err := fmt.Sscanf(name, "order:%d:%d", &x, &y); err == nil {
 		e, _ := a.synth.Snapshot()
 		a.modal = fmt.Sprintf("Order %d channel %d", x, y)
@@ -952,6 +964,17 @@ func (a *App) action(name string) {
 	case "pcm-mode":
 		a.remember()
 		a.synth.Edit(func(e *replay.Engine) { e.Project.Song.State[49] = (e.Project.Song.State[49] + 1) % 4 })
+		a.dirty = true
+	case "midi-clock":
+		a.synth.Edit(func(e *replay.Engine) {
+			e.Stop()
+			e.ExternalClock = !e.ExternalClock
+			if e.ExternalClock {
+				e.Project.Song.State[31] |= 1
+			} else {
+				e.Project.Song.State[31] &^= 1
+			}
+		})
 		a.dirty = true
 	case "bank:0":
 		a.instrument = a.instrument % 16
@@ -1273,6 +1296,11 @@ func (a *App) applyModal() {
 		a.remember()
 		a.synth.Edit(func(e *replay.Engine) {
 			switch {
+			case strings.HasPrefix(modal, "MIDI track "):
+				fmt.Sscanf(modal, "MIDI track %d channel", &x)
+				if x >= 0 && x < 5 {
+					e.Project.Song.State[[]int{40, 41, 42, 43, 51}[x]] = byte(n) & 15
+				}
 			case modal == "Song length":
 				length := max(1, min(255, int(n)))
 				for at := int(e.Project.Song.Length); at < length; at++ {

@@ -7,14 +7,14 @@ replay validation and hardware-specific integration.
 | Area | Implemented | Remaining verification or work |
 | --- | --- | --- |
 | Tracker | Three YM voices, two PCM voices, both effect columns, live/step note entry, masked block cut/copy/paste, paste modes, row insert/delete, expand/shrink, transpose/remap, undo/redo | Song-wide remapping and additional editing shortcuts |
-| Arrangement | Independent pattern lists, length/repeat, position selection, Jam markers, duplicate pattern/sequence packing with reference remapping | More live resequencing scenarios and MIDI next-pattern controllers |
+| Arrangement | Independent pattern lists, length/repeat, position selection, Jam markers, boundary-queued next-pattern controllers, duplicate pattern/sequence packing with reference remapping | More live resequencing scenarios |
 | Instruments | 32 definitions, scalar/mask editing, linked sequence values, individual MYI exchange | More native MYI legacy/sample fixtures, copy/remap convenience |
 | Sequences | 256 sequences, length/repeat, generation, signed values, copying and morphing | Range modification and additional shortcuts |
 | Samples | Eight banks, signed PCM/WAV import, gain, interpolated tuning, trim, sign conversion, save and preview | Native YMise operation and full STe mixer/filter comparison |
 | Native files | MYS/MYV lossless example round trips, MYI0–3 decode, MYI3 export, own SNDH import/export using a local replay template, ICE unpacking | ICE packing |
 | YM | YM Player reference playback, register inspector, candidate score, composer corpus and cross-arrangement comparison | Musical-grid reconstruction, improved modulation/envelope hypotheses and reconstruction selection ranges |
 | Replay | Sequences, commands, native frequency/DAC tables, timer waveforms, PCM note rates/modes | Broader full-song and mixed-timer evidence; sample-grid timer scheduling remains distinct from cycle-exact hardware |
-| MIDI | macOS notes, program changes, controllers and transport | External clock/SPP, DMA MIDI voices, output ports and Sync24 hardware |
+| MIDI | macOS notes, program changes, controllers, transport, external clock/SPP, native channel mapping, duplicate-channel voice allocation and DMA input voices | Output ports and Sync24 hardware |
 | Workflow | Resizable modern interface, drag/drop, file browser, native save, asynchronous WAV export with selectable duration | Richer contextual help |
 
 Native register evidence currently includes 8,778 complete replay calls across

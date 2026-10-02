@@ -46,6 +46,12 @@ type Engine struct {
 	MasterVolume, Pan, Bass, Treble int
 	pending                         [3]bool
 	pendingDMA                      [2]bool
+	ExternalClock                   bool
+	clockPulses                     int
+	clockRows                       int
+	rowParsed                       bool
+	NextPatterns                    [4]byte
+	nextPatternMask                 byte
 }
 
 func New(p *model.Project) *Engine {
@@ -64,6 +70,9 @@ func (e *Engine) Reset() {
 	e.Speed = e.Project.Song.Speed()
 	e.Playing, e.PatternMode, e.Break = false, false, false
 	e.Jam = e.Project.Song.State[39] != 0
+	e.ExternalClock = e.Project.Song.State[31]&1 != 0
+	e.clockPulses, e.clockRows, e.rowParsed = 0, 0, false
+	e.NextPatterns, e.nextPatternMask = [4]byte{}, 0
 	e.Mutes = e.Project.Song.State[37]
 	e.TimerMask = e.Project.Song.State[36] & 7
 	e.MasterVolume, e.Pan, e.Bass, e.Treble = 127, 0, 6, 6
@@ -81,6 +90,7 @@ func (e *Engine) Play(pattern bool) {
 	e.PatternMode = pattern
 	e.TickInRow = 0
 	e.Row = 0
+	e.rowParsed, e.clockPulses, e.clockRows = false, 0, 0
 }
 func (e *Engine) Stop() {
 	e.Playing = false
@@ -103,11 +113,19 @@ func (e *Engine) Tick() {
 		e.DMA[i].Triggered = e.pendingDMA[i]
 		e.pendingDMA[i] = false
 	}
-	if e.Playing && e.TickInRow == 0 {
-		for ch := range 3 {
-			e.parse(ch, e.cell(e.Patterns[ch], e.Row), e.Mutes&(1<<ch) != 0)
+	if e.Playing && e.ExternalClock {
+		for e.clockRows > 0 {
+			if !e.rowParsed {
+				e.parseRow()
+			}
+			e.advanceRow()
+			e.clockRows--
 		}
-		e.parseDMA(e.cell(e.Patterns[3], e.Row))
+	}
+	if e.Playing && e.TickInRow == 0 {
+		if !e.ExternalClock || !e.rowParsed {
+			e.parseRow()
+		}
 	}
 	for ch := range 3 {
 		e.sequence(&e.Voices[ch])
@@ -128,24 +146,77 @@ func (e *Engine) Tick() {
 		}
 	}
 	if e.Playing {
+		if e.ExternalClock {
+			return
+		}
 		e.TickInRow++
 		if e.TickInRow >= max(1, e.Speed) {
 			e.TickInRow = 0
-			e.Row++
-			if e.Break || e.Row >= 64 {
-				e.Break = false
-				e.Row = 0
-				if !e.PatternMode {
-					e.Position++
-					if e.Position >= int(e.Project.Song.Length) {
-						e.Position = int(e.Project.Song.Repeat)
-						e.Loops++
-					}
-					e.loadPosition()
-				}
-			}
+			e.advanceRow()
 		}
 	}
+}
+
+func (e *Engine) parseRow() {
+	for channel := 0; channel < 3; channel++ {
+		e.parse(channel, e.cell(e.Patterns[channel], e.Row), e.Mutes&(1<<channel) != 0)
+	}
+	e.parseDMA(e.cell(e.Patterns[3], e.Row))
+	e.rowParsed = true
+}
+
+func (e *Engine) advanceRow() {
+	e.rowParsed = false
+	e.Row++
+	if !e.Break && e.Row < 64 {
+		return
+	}
+	e.Break, e.Row = false, 0
+	if !e.PatternMode {
+		e.Position++
+		if e.Position >= int(e.Project.Song.Length) {
+			e.Position = int(e.Project.Song.Repeat)
+			e.Loops++
+		}
+		e.loadPosition()
+	}
+	for channel := 0; channel < 4; channel++ {
+		if e.nextPatternMask&(1<<channel) != 0 {
+			e.Patterns[channel] = e.NextPatterns[channel]
+		}
+	}
+	e.nextPatternMask = 0
+}
+
+// ClockPulse receives MIDI's 24 pulses per quarter note. Six pulses advance
+// one 1/16 tracker row; envelopes and effects retain their internal replay rate.
+func (e *Engine) ClockPulse() {
+	if !e.ExternalClock || !e.Playing {
+		return
+	}
+	e.clockPulses++
+	if e.clockPulses >= 6 {
+		e.clockPulses = 0
+		e.clockRows++
+	}
+}
+
+func (e *Engine) SetSongPointer(rows int) {
+	rows = max(0, rows)
+	if length := int(e.Project.Song.Length); length > 0 {
+		e.Position = (rows / 64) % length
+		e.loadPosition()
+	}
+	e.Row, e.TickInRow = rows%64, 0
+	e.clockPulses, e.clockRows, e.rowParsed = 0, 0, false
+}
+
+func (e *Engine) QueuePattern(channel int, pattern byte) {
+	if channel < 0 || channel >= 4 {
+		return
+	}
+	e.NextPatterns[channel] = pattern
+	e.nextPatternMask |= 1 << channel
 }
 func (e *Engine) cell(id byte, row int) model.Cell {
 	if id == model.NoteOffPattern && row == 0 {

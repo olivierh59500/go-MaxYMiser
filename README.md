@@ -174,7 +174,12 @@ The native timer paths are implemented in Go and feed the YM Player chip.
 Subsample timing, oscillator synchronisation, mixed timer combinations and STe
 mixing have not yet been validated against a complete Atari recording matrix;
 they should not be described as bit-exact hardware emulation. MIDI input is
-available on macOS, including notes, program changes, controllers and transport.
+available on macOS, including notes, program changes, controllers, transport,
+external clock and Song Position Pointer. Native A–E channel assignments are
+editable in Settings (hexadecimal 00–0F); matching channels can allocate YM
+polyphony. The D/E assignments control the two PCM voices. MIDI clocks advance
+one tracker row per six pulses while sound sequences retain their replay rate.
+Controllers 44–47 queue patterns at the next pattern boundary.
 MIDI clock output, Sync24 hardware and ICE packing are not
 included in this edition.
 
