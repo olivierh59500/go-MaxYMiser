@@ -695,7 +695,9 @@ func (e *Engine) Period(v *Voice, component int) uint16 {
 					delta = delta * 32 / scale
 				}
 			} else {
-				delta = delta * int(table(tuningScale[:], -adjust)) / 32
+				// MULS stores a long, but the original ASR.W shifts only its
+				// signed low word; preserve overflow before dividing by 32.
+				delta = int(int16(delta*int(table(tuningScale[:], -adjust))) >> 5)
 			}
 			if component == 1 {
 				delta = (delta >> 3) + 1

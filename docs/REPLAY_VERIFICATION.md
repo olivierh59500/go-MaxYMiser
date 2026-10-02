@@ -64,6 +64,15 @@ A zero tone period also retains the configured mixer bit until the voice becomes
 silent; it is not an implicit note-off. Both behaviors have independent boundary
 regressions, including signed overflow, upper-byte values and explicit note-off.
 
+Chom extends the complete arrangement comparison to a native-rate PCM song. Its
+7,936-call arranged traversal is covered by 26,977 captured main calls in both
+the source and regenerated SNDH, after native-pair save/reload. A negative-detune
+portamento exposed the original MULS/ASR.W behavior: the signed low word wraps
+before scaling. Go now preserves that overflow, with explicit boundary checks.
+The three songs total 64,562 main-call comparisons per original/export set.
+This includes YM sequencing alongside enabled PCM, not proof of identical mixed
+PCM waveforms; the separately measured DAC/rate/filter scope below still applies.
+
 ## Isolated timer fixtures
 
 Small original test projects were also passed through the supplied native binary.
