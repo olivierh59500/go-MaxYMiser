@@ -14,6 +14,8 @@ type sourceMixerVoice struct {
 	program                 []SourceNoiseStep
 	step                    int
 	noiseActive             bool
+	sweepActive             bool
+	sweepCounter            byte
 }
 
 // Classic fixed-pitch voices alternate noise and tone at replay-call cadence.
@@ -80,6 +82,10 @@ func classicMixerFrames(score SourceScore) ([]sourceMixerFrame, error) {
 					v.noiseMode = true
 				case c.Opcode == 0x8d:
 					v.fixed = true
+				case c.Opcode == 0x8f:
+					base = (base &^ mask) | (mask & 7)
+					v.noiseMode, v.sweepActive = true, true
+					v.sweepCounter = 0x40
 				}
 			}
 			for _, e := range es {
@@ -91,7 +97,13 @@ func classicMixerFrames(score SourceScore) ([]sourceMixerFrame, error) {
 				if v.inst < 0 || v.inst >= len(score.Instruments) || len(score.Instruments[v.inst].Settings) != 6 {
 					return nil, fmt.Errorf("source: mixer note references an invalid instrument")
 				}
-				if v.noiseMode {
+				forced := false
+				for _, control := range cs {
+					forced = forced || e.FixedPitch && control.Opcode >= 0xc0 && control.Opcode < 0xe0 && control.Offset+1 == e.Offset
+				}
+				// Instrument-triggered fixed notes skip the ordinary note's
+				// noise-shadow assignment before joining its common tail.
+				if v.noiseMode && !forced {
 					shadow = byte(e.NativeNote)
 				}
 				v.held = shadow
@@ -100,6 +112,15 @@ func classicMixerFrames(score SourceScore) ([]sourceMixerFrame, error) {
 				v.program = score.Instruments[v.inst].NoiseProgram
 				v.step = 0
 				v.noiseActive = len(v.program) > 0
+			}
+			if len(es) > 0 {
+				v.sweepCounter = 0x30
+			} else {
+				for _, control := range cs {
+					if control.Opcode == 0x80 || control.Opcode == 0x90 {
+						v.sweepCounter = 0x30
+					}
+				}
 			}
 		}
 		mixer := byte(0x38)
@@ -134,6 +155,15 @@ func classicMixerFrames(score SourceScore) ([]sourceMixerFrame, error) {
 				value = 7
 				output = shadow ^ 8
 			}
+			if v.sweepActive {
+				// The common note/wait tail resets this byte to 0x30, after
+				// 8F initially set 0x40. Eight calls advance it by two to 0x40.
+				v.sweepCounter += 2
+				if int8(v.sweepCounter-0x40) >= 0 {
+					v.sweepActive = false
+				}
+				shadow = v.sweepCounter
+			}
 			mixer = (mixer &^ mask) | (value & mask)
 		}
 		frames[frame] = sourceMixerFrame{mixer: mixer & 63, noise: output & 31}
@@ -147,12 +177,6 @@ func classicMixerFrames(score SourceScore) ([]sourceMixerFrame, error) {
 func prepareClassicMixerScore(score SourceScore) (SourceScore, []int) {
 	if score.Player != madMaxClassic {
 		return score, nil
-	}
-	// The additional native noise sweep has not been verified by this model.
-	for _, control := range score.Controls {
-		if control.Opcode == 0x8f {
-			return score, nil
-		}
 	}
 	edited := score
 	edited.Instruments = append([]SourceInstrument(nil), score.Instruments...)

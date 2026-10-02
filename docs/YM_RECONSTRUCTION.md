@@ -278,13 +278,22 @@ The editable bank retains each sound's translated volume and arpeggio. Its
 generated score supplies mixer/noise timing, so standalone MYV preview does not
 claim the original timbre. `pattern_mixer_instruments` and
 `pattern_mixer_changes` identify these dependencies in the conversion report;
-the source view labels the affected definitions too. The unverified additional
-noise-sweep command `8F` keeps these definitions unsupported for now.
+the source view labels the affected definitions too.
+
+The classic `8F` noise sweep follows the native common-tail behavior: the command
+sets its counter to `40`, but the following note/wait tail resets it to `30`.
+Eight replay calls advance the byte by two to `40`, then hold. The shared shadow
+changes after that voice's current noise output, retaining the original call
+ordering. An instrument-triggered fixed note skips the ordinary note's noise
+assignment before joining the common tail. The generated fixed-pitch M/N score
+now incorporates this sweep state rather than excluding those definitions.
 
 After native pair save/reload, Commando's 312 captured fixed-pitch calls match
 the original active mixer bits, audible shared noise period and volume values.
 A synthetic native score verifies another 120 calls with a different voice
-changing the shared shadow. The mixer model was also checked against 1,200
+changing the shared shadow. Another 120 native calls verify a sweep on the
+fixed-pitch voice, including its counter reset and shared-noise output. The mixer
+model was also checked against 1,200
 complete calls from both Commando and Ace 2, plus 220 synthetic calls. These
 checks concern the stated registers and timing, not complete analog waveform
 parity or every original sound definition.

@@ -105,15 +105,26 @@ func TestClassicFixedMixerCropPreservesAlternatingPhase(t *testing.T) {
 	}
 }
 
-func TestClassicFixedMixerKeepsUnverifiedNoiseSweepDefinitionsUnsupported(t *testing.T) {
+func TestClassicNoiseSweepMatchesNativeEightCallCadenceAndSharedShadow(t *testing.T) {
 	score := fixedMixerFixture()
-	score.Controls = append(score.Controls, SourceControl{Channel: 0, Frame: 6, Opcode: 0x8f})
+	score.Events[0].Offset = 102
+	score.Events = append([]SourceEvent{{Channel: 0, Frame: 0, NativeNote: 45, Note: 57, Instrument: 1, Retrigger: true, Offset: 46}}, score.Events...)
+	score.Controls = []SourceControl{{Channel: 0, Frame: 0, Opcode: 0x8b, Offset: 44}, {Channel: 0, Frame: 0, Opcode: 0xc1, Offset: 45}, {Channel: 2, Frame: 0, Opcode: 0x8f, Offset: 100}, {Channel: 2, Frame: 0, Opcode: 0xc0, Offset: 101}}
 	p, report, err := SourceProject(score, 0, 30)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(report.ScoreMixerInstruments) != 0 || report.Bank.Unsupported[0] == "" || p.Bank.Instruments[0][48] != 0 {
-		t.Fatal("an unverified shared-noise sweep acquired a guessed sound program")
+	if len(report.ScoreMixerInstruments) != 1 || report.Bank.Unsupported[0] != "" {
+		t.Fatal("verified noise-sweep state still excluded the fixed-pitch sound")
+	}
+	e := replay.New(p)
+	e.Play(false)
+	want := []byte{5, 28, 16, 20, 8}
+	for frame := 0; frame < 9; frame++ {
+		e.Tick()
+		if frame%2 == 0 && e.Registers[6] != want[frame/2] {
+			t.Fatalf("native sweep frame %d: noise=%d, want %d", frame, e.Registers[6], want[frame/2])
+		}
 	}
 }
 
