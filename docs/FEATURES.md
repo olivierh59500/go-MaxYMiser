@@ -6,7 +6,7 @@ replay validation and hardware-specific integration.
 
 | Area | Implemented | Remaining verification or work |
 | --- | --- | --- |
-| Tracker | Three YM voices, two PCM voices, both effect columns, live/step note entry, masked block cut/copy/paste, paste modes, row insert/delete, expand/shrink, block/song remap, transpose, undo/redo | Additional editing shortcuts |
+| Tracker | Three YM voices, two PCM voices, both effect columns, live/step recording, masked block editing, transpose/remap, row tools, octave/percussion shortcuts, undo/redo | Additional convenience shortcuts can be extended |
 | Arrangement | Independent pattern lists, length/repeat, position selection, Jam markers, boundary-queued next-pattern controllers, duplicate pattern/sequence packing with reference remapping | More live resequencing scenarios |
 | Instruments | 32 definitions, scalar/mask editing, linked sequence values, individual MYI exchange and copying | More native MYI legacy/sample fixtures |
 | Sequences | 256 sequences, length/repeat, generation, signed values, range add/scale, copying and morphing | Additional shortcuts |
@@ -15,7 +15,7 @@ replay validation and hardware-specific integration.
 | YM | YM Player reference playback, register inspector, candidate score with selection ranges/explicit grids, onset-alignment proposals, composer corpus and cross-arrangement comparison | Improved modulation/envelope hypotheses |
 | Replay | Sequences, commands, native frequency/DAC tables, timer waveforms, PCM note rates/modes | Broader full-song and mixed-timer evidence; sample-grid timer scheduling remains distinct from cycle-exact hardware |
 | MIDI | macOS notes, program changes, controllers, transport, external clock/SPP, native channel mapping, duplicate-channel voice allocation, DMA input/output voices and selected CoreMIDI output ports | Physical Sync24 hardware; tighter output timestamp scheduling |
-| Workflow | Resizable modern interface, drag/drop, file browser, native save, asynchronous WAV export with selectable duration | Richer contextual help |
+| Workflow | Resizable modern interface, drag/drop, file browser, native save, asynchronous WAV export, selectable help for keyboard/effects/instruments/formats/MIDI | Platform-specific device and clipboard conveniences |
 
 Native register evidence currently includes 8,778 complete replay calls across
 the three supplied examples and isolated timer fixtures. The register checks

@@ -47,6 +47,8 @@ type App struct {
 	exportDuration                                                     time.Duration
 	exporting                                                          bool
 	icePacking                                                         bool
+	helpTopic                                                          int
+	drumKeyboard                                                       bool
 	corpus                                                             *ymimport.Corpus
 	ymPath                                                             string
 	ymReport                                                           *ymimport.Report
@@ -194,7 +196,7 @@ func (a *App) Draw(dst *ebiten.Image) {
 	case "Settings":
 		a.drawSettings(dst, &e)
 	case "Help":
-		a.drawHelp(dst)
+		a.drawDetailedHelp(dst)
 	}
 	rect(dst, 24, 692, 1232, 62, panel)
 	for i := 0; i < len(wave)-1; i++ {
@@ -640,23 +642,29 @@ func (a *App) keyboard() {
 		}
 		return
 	}
-	if a.tab != "Patterns" {
-		return
-	}
-	if inpututil.IsKeyJustPressed(ebiten.KeyInsert) {
-		a.patternAction("row-insert")
-	}
-	if inpututil.IsKeyJustPressed(ebiten.KeyDelete) {
-		a.patternAction("row-delete")
-	}
 	if inpututil.IsKeyJustPressed(ebiten.KeyF10) {
 		a.action("jam")
 	}
 	if inpututil.IsKeyJustPressed(ebiten.KeySpace) {
 		a.action("play")
 	}
-	if inpututil.IsKeyJustPressed(ebiten.KeyControlRight) {
-		a.action("pattern")
+	if a.tab != "Patterns" {
+		return
+	}
+	for octave, key := range []ebiten.Key{ebiten.KeyF1, ebiten.KeyF2, ebiten.KeyF3, ebiten.KeyF4, ebiten.KeyF5, ebiten.KeyF6, ebiten.KeyF7, ebiten.KeyF8} {
+		if inpututil.IsKeyJustPressed(key) {
+			a.octave = octave
+			a.drumKeyboard = false
+		}
+	}
+	if inpututil.IsKeyJustPressed(ebiten.KeyF9) {
+		a.drumKeyboard = !a.drumKeyboard
+	}
+	if inpututil.IsKeyJustPressed(ebiten.KeyInsert) {
+		a.patternAction("row-insert")
+	}
+	if inpututil.IsKeyJustPressed(ebiten.KeyDelete) {
+		a.patternAction("row-delete")
 	}
 	if inpututil.IsKeyJustPressed(ebiten.KeyEnter) {
 		a.editing = !a.editing
@@ -715,6 +723,10 @@ func (a *App) enterNote(note byte) {
 	playing := false
 	a.synth.Edit(func(e *replay.Engine) {
 		if a.channel < 3 {
+			if a.drumKeyboard && note > 1 {
+				a.instrument = int(note-12) % 32
+				note = 48
+			}
 			e.Trigger(a.channel, note, byte(a.instrument+1))
 		} else {
 			dmaChannel := 0
@@ -816,6 +828,9 @@ func (a *App) enterField(r rune) {
 	}
 }
 func (a *App) action(name string) {
+	if a.modal == "" && a.helpAction(name) {
+		return
+	}
 	if a.modal == "" && a.midiOutputAction(name) {
 		return
 	}
@@ -1064,13 +1079,19 @@ func (a *App) action(name string) {
 		}
 		a.synth.Edit(func(e *replay.Engine) { e.Patterns[a.channel] = byte(a.pattern); e.Play(true) })
 	case "stop":
+		a.editing = false
 		if r, ok := a.synth.Reference(); ok && r.Active {
 			a.synth.StopYM()
 			return
 		}
 		a.synth.Edit(func(e *replay.Engine) { e.Stop() })
 	case "record":
-		a.editing = !a.editing
+		a.editing = true
+		if _, ok := a.synth.Reference(); ok {
+			a.synth.SelectReference(false)
+		}
+		a.synth.Edit(func(e *replay.Engine) { e.Play(false) })
+		a.status = "Recording notes into the playing native pattern"
 	case "pat:+":
 		a.synth.Edit(func(e *replay.Engine) {
 			a.pattern++

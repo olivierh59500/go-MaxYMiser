@@ -72,6 +72,8 @@ the list, select a file and confirm; a full path can also be typed.
 | Open / save | Ctrl+O / Ctrl+S |
 | Undo / redo | Ctrl+Z / Ctrl+Y |
 | Jam mode | F10 |
+| Octave selection | F1–F8 |
+| Percussion note keyboard | F9 |
 | Copy / paste selected row range | Ctrl+C / Ctrl+V |
 | Cut selected row range | Ctrl+X |
 | Insert / delete row | Insert / Delete |
@@ -79,6 +81,9 @@ the list, select a file and confirm; a full path can also be typed.
 Instrument and sequence values use hexadecimal notation. Playback settings use
 decimal notation. Notes entered during playback and recording target the
 currently playing row.
+**Record** starts song playback with note entry enabled; **Stop** leaves recording
+mode. F9 maps note keys to instruments played at middle C. **Help** provides
+separate keyboard, effects, instruments, native format/YM and MIDI references.
 
 In **Sequences**, choose **Generate / morph** to create envelopes or oscillations.
 The selected sequence's length defines the generated length. Ramps hold their
