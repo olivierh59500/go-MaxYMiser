@@ -5,8 +5,8 @@ SNDH files. Of these, 704 contain MaxYMiser native instrument signatures.
 The other files contain different replay routines and are not editable MaxYMiser
 projects merely because they share the SNDH container format.
 
-The current audit imports 687 files containing 863 editable native subtunes.
-667 files use supported replay template layouts. All 667 export/reload checks
+The current audit imports 689 files containing 869 editable native subtunes.
+658 files use supported single-song replay templates. All 658 export/reload checks
 preserve serialized song data, voice banks and title/author metadata exactly.
 This verifies editable data handling, not audio fidelity across those songs.
 
@@ -22,7 +22,9 @@ The collection exposed independent INST/DIGI versions, alternate bank/song/sampl
 ordering, multiple native subtunes and metadata words that resemble SNDH tags.
 Regression fixtures cover these cases without copying the source compositions.
 
-The remaining 37 reported issues include:
+The current report contains 50 issues: 15 import failures, 31 unsupported
+single-song export templates, and four declared-count discrepancies. These
+categories can refer to the same container. Issues include:
 
 - MaxYMiser signatures embedded in nonstandard or repacked replay layouts.
 - Archives with sample pointers beyond the physical file or truncated samples.
@@ -56,3 +58,30 @@ initial state accounts for unused tone registers retained from the Atari
 environment. Other recovered files are covered by decode/export/reload checks;
 this one playback comparison is not evidence for complete audio parity of all
 thirteen songs.
+
+The same rule now supports an empty trailing suffix after physically present
+waveforms. Each normalized slot must declare zero length, all later slots must
+also be empty, and the unchanged strict decoder must still validate every
+nonempty sample. Hatari 2.1 by Dma-Sc and Vrien by Frequent import through this
+layout. Missing or truncated nonempty waveforms remain rejected.
+
+## Subtunes and export templates
+
+Several native songs can share one voice bank. The importer retains all their
+separate editable arrangements rather than stopping after the first song.
+Yoomp exposes five songs through this layout.
+
+The audit compares decoded payload count with the bounded `##nn` header tag.
+Terraboink declares 20 songs with one decoded payload; Nano Cave declares seven
+with six; Randomazer declares nine with eight; PHF Rally 2 declares two with one.
+Selector aliases, cue positions or unsupported payloads require further native
+analysis. These collections are imported partially and recorded as such.
+
+A multi-song executable prefix cannot safely export one replacement song while
+its selector retains references to discarded songs. Single-song template
+validation now rejects both declared and physically detected multi-song
+containers. This removed eleven previously counted data-only round trips from
+the safe export-template total: successful data reload did not prove that those
+generated executables could still select every song. Their editable imports
+remain available, and selected songs can be saved as MYS/MYV or exported using
+a verified single-song replay template.

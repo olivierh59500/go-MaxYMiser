@@ -16,6 +16,24 @@ func Load(songPath, bankPath string) (*model.Project, error) {
 	return loadWithReader(songPath, bankPath, os.ReadFile)
 }
 
+// LoadSubtune selects a one-based native SNDH song without assuming physical
+// payload order is the only editable song in the executable container.
+func LoadSubtune(path string, index int) (*model.Project, error) {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	projects, err := native.DecodeContainers(raw)
+	if err != nil {
+		return nil, err
+	}
+	if index < 1 || index > len(projects) {
+		return nil, fmt.Errorf("project: subtune %d is outside 1–%d", index, len(projects))
+	}
+	value := projects[index-1]
+	return (&model.Project{Title: value.Title, Author: value.Author, Song: value.Song, Bank: value.Bank, ReplaySource: append([]byte(nil), raw...)}).Clone(), nil
+}
+
 // LoadFS uses the same native decoding and paired-bank lookup for dropped
 // files or embedded filesystems. Both payloads are validated before returning.
 func LoadFS(files fs.FS, songPath, bankPath string) (*model.Project, error) {

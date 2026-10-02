@@ -26,8 +26,12 @@ func ParseSNDHTemplate(data []byte) (SNDHTemplate, error) {
 	if err != nil {
 		return template, err
 	}
-	if _, err := DecodeContainer(plain); err != nil {
+	projects, err := DecodeContainers(plain)
+	if err != nil {
 		return template, err
+	}
+	if len(projects) != 1 || DeclaredSubtunes(plain) > 1 {
+		return template, fmt.Errorf("native: multi-tune replay wrapper cannot export a single song; select a single-song replay template")
 	}
 	inst := bytes.Index(plain, []byte("MYM1INST"))
 	if inst < 40 {

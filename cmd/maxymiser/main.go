@@ -23,6 +23,7 @@ func main() {
 	template := flag.String("template", "", "existing MaxYMiser SNDH replay template")
 	ice := flag.Bool("ice", false, "ICE-compress native SNDH output")
 	duration := flag.Duration("duration", 30*time.Second, "render duration")
+	subtune := flag.Int("subtune", 1, "one-based native SNDH subtune")
 	flag.Parse()
 	if *song == "" && flag.NArg() > 0 {
 		*song = flag.Arg(0)
@@ -31,7 +32,11 @@ func main() {
 	var err error
 	isYM := *song != "" && strings.EqualFold(filepath.Ext(*song), ".ym")
 	if !isYM && (*song != "" || *bank != "") {
-		p, err = project.Load(*song, *bank)
+		if strings.EqualFold(filepath.Ext(*song), ".snd") || strings.EqualFold(filepath.Ext(*song), ".sndh") {
+			p, err = project.LoadSubtune(*song, *subtune)
+		} else {
+			p, err = project.Load(*song, *bank)
+		}
 		if err != nil {
 			log.Fatal(err)
 		}

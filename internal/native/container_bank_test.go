@@ -63,3 +63,27 @@ func TestContainerBankRecoveryNeverFillsMissingNonemptySamples(t *testing.T) {
 		t.Fatal("a pointer into the header was repaired as an empty sample")
 	}
 }
+
+func TestContainerKeepsPresentWaveformsWhenOnlyEmptyTrailingSlotsAreOptimized(t *testing.T) {
+	p := model.New()
+	p.Bank.Samples[0].PCM = []byte{0, 127, 128, 255}
+	p.Bank.Samples[1].PCM = []byte{1, 2, 3}
+	raw, err := EncodeVoiceBank(p.Bank)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bank, err := decodeContainerBank(raw[:len(raw)-3])
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range []int{0, 1} {
+		if !bytes.Equal(bank.Samples[id].PCM, p.Bank.Samples[id].PCM) {
+			t.Fatal("optimizing an empty suffix changed a present sample")
+		}
+	}
+	for _, s := range bank.Samples[2:] {
+		if len(s.PCM) != 0 {
+			t.Fatal("empty slot acquired fabricated audio")
+		}
+	}
+}

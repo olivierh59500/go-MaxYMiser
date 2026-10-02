@@ -58,6 +58,9 @@ func main() {
 		}
 		report.Imported++
 		report.Subtunes += len(projects)
+		if declared := native.DeclaredSubtunes(plain); declared > len(projects) {
+			problem("subtunes", fmt.Errorf("container declares %d songs; %d editable payloads were decoded", declared, len(projects)))
+		}
 		template, err := native.ParseSNDHTemplate(plain)
 		if err != nil {
 			problem("replay template", err)

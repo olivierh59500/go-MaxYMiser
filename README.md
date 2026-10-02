@@ -160,6 +160,15 @@ supported SNDH keeps its replay available for saving; a new composition can
 choose **Settings → Load SNDH replay**, then **Export SNDH**. Original executable
 data is loaded at runtime and is not bundled with the Go application.
 
+The Song workspace can select a native subtune directly or move to the next
+one. Each subtune retains its own edits, cursor, undo/redo history, replay
+template and MYS/MYV save destination. Multi-song source files default to saving
+individual native pairs. To export one selected song as SNDH, choose a compatible
+single-song replay template; a multi-song selector cannot be retained while
+discarding the payloads it references. Shared-bank containers such as Yoomp
+expose each stored song independently. Declared songs without a decoded payload
+are reported explicitly rather than assigned invented data.
+
 YM files are played by YM Player, including its compressed-file support and
 chip effects. Their register data is retained separately from the native
 tracker project. **Listen YM** and **Listen score** compare the original
@@ -168,6 +177,8 @@ recording with the reconstructed candidate.
 ```sh
  go run ./cmd/maxymiser -song /path/to/song.mys -bank /path/to/voices.myv
  go run ./cmd/maxymiser -song /path/to/song.snd -wav music.wav -duration 30s
+ go run ./cmd/maxymiser -song /path/to/collection.sndh -subtune 2 \
+   -wav second-song.wav -duration 30s
  go run ./cmd/maxymiser -song /path/to/song.mys \
    -template /path/to/maxymiser.snd -sndh finished.snd -duration 3m
 ```
@@ -272,8 +283,9 @@ loops and saved Jam behaviour. Isolated timer tests verify native levels,
 frequency steps and MFP divider/data calculations.
 See [native replay verification](docs/REPLAY_VERIFICATION.md) for the scope,
 method and register-trace verifier.
-The [SNDH corpus audit](docs/SNDH_CORPUS.md) covers 687 imported files, 863 native
-subtunes and 667 unchanged export/reload checks, with explicit remaining issues.
+The [SNDH corpus audit](docs/SNDH_CORPUS.md) covers 689 imported files, 869 native
+subtunes and 658 unchanged single-song export/reload checks, with explicit
+remaining issues and incomplete declared collections.
 
 ## Credits
 

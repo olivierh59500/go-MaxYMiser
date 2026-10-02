@@ -167,7 +167,9 @@ func DecodeContainers(data []byte) ([]EmbeddedProject, error) {
 			}
 			projects = append(projects, EmbeddedProject{Song: song, Bank: voice, Title: containerText(plain, "TITL"), Author: containerText(plain, "COMM")})
 			usedSongs[songAt] = true
-			break
+			if len(insts) > 1 {
+				break
+			}
 		}
 	}
 	if len(projects) == 0 {

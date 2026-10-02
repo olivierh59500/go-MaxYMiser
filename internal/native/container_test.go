@@ -47,6 +47,37 @@ func TestNativeContainerCanPlaceBankSamplesBeforeItsSong(t *testing.T) {
 	}
 }
 
+func TestNativeContainerCanShareOneBankAcrossSeveralSongs(t *testing.T) {
+	p, q := model.New(), model.New()
+	p.Song.Patterns[0][0].Note = 60
+	q.Song.Patterns[0][0].Note = 72
+	bank, err := EncodeVoiceBank(p.Bank)
+	if err != nil {
+		t.Fatal(err)
+	}
+	header := make([]byte, 32)
+	copy(header[12:], "SNDH##02\x00HDNS")
+	raw := append(header, bank...)
+	for _, s := range []model.Song{p.Song, q.Song} {
+		b, err := EncodeSong(s)
+		if err != nil {
+			t.Fatal(err)
+		}
+		raw = append(raw, b...)
+	}
+	projects, err := DecodeContainers(raw)
+	if err != nil || len(projects) != 2 || projects[0].Song.Patterns[0][0].Note != 60 || projects[1].Song.Patterns[0][0].Note != 72 || projects[0].Bank.Instruments != projects[1].Bank.Instruments {
+		t.Fatalf("shared-bank subtunes were lost or paired incorrectly: %v", err)
+	}
+	if DeclaredSubtunes(raw) != 2 {
+		t.Fatal("header subtune count was not retained")
+	}
+	projects[0].Song.Patterns[0][0].Note = 83
+	if projects[1].Song.Patterns[0][0].Note != 72 {
+		t.Fatal("shared-bank songs aliased editable pattern storage")
+	}
+}
+
 func TestNativeContainerSeparatesTwoSubtunesWithoutScanningSampleTags(t *testing.T) {
 	p := model.Demo()
 	first := syntheticSNDH(t, p)
@@ -71,6 +102,9 @@ func TestNativeContainerSeparatesTwoSubtunesWithoutScanningSampleTags(t *testing
 	projects, err := DecodeContainers(raw)
 	if err != nil || len(projects) != 2 || projects[1].Song.Patterns[0][0].Note != 69 {
 		t.Fatalf("subtune payloads were confused: count=%d err=%v", len(projects), err)
+	}
+	if _, err := ParseSNDHTemplate(raw); err == nil {
+		t.Fatal("multi-tune source was accepted as a single-song executable export prefix")
 	}
 }
 

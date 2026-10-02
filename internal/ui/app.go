@@ -67,6 +67,7 @@ type App struct {
 	midiMessages                                                       [256]replay.MIDIMessage
 	subtunes                                                           []native.EmbeddedProject
 	subtuneIndex                                                       int
+	subtuneWorkspaces                                                  []subtuneWorkspace
 	midiData                                                           chan []byte
 	midiDecoder                                                        midi.Decoder
 	undo, redo                                                         []*model.Project
@@ -122,6 +123,7 @@ func New(p *model.Project, projectPath string, mute bool) (*App, error) {
 		a.directory = filepath.Dir(projectPath)
 		a.status = "Loaded " + filepath.Base(projectPath)
 	}
+	a.initializeSubtuneWorkspaces()
 	if !mute {
 		context := audio.CurrentContext()
 		if context == nil {
@@ -357,7 +359,8 @@ func (a *App) drawSong(dst *ebiten.Image, e *replay.Engine) {
 		}
 	}
 	if len(a.subtunes) > 1 {
-		a.btn(dst, fmt.Sprintf("Subtune %d / %d", a.subtuneIndex+1, len(a.subtunes)), 942, 636, 284, 28, "subtune-next", false)
+		a.btn(dst, fmt.Sprintf("Subtune %d / %d", a.subtuneIndex+1, len(a.subtunes)), 942, 636, 198, 28, "subtune-select", false)
+		a.btn(dst, "Next", 1150, 636, 76, 28, "subtune-next", false)
 	}
 }
 func (a *App) drawInstruments(dst *ebiten.Image, e *replay.Engine) {
@@ -890,6 +893,9 @@ func (a *App) enterField(r rune) {
 	}
 }
 func (a *App) action(name string) {
+	if a.modal == "" && a.subtuneAction(name) {
+		return
+	}
 	if a.modal == "" && a.midiAssignmentAction(name) {
 		return
 	}
@@ -1145,22 +1151,17 @@ func (a *App) action(name string) {
 		a.beginFileBrowser("Open music (.mys / .myv / .snd / .ym)", "", false)
 	case "subtune-next":
 		if len(a.subtunes) > 1 {
-			a.synth.Edit(func(e *replay.Engine) {
-				copy := e.Project.Clone()
-				a.subtunes[a.subtuneIndex].Song = copy.Song
-				a.subtunes[a.subtuneIndex].Bank = copy.Bank
-			})
-			a.remember()
-			a.subtuneIndex = (a.subtuneIndex + 1) % len(a.subtunes)
-			value := a.subtunes[a.subtuneIndex]
-			a.reloadConfiguration(&value.Song)
-			a.synth.Edit(func(e *replay.Engine) { e.Stop(); e.Project.Song = value.Song; e.Project.Bank = value.Bank; e.Reset() })
-			a.pattern, a.row = 0, 0
-			a.status = fmt.Sprintf("Selected native subtune %d of %d; export MYS/MYV or use a supported replay template", a.subtuneIndex+1, len(a.subtunes))
+			if err := a.SelectSubtune((a.subtuneIndex + 1) % len(a.subtunes)); err != nil {
+				a.status = err.Error()
+			}
 		}
 	case "save":
 		if a.projectPath == "" {
-			a.beginFileBrowser("Save project (.mys + .myv)", "untitled.mys", true)
+			name := "untitled.mys"
+			if len(a.subtunes) > 1 {
+				name = fmt.Sprintf("subtune-%02d.mys", a.subtuneIndex+1)
+			}
+			a.beginFileBrowser("Save project (.mys + .myv)", name, true)
 		} else {
 			a.save(a.projectPath)
 		}
@@ -1331,6 +1332,9 @@ func (a *App) applyModal() {
 	}
 	modal, entry := a.modal, strings.TrimSpace(a.entry)
 	a.modal = ""
+	if a.subtuneModal(modal, entry) {
+		return
+	}
 	if a.midiAssignmentModal(modal, entry) {
 		return
 	}
