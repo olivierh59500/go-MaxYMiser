@@ -105,7 +105,7 @@ func EncodeSNDH(template SNDHTemplate, project *model.Project, duration time.Dur
 	if headerEnd < 16 || headerEnd > 512 {
 		return nil, fmt.Errorf("native: SNDH template lacks a bounded header")
 	}
-	if at := bytes.Index(out[:headerEnd], []byte("TIME")); at >= 0 && at+6 <= headerEnd {
+	if at := sndhHeaderTag(out, "TIME", headerEnd); at >= 0 && at+6 <= headerEnd {
 		binary.BigEndian.PutUint16(out[at+4:], uint16(duration/time.Second))
 	} else if duration != 0 {
 		return nil, fmt.Errorf("native: SNDH template has no TIME field")
@@ -121,12 +121,21 @@ func EncodeSNDH(template SNDHTemplate, project *model.Project, duration time.Dur
 	return out, nil
 }
 
+func sndhHeaderTag(data []byte, tag string, end int) int {
+	for at := 16; at+len(tag) <= end; at++ {
+		if bytes.Equal(data[at:at+len(tag)], []byte(tag)) && (at == 16 || data[at-1] == 0) {
+			return at
+		}
+	}
+	return -1
+}
+
 func setSNDHText(prefix []byte, tag, value string) error {
 	end := bytes.Index(prefix, []byte("HDNS"))
 	if end < 16 || end > 512 {
 		return fmt.Errorf("native: unsupported SNDH metadata header")
 	}
-	at := bytes.Index(prefix[:end], []byte(tag))
+	at := sndhHeaderTag(prefix, tag, end)
 	if at < 0 {
 		return fmt.Errorf("native: SNDH template lacks %s metadata", tag)
 	}
@@ -153,7 +162,7 @@ func setSNDHRate(prefix []byte, rate int) error {
 	if end < 16 || end > 512 {
 		return fmt.Errorf("native: unsupported SNDH metadata header")
 	}
-	at := bytes.Index(prefix[:end], []byte("TC"))
+	at := sndhHeaderTag(prefix, "TC", end)
 	if at < 0 {
 		return fmt.Errorf("native: SNDH template lacks timer C rate metadata")
 	}

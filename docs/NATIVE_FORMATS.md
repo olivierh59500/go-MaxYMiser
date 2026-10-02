@@ -42,6 +42,8 @@ sequences.
 Version 1 sequences use 126 bytes of word values and final length/repeat bytes.
 Version 0 uses half that stride. `MYM1DIGI` precedes the sample payload. Unused
 sample tails and instrument reserved bytes are preserved when saving.
+INST and DIGI versions are independent; legacy 31-word sequence banks can contain
+signed-byte DIGI1 samples. Both versions are preserved on save.
 
 ## Individual instruments
 
@@ -71,6 +73,10 @@ sequence data and the sample tag. Extracting a native voice bank removes that
 song block and adjusts the relative sample pointers by its length. The import
 checks the native tags and decodes both resulting payloads before accepting the
 project.
+Optimized wrappers can place tracker data before or after the complete bank.
+The importer locates actual sample boundaries through relative pointers and
+validates candidate song/bank pairs. `DecodeContainers` exposes independently
+editable subtunes; `DecodeContainer` selects the first accepted pair.
 
 ### Native SNDH export
 

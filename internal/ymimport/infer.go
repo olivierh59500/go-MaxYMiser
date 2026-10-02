@@ -29,7 +29,7 @@ func Reconstruct(trace Trace) (*model.Project, Report, error) {
 	p.Song.Patterns = nil
 	p.Song.SetSpeed(1)
 	p.Song.SetTickRate(trace.Rate)
-	p.Bank = model.VoiceBank{Version: 1, SequenceCount: 1}
+	p.Bank = model.VoiceBank{Version: 1, SampleVersion: 1, SequenceCount: 1}
 	report := Report{Frames: len(trace.Frames)}
 	if trace.Rate < 25 || trace.Rate > 200 {
 		return nil, report, fmt.Errorf("ymimport: native tracker rate is limited to 25–200 Hz")

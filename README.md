@@ -206,6 +206,8 @@ loops and saved Jam behaviour. Isolated timer tests verify native levels,
 frequency steps and MFP divider/data calculations.
 See [native replay verification](docs/REPLAY_VERIFICATION.md) for the scope,
 method and register-trace verifier.
+The [SNDH corpus audit](docs/SNDH_CORPUS.md) covers 663 imported files, 839 native
+subtunes and 648 unchanged export/reload checks, with explicit remaining issues.
 
 ## Credits
 

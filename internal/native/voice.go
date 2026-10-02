@@ -34,6 +34,10 @@ func DecodeVoiceBank(data []byte) (model.VoiceBank, error) {
 	if !bytes.Equal(data[end:end+3], []byte("MYM")) || !bytes.Equal(data[end+4:end+8], []byte("DIGI")) {
 		return bank, fmt.Errorf("native: missing sample tag")
 	}
+	bank.SampleVersion = data[end+3] - '0'
+	if bank.SampleVersion > 1 {
+		return bank, fmt.Errorf("native: unsupported DIGI version")
+	}
 	stride := 128
 	if bank.Version == 0 {
 		stride = 64
@@ -104,7 +108,7 @@ func EncodeVoiceBank(bank model.VoiceBank) ([]byte, error) {
 		out[at+stride-2], out[at+stride-1] = s.Length, s.Repeat
 	}
 	copy(out[len(out)-8:], []byte("MYM1DIGI"))
-	out[len(out)-5] = '0' + bank.Version
+	out[len(out)-5] = '0' + bank.SampleVersion
 	for i, s := range bank.Samples {
 		if len(s.PCM) > 65535 {
 			return nil, fmt.Errorf("native: sample %d too long", i)
