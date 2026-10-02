@@ -56,6 +56,11 @@ trying the editor. External MaxYMiser files are not needed to launch it.
   **All columns** enables or disables the complete copy/paste mask.
   **Pack project** removes duplicate pattern/sequence definitions and remaps their
   references, including sequence-selection commands in both effect columns.
+  **Clear song** empties notes and arrangement while keeping the sound bank,
+  composition metadata and playback/edit settings. **Clear bank** empties the
+  instruments, sequences and eight sample banks while keeping the partition.
+  Both stop recording/playback, retain the current save destination and support
+  undo/redo. They affect only the currently selected subtune.
 - **YM**: original YM playback, live register inspection and proposed tracker
   reconstruction, with optional composer-corpus evidence and source-labelled
   profiles learned from verified SNDH/YM pairs. On the one-frame grid, labelled

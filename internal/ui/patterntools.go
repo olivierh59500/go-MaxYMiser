@@ -43,8 +43,10 @@ func (a *App) drawPatternTools(dst *ebiten.Image, e *replay.Engine) {
 	a.btn(dst, "Remap sound", 454, 528, 190, 36, "block-remap", false)
 	a.btn(dst, "Remap song", 660, 528, 190, 36, "song-remap", false)
 	a.btn(dst, "Pack project", 866, 528, 232, 36, "project-pack", false)
-	a.text(dst, "Transpose and remap use the selected row range; PCM edits apply to both sample voices.", 42, 595, 12, dim)
-	a.text(dst, "Expand/shrink retain displaced rows in the clipboard. Ctrl+Z undoes all edits.", 42, 626, 12, dim)
+	a.btn(dst, "Clear song", 42, 578, 190, 30, "song-clear", false)
+	a.btn(dst, "Clear bank", 248, 578, 190, 30, "bank-clear", false)
+	a.text(dst, "Clear song keeps sounds; clear bank keeps notes. Ctrl+Z restores either operation.", 454, 587, 12, dim)
+	a.text(dst, "Transpose/remap use the selected rows; PCM edits apply to both voices. Expand/shrink retain the clipboard.", 42, 636, 12, dim)
 }
 
 func (a *App) patternAction(name string) bool {
@@ -83,6 +85,8 @@ func (a *App) patternAction(name string) bool {
 		a.pattern, a.row = 0, 0
 		a.dirty = true
 		a.status = fmt.Sprintf("Packed %d→%d patterns and %d→%d sequences", result.PatternsBefore, result.PatternsAfter, result.SequencesBefore, result.SequencesAfter)
+	case "song-clear", "bank-clear":
+		a.resetContent(name)
 	case "block-first", "block-last":
 		a.modal, a.entry = "Block first row", fmt.Sprintf("%02X", a.blockFirst)
 		if name == "block-last" {
