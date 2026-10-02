@@ -161,6 +161,10 @@ sequence/effect behaviour, PCM timing, live note triggering, MIDI framing,
 YM-reference playback, reconstruction and duplicate-aware corpus evidence.
 Cross-composer checks cover tempo changes, transposition, channel reassignment,
 noise-only events and misleading filenames.
+The first 199 replay calls of each supplied native example were also compared
+under Hatari: all YM registers and envelope-write flags match across 597 calls.
+See [native replay verification](docs/REPLAY_VERIFICATION.md) for the scope,
+method and register-trace verifier.
 
 ## Credits
 
