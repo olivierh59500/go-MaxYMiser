@@ -398,6 +398,15 @@ func (a *App) drawSettings(dst *ebiten.Image, e *replay.Engine) {
 	a.text(dst, "The YM noise generator and envelope are shared between all three voices.", 670, 321, 12, dim)
 	a.btn(dst, "Jam mode", 860, 372, 180, 38, "jam", e.Jam)
 	a.btn(dst, "MIDI input", 670, 372, 180, 38, "midi", a.midiInput != nil)
+	modes := []string{"Disabled", "One voice", "Two voices", "Native STe rate", "MIDI output"}
+	mode := int(e.Project.Song.State[49])
+	if mode >= len(modes) {
+		mode = 0
+	}
+	a.text(dst, "PCM mode", 670, 438, 13, dim)
+	a.btn(dst, modes[mode], 850, 426, 280, 38, "pcm-mode", false)
+	a.text(dst, "PCM attenuation limit", 670, 492, 13, dim)
+	a.btn(dst, fmt.Sprint(e.Project.Song.State[56]), 950, 480, 180, 38, "setting:pcm-limit", false)
 }
 func (a *App) drawHelp(dst *ebiten.Image) {
 	rect(dst, 24, 192, 1232, 482, panel)
@@ -846,7 +855,14 @@ func (a *App) action(name string) {
 	case "ym:score":
 		a.synth.SelectReference(false)
 	case "jam":
-		a.synth.Edit(func(e *replay.Engine) { e.Jam = !e.Jam })
+		a.synth.Edit(func(e *replay.Engine) {
+			e.Jam = !e.Jam
+			e.Project.Song.State[39] = 0
+			if e.Jam {
+				e.Project.Song.State[39] = 255
+			}
+		})
+		a.dirty = true
 	case "midi":
 		if a.midiInput != nil {
 			a.midiInput.Close()
@@ -870,6 +886,10 @@ func (a *App) action(name string) {
 		a.selectChannel(0)
 	case "mode:dma":
 		a.selectChannel(3)
+	case "pcm-mode":
+		a.remember()
+		a.synth.Edit(func(e *replay.Engine) { e.Project.Song.State[49] = (e.Project.Song.State[49] + 1) % 4 })
+		a.dirty = true
 	case "bank:0":
 		a.instrument = a.instrument % 16
 	case "bank:1":
@@ -1113,6 +1133,8 @@ func (a *App) applyModal() {
 			case "timers":
 				e.TimerMask = byte(n) & 7
 				e.Project.Song.State[36] = e.TimerMask
+			case "pcm-limit":
+				e.Project.Song.State[56] = byte(max(0, min(7, n)))
 			}
 		})
 	default:

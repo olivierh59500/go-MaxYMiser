@@ -35,8 +35,8 @@ trying the editor. External MaxYMiser files are not needed to launch it.
   independent preview.
 - **YM**: original YM playback, live register inspection and proposed tracker
   reconstruction, with optional composer-corpus evidence.
-- **Settings**: playback rate, speed, edit step, octave, volume, timer mask and
-  macOS MIDI input.
+- **Settings**: playback rate, speed, edit step, octave, volume, timer mask,
+  saved Jam mode, one/two-voice/native-rate PCM modes and macOS MIDI input.
 
 The window can be resized. The waveform at the bottom displays the actual
 synthesizer output.
@@ -69,7 +69,8 @@ The selected sequence's length defines the generated length. Ramps hold their
 last value; oscillations loop. Morphing fills IDs between two endpoints with the
 same length and repeat. **Samples** supports 1.5 dB gain steps and decimal tuning
 in semitones, including 0.125-semitone fine steps. These operations support undo.
-Sample preview uses the Go PCM voice; its pitch reference is 8287 Hz at C4.
+Sample preview uses the Go PCM voice and native note-rate table: 8287 Hz at C3
+and 16574 Hz at C4. Notes above the native range wrap down by octaves.
 Title and artist are runtime/export metadata; the separate native MYS/MYV format
 does not contain SNDH title/artist tags.
 
@@ -161,8 +162,9 @@ sequence/effect behaviour, PCM timing, live note triggering, MIDI framing,
 YM-reference playback, reconstruction and duplicate-aware corpus evidence.
 Cross-composer checks cover tempo changes, transposition, channel reassignment,
 noise-only events and misleading filenames.
-The first 199 replay calls of each supplied native example were also compared
-under Hatari: all YM registers and envelope-write flags match across 597 calls.
+Longer native example traces compare 8,778 calls under Hatari, including pattern
+loops and saved Jam behaviour. Isolated timer tests verify native levels,
+frequency steps and MFP divider/data calculations.
 See [native replay verification](docs/REPLAY_VERIFICATION.md) for the scope,
 method and register-trace verifier.
 

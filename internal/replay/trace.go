@@ -11,6 +11,9 @@ import (
 type RegisterTick struct {
 	Registers     [14]byte
 	EnvelopeWrite bool
+	// A nil mask denotes a complete legacy fixture. A native capture can
+	// specify writes to exclude registers owned by subtick timer interrupts.
+	Written *[14]bool `json:",omitempty"`
 }
 
 // VerifyRegisterTrace compares every register and envelope write, rather than
@@ -24,6 +27,9 @@ func VerifyRegisterTrace(project *model.Project, expected []RegisterTick) error 
 	for tick, reference := range expected {
 		engine.Tick()
 		for reg, value := range reference.Registers {
+			if reference.Written != nil && !reference.Written[reg] {
+				continue
+			}
 			if engine.Registers[reg] != value {
 				return fmt.Errorf("replay: tick %d R%d: Go %02X, native %02X", tick, reg, engine.Registers[reg], value)
 			}

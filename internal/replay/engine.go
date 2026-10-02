@@ -63,6 +63,7 @@ func (e *Engine) Reset() {
 	e.Position, e.Row, e.TickInRow = 0, 0, 0
 	e.Speed = e.Project.Song.Speed()
 	e.Playing, e.PatternMode, e.Break = false, false, false
+	e.Jam = e.Project.Song.State[39] != 0
 	e.Mutes = e.Project.Song.State[37]
 	e.TimerMask = e.Project.Song.State[36] & 7
 	e.MasterVolume, e.Pan, e.Bass, e.Treble = 127, 0, 6, 6
@@ -171,6 +172,9 @@ func (e *Engine) TriggerSample(channel int, note, sample byte) {
 	if channel < 0 || channel >= 2 || sample > 8 {
 		return
 	}
+	for note >= 68 && e.Project.Song.State[49] != 4 {
+		note -= 12
+	}
 	e.DMA[channel] = PCMVoice{Sample: sample, Note: note}
 	e.pendingDMA[channel] = true
 }
@@ -219,16 +223,24 @@ func (e *Engine) parse(ch int, cell model.Cell, muted bool) {
 func (e *Engine) parseDMA(c model.Cell) {
 	vals := [2][3]byte{{c.Note, c.Instrument, c.Volume}, {c.Effect1, c.Parameter1, c.Effect2}}
 	for i, x := range vals {
-		v := &e.DMA[i]
-		if x[0] == 1 {
-			v.Note = 0
-			v.Triggered = true
-		} else if x[0] > 1 {
-			v.Note = x[0]
-			v.Triggered = true
+		if e.Mutes&(1<<(i+3)) != 0 || i == 1 && e.Project.Song.State[49] != 2 && e.Project.Song.State[49] != 4 {
+			continue
 		}
+		v := &e.DMA[i]
 		if x[1] > 0 && x[1] <= 8 {
 			v.Sample = x[1]
+			v.Volume = 0
+		}
+		if x[0] == 1 {
+			v.Note = 0
+			v.Sample = 0
+			v.Triggered = true
+		} else if x[0] > 1 {
+			note := x[0]
+			for note >= 68 && e.Project.Song.State[49] != 4 {
+				note -= 12
+			}
+			v.Note = note
 			v.Triggered = true
 		}
 		if x[2] > 0 {
@@ -452,9 +464,6 @@ func (e *Engine) Period(v *Voice, component int) uint16 {
 		period = int(table(tonePeriods[:], index))
 		if component == 1 {
 			period = int(table(envelopePeriods[:], index))
-		}
-		if component == 0 {
-			period = int(table(timerPeriods[:], index))
 		}
 		if component != 1 && p[25] != 0 {
 			period = int(table(envelopePeriods[:], index)) * 16

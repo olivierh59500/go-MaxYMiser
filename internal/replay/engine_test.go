@@ -117,6 +117,20 @@ func TestJamMarkersLoopTheSelectedSection(t *testing.T) {
 	}
 }
 
+func TestResetRestoresTheSavedJamPlaybackMode(t *testing.T) {
+	p := model.New()
+	p.Song.State[39] = 255
+	e := New(p)
+	if !e.Jam {
+		t.Fatal("native Jam mode was lost on load")
+	}
+	p.Song.State[39] = 0
+	e.Reset()
+	if e.Jam {
+		t.Fatal("Jam state leaked from the previous project")
+	}
+}
+
 func TestReusableSnapshotDoesNotAliasEditedSourceData(t *testing.T) {
 	p := model.Demo()
 	p.Bank.Samples[0].PCM = []byte{1, 2, 3}
