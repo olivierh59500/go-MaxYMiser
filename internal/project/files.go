@@ -1,0 +1,99 @@
+// Package project handles native tracker projects and atomic file writes.
+package project
+
+import (
+	"fmt"
+	"github.com/olivierh59500/go-MaxYMiser/internal/model"
+	"github.com/olivierh59500/go-MaxYMiser/internal/native"
+	"os"
+	"path/filepath"
+	"strings"
+)
+
+func Load(songPath, bankPath string) (*model.Project, error) {
+	p := model.New()
+	if songPath != "" {
+		b, err := os.ReadFile(songPath)
+		if err != nil {
+			return nil, err
+		}
+		song, err := native.DecodeSong(b)
+		if err != nil {
+			return nil, err
+		}
+		p.Song = song
+		p.Title = strings.TrimSuffix(filepath.Base(songPath), filepath.Ext(songPath))
+		if bankPath == "" {
+			for _, ext := range []string{".MYV", ".myv"} {
+				candidate := strings.TrimSuffix(songPath, filepath.Ext(songPath)) + ext
+				if _, err := os.Stat(candidate); err == nil {
+					bankPath = candidate
+					break
+				}
+			}
+		}
+	}
+	if bankPath != "" {
+		b, err := os.ReadFile(bankPath)
+		if err != nil {
+			return nil, err
+		}
+		bank, err := native.DecodeVoiceBank(b)
+		if err != nil {
+			return nil, err
+		}
+		p.Bank = bank
+	}
+	return p, nil
+}
+func Save(p *model.Project, path string) error {
+	stem := strings.TrimSuffix(path, filepath.Ext(path))
+	song, err := native.EncodeSong(p.Song)
+	if err != nil {
+		return err
+	}
+	bank, err := native.EncodeVoiceBank(p.Bank)
+	if err != nil {
+		return err
+	}
+	if err = atomicWrite(stem+".mys", song); err != nil {
+		return err
+	}
+	return atomicWrite(stem+".myv", bank)
+}
+func atomicWrite(path string, data []byte) error {
+	dir := filepath.Dir(path)
+	f, err := os.CreateTemp(dir, ".maxymiser-save-")
+	if err != nil {
+		return err
+	}
+	name := f.Name()
+	defer os.Remove(name)
+	if _, err = f.Write(data); err != nil {
+		f.Close()
+		return err
+	}
+	if err = f.Sync(); err != nil {
+		f.Close()
+		return err
+	}
+	if err = f.Close(); err != nil {
+		return err
+	}
+	return os.Rename(name, path)
+}
+func ImportSample(bank *model.VoiceBank, index int, path string) error {
+	if index < 0 || index >= 8 {
+		return fmt.Errorf("project: invalid sample bank")
+	}
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	if len(b) > 32768 {
+		return fmt.Errorf("project: raw sample exceeds 32 KiB")
+	}
+	bank.Samples[index].PCM = append([]byte(nil), b...)
+	bank.Samples[index].Trailer = []byte{0}
+	return nil
+}
