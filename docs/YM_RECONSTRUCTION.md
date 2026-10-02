@@ -184,6 +184,31 @@ fidelity. The remaining mixer discrepancies, continuous modulation phases,
 hardware programs and native pattern structure need further reconstruction.
 The report includes the before/after error for every accepted passage.
 
+### Source-pattern candidates
+
+Paired profiles retain complete source-pattern occurrences as 64-sample phrase
+fingerprints, including relative pitch, volume, mixer, noise and envelope.
+Training uses the original order boundaries and excludes passages crossing the
+held-out quarter. Constant tones and nearly empty patterns do not supply enough
+musical information and are omitted.
+
+On import, the matcher searches independently detected phrase starts in the
+selected YM range. It does not copy the training arrangement's timestamps.
+Matching permits pitch transposition and another channel while retaining the
+learned duration. Adjacent sampling offsets are combined into one candidate,
+and equally plausible source IDs remain listed together.
+
+In Last Ninja's held-out section, 22 of 26 passages with a known source pattern
+are recognized. Of 30 candidate passages, 22 include the expected source ID and
+agree with its boundaries. The remaining eight are recorded in the validation
+report. Some repeated material supports an internal or shifted boundary, so
+these candidates are not used to rewrite the arrangement automatically.
+
+**YM → Patterns** displays the candidate frame ranges and source IDs. Click a
+passage to hear that position in the original YM. This browsing preserves the
+editable composition. Source-pattern IDs describe the original player's data;
+they are not the same as the generated MaxYMiser pattern numbers.
+
 ## Comparing arrangements from different composers
 
 Two arrangements of a common composition are complementary evidence. A phrase

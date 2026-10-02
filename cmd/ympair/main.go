@@ -44,6 +44,7 @@ func main() {
 		}
 		result = profile
 		fmt.Printf("Verified alignment: offset %d frames, transpose %d, %d/%d tonal events; held-out labels %d/%d correct (%d abstentions)\n", profile.Alignment.Offset, profile.Alignment.Transpose, profile.Alignment.Matched, profile.Alignment.Checked, profile.Validation.Correct, profile.Validation.Known, profile.Validation.Abstained)
+		fmt.Printf("Pattern validation: %d/%d known source passages recognized; %d/%d candidate passages include the correct source pattern\n", profile.PatternValidation.Recognized, profile.PatternValidation.Known, profile.PatternValidation.Correct, profile.PatternValidation.Hits)
 	}
 	data, err := json.MarshalIndent(result, "", "  ")
 	if err != nil {

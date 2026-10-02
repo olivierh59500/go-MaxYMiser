@@ -1,9 +1,11 @@
 package ui
 
 import (
+	"github.com/olivierh59500/go-MaxYMiser/internal/model"
 	"os"
 
 	"github.com/olivierh59500/go-MaxYMiser/internal/native"
+	"github.com/olivierh59500/go-MaxYMiser/internal/project"
 	"github.com/olivierh59500/go-MaxYMiser/internal/replay"
 )
 
@@ -17,6 +19,7 @@ func (a *App) LoadConfiguration(path string) error {
 		return err
 	}
 	a.nativeConfiguration = config
+	a.configurationLoaded = true
 	a.synth.Edit(func(e *replay.Engine) { e.Stop(); config.Apply(&e.Project.Song); e.Reset() })
 	return nil
 }
@@ -27,9 +30,29 @@ func (a *App) configurationAction(name string) bool {
 		a.beginFileBrowser("Load native configuration (.cnf)", "", false)
 	case "config-save":
 		a.beginFileBrowser("Save native configuration (.cnf)", "MYM.CNF", true)
+	case "config-reload":
+		if !a.configurationLoaded {
+			e, _ := a.synth.Snapshot()
+			a.nativeConfiguration = native.CaptureConfiguration(e.Project.Song, a.nativeConfiguration)
+			a.configurationLoaded = true
+		}
+		if a.nativeConfiguration[10] == 0 {
+			a.nativeConfiguration[10] = 255
+		} else {
+			a.nativeConfiguration[10] = 0
+		}
+		a.status = "Configuration reload preference changed; Save CNF keeps it for the next launch"
 	default:
 		return false
 	}
+	return true
+}
+
+func (a *App) reloadConfiguration(song *model.Song) bool {
+	if !a.configurationLoaded || a.nativeConfiguration[10] == 0 {
+		return false
+	}
+	a.nativeConfiguration.Apply(song)
 	return true
 }
 
@@ -45,18 +68,12 @@ func (a *App) configurationModal(modal, entry string) bool {
 	case "Save native configuration (.cnf)":
 		e, _ := a.synth.Snapshot()
 		config := native.CaptureConfiguration(e.Project.Song, a.nativeConfiguration)
-		file, err := os.OpenFile(entry, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0644)
-		if err == nil {
-			_, err = file.Write(config[:])
-			closeErr := file.Close()
-			if err == nil {
-				err = closeErr
-			}
-		}
+		err := project.SaveConfiguration(config, entry)
 		if err != nil {
 			a.status = err.Error()
 		} else {
 			a.nativeConfiguration = config
+			a.configurationLoaded = true
 			a.status = "Native MYM.CNF configuration saved"
 		}
 	default:

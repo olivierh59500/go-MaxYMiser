@@ -26,8 +26,19 @@ func ApplyPairedRecipes(project *model.Project, report *Report, trace Trace, pro
 	if project == nil || report == nil || report.StartFrame < 0 || report.EndFrame > len(trace.Frames) || report.EndFrame <= report.StartFrame {
 		return fmt.Errorf("pair: invalid reconstruction selection")
 	}
-	labels := profile.SourceEvidence(trace)
+	selection := trace
+	selection.Frames = trace.Frames[report.StartFrame:report.EndFrame]
+	labels := profile.SourceEvidence(selection)
+	for i := range labels {
+		labels[i].Start += report.StartFrame
+		labels[i].End += report.StartFrame
+	}
 	report.SourcePlayer, report.SourceLabelRate, report.SourceLabels = profile.Source.Player, trace.Rate, labels
+	report.SourcePatterns = profile.PatternEvidence(selection)
+	for i := range report.SourcePatterns {
+		report.SourcePatterns[i].Start += report.StartFrame
+		report.SourcePatterns[i].End += report.StartFrame
+	}
 	if report.FramesPerRow != 1 {
 		report.Warnings = appendUnique(report.Warnings, "Source instrument recipes require the one-frame reconstruction grid; labels remain available on coarser grids.")
 		return nil

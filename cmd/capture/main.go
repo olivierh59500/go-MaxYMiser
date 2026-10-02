@@ -56,6 +56,7 @@ func main() {
 	paired := flag.String("paired-profile", "", "source-labelled profile for the YM workspace")
 	reconstruct := flag.Bool("reconstruct", false, "apply the YM reconstruction workflow before capture")
 	end := flag.Int("end-frame", 0, "exclusive reconstruction end frame")
+	sourcePatterns := flag.Bool("source-patterns", false, "show source-pattern candidates in the YM workspace")
 	flag.Parse()
 	app, e := ui.New(model.Demo(), "", true)
 	if e != nil {
@@ -63,6 +64,7 @@ func main() {
 	}
 	defer app.Close()
 	app.SetTab(*tab)
+	app.SetYMSourcePatterns(*sourcePatterns)
 	app.SelectInstrument(*instrument - 1)
 	app.SetSequenceTools(*tools)
 	if *song != "" {

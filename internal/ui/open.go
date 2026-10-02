@@ -39,6 +39,7 @@ func (a *App) OpenMusic(path string) error {
 	if err != nil {
 		return err
 	}
+	reloaded := a.reloadConfiguration(&p.Song)
 	var subtunes []native.EmbeddedProject
 	if strings.EqualFold(filepath.Ext(path), ".snd") || strings.EqualFold(filepath.Ext(path), ".sndh") {
 		subtunes, _ = native.DecodeContainers(p.ReplaySource)
@@ -56,8 +57,11 @@ func (a *App) OpenMusic(path string) error {
 			break
 		}
 	}
-	a.tab, a.editing, a.dirty = "Patterns", false, false
+	a.tab, a.editing, a.dirty = "Patterns", false, reloaded
 	a.status = fmt.Sprintf("Loaded %s · %d patterns · %d native subtune(s)", filepath.Base(path), len(p.Song.Patterns), max(1, len(subtunes)))
+	if reloaded {
+		a.status += " · personal configuration reapplied"
+	}
 	return nil
 }
 

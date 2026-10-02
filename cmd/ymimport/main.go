@@ -59,5 +59,5 @@ func main() {
 	if err = os.WriteFile(*output+".analysis.json", append(data, '\n'), 0644); err != nil {
 		log.Fatal(err)
 	}
-	fmt.Printf("%d candidate instruments, %d patterns, %d positions, %d corpus matches, %d source-labelled matches, %d improved instrument passages\n", report.Instruments, report.Patterns, report.Positions, len(report.Evidence), len(report.SourceLabels), len(report.RecipeApplications))
+	fmt.Printf("%d candidate instruments, %d patterns, %d positions, %d corpus matches, %d source-labelled matches, %d improved instrument passages, %d source-pattern candidates\n", report.Instruments, report.Patterns, report.Positions, len(report.Evidence), len(report.SourceLabels), len(report.RecipeApplications), len(report.SourcePatterns))
 }

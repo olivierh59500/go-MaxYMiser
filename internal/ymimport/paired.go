@@ -23,15 +23,17 @@ type PairedPrototype struct {
 }
 
 type PairedProfile struct {
-	Version     int                `json:"version"`
-	Source      SourceScore        `json:"source"`
-	YMFile      string             `json:"ym_file"`
-	Alignment   PairAlignment      `json:"alignment"`
-	TrainingEnd int                `json:"training_end_source_frame"`
-	Prototypes  []PairedPrototype  `json:"prototypes"`
-	Validation  PairValidation     `json:"validation"`
-	Warnings    []string           `json:"warnings"`
-	Recipes     []InstrumentRecipe `json:"instrument_recipes,omitempty"`
+	Version           int                `json:"version"`
+	Source            SourceScore        `json:"source"`
+	YMFile            string             `json:"ym_file"`
+	Alignment         PairAlignment      `json:"alignment"`
+	TrainingEnd       int                `json:"training_end_source_frame"`
+	Prototypes        []PairedPrototype  `json:"prototypes"`
+	Validation        PairValidation     `json:"validation"`
+	Warnings          []string           `json:"warnings"`
+	Recipes           []InstrumentRecipe `json:"instrument_recipes,omitempty"`
+	Patterns          []PatternPrototype `json:"pattern_prototypes,omitempty"`
+	PatternValidation PatternValidation  `json:"pattern_validation"`
 }
 
 type PairValidation struct {
@@ -241,6 +243,8 @@ func LearnPair(score SourceScore, trace Trace, ymFile string) (PairedProfile, er
 		return p, fmt.Errorf("pair: no labelled training events")
 	}
 	p.Recipes = learnRecipes(score, trace, alignment, p.TrainingEnd)
+	p.Patterns = learnPatternPrototypes(score, trace, alignment, p.TrainingEnd)
+	p.PatternValidation = validatePatternEvidence(score, trace, p)
 	for _, f := range labelled {
 		if f.event.Frame < p.TrainingEnd {
 			continue
@@ -361,6 +365,14 @@ func LoadPairedProfile(path string) (PairedProfile, error) {
 	}
 	if len(p.Recipes) > 100000 {
 		return p, fmt.Errorf("pair: too many instrument recipes")
+	}
+	if len(p.Patterns) > 4096 {
+		return p, fmt.Errorf("pair: too many source pattern prototypes")
+	}
+	for _, pattern := range p.Patterns {
+		if pattern.Pattern < 0 || pattern.Pattern > 255 || pattern.Frames < 12 || pattern.Frames > 2048 || len(pattern.Features) != 320 {
+			return p, fmt.Errorf("pair: invalid source pattern prototype")
+		}
 	}
 	for _, recipe := range p.Recipes {
 		if recipe.SourceInstrument < 0 || recipe.SourceInstrument >= len(p.Source.Instruments) || recipe.Frames < 1 || recipe.Frames > 63 || recipe.Note < 2 || recipe.Note > 127 || len(recipe.Features) != 80 || math.IsNaN(recipe.RegisterError) || math.IsInf(recipe.RegisterError, 0) || recipe.RegisterError < 0 {

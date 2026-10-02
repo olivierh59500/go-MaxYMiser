@@ -49,11 +49,14 @@ type App struct {
 	icePacking                                                         bool
 	helpTopic                                                          int
 	nativeConfiguration                                                native.Configuration
+	configurationLoaded                                                bool
 	drumKeyboard                                                       bool
 	corpus                                                             *ymimport.Corpus
 	pairedProfile                                                      *ymimport.PairedProfile
 	ymPath                                                             string
 	ymReport                                                           *ymimport.Report
+	ymPatternView                                                      bool
+	ymPatternPage                                                      int
 	ymOptions                                                          ymimport.ReconstructionOptions
 	ymLibrary                                                          ymimport.YMLibrary
 	ymLibraryDirectory                                                 string
@@ -471,6 +474,7 @@ func (a *App) drawSettings(dst *ebiten.Image, e *replay.Engine) {
 	a.btn(dst, "MIDI output", 670, 236, 180, 30, "midi-output", a.midiOutput != nil)
 	a.btn(dst, "Load CNF", 870, 236, 160, 30, "config-load", false)
 	a.btn(dst, "Save CNF", 1044, 236, 160, 30, "config-save", false)
+	a.btn(dst, "Reload CNF", 1060, 205, 144, 28, "config-reload", a.nativeConfiguration[10] != 0)
 	modes := []string{"Disabled", "One voice", "Two voices", "Native STe rate", "MIDI output"}
 	mode := int(e.Project.Song.State[49])
 	if mode >= len(modes) {
@@ -902,6 +906,9 @@ func (a *App) enterField(r rune) {
 	}
 }
 func (a *App) action(name string) {
+	if a.ymPatternAction(name) {
+		return
+	}
 	if a.alternativeAction(name) {
 		return
 	}
@@ -1151,6 +1158,7 @@ func (a *App) action(name string) {
 			a.remember()
 			a.subtuneIndex = (a.subtuneIndex + 1) % len(a.subtunes)
 			value := a.subtunes[a.subtuneIndex]
+			a.reloadConfiguration(&value.Song)
 			a.synth.Edit(func(e *replay.Engine) { e.Stop(); e.Project.Song = value.Song; e.Project.Bank = value.Bank; e.Reset() })
 			a.pattern, a.row = 0, 0
 			a.status = fmt.Sprintf("Selected native subtune %d of %d; export MYS/MYV or use a supported replay template", a.subtuneIndex+1, len(a.subtunes))
@@ -1168,16 +1176,27 @@ func (a *App) action(name string) {
 		}
 		a.synth.Edit(func(e *replay.Engine) {
 			if e.Playing {
-				e.Stop()
+				if e.PatternMode {
+					e.PatternMode = false
+				} else {
+					e.Stop()
+				}
 			} else {
 				e.Play(false)
 			}
 		})
 	case "pattern":
-		if _, ok := a.synth.Reference(); ok {
+		if r, ok := a.synth.Reference(); ok && r.Active {
 			a.synth.SelectReference(false)
 		}
-		a.synth.Edit(func(e *replay.Engine) { e.Patterns[a.channel] = byte(a.pattern); e.Play(true) })
+		a.synth.Edit(func(e *replay.Engine) {
+			if e.Playing {
+				e.PatternMode = true
+			} else {
+				e.Patterns[a.channel] = byte(a.pattern)
+				e.Play(true)
+			}
+		})
 	case "stop":
 		a.editing = false
 		if r, ok := a.synth.Reference(); ok && r.Active {
@@ -1187,10 +1206,16 @@ func (a *App) action(name string) {
 		a.synth.Edit(func(e *replay.Engine) { e.Stop() })
 	case "record":
 		a.editing = true
-		if _, ok := a.synth.Reference(); ok {
+		if r, ok := a.synth.Reference(); ok && r.Active {
 			a.synth.SelectReference(false)
 		}
-		a.synth.Edit(func(e *replay.Engine) { e.Play(false) })
+		a.synth.Edit(func(e *replay.Engine) {
+			if e.Playing {
+				e.PatternMode = false
+			} else {
+				e.Play(false)
+			}
+		})
 		a.status = "Recording notes into the playing native pattern"
 	case "pat:+":
 		a.synth.Edit(func(e *replay.Engine) {
@@ -1649,7 +1674,12 @@ func (a *App) drawYM(dst *ebiten.Image) {
 	a.btn(dst, "Listen score", 1038, 246, 194, 34, "ym:score", !r.Active)
 	a.btn(dst, fmt.Sprintf("Range %d:%d · grid %d", a.ymOptions.StartFrame, a.ymOptions.EndFrame, a.ymOptions.FramesPerRow), 520, 205, 344, 30, "ym:range", false)
 	a.btn(dst, "Paired profile", 350, 205, 154, 30, "ym:paired-profile", a.pairedProfile != nil)
+	a.btn(dst, "Patterns", 214, 205, 120, 30, "ym:source-patterns", a.ymPatternView)
 	a.text(dst, fmt.Sprintf("%d:%02d / %d:%02d", r.Position/60000, (r.Position/1000)%60, r.Duration/60000, (r.Duration/1000)%60), 968, 217, 18, accent)
+	if a.ymPatternView {
+		a.drawYMPatterns(dst)
+		return
+	}
 	labels := []string{"Tone A low", "Tone A high", "Tone B low", "Tone B high", "Tone C low", "Tone C high", "Noise period", "Mixer", "Volume A", "Volume B", "Volume C", "Envelope low", "Envelope high", "Envelope shape"}
 	for reg, label := range labels {
 		x := 42 + (reg%2)*590

@@ -60,6 +60,10 @@ synthesizer output.
 **Settings → Load CNF / Save CNF** exchanges the original 29-byte `MYM.CNF`
 configuration, preserving hardware/display fields. `-config /path/to/MYM.CNF`
 loads it explicitly at startup.
+**Reload CNF** reapplies the loaded personal configuration after opening a native
+song or selecting a subtune. The preference uses the original CNF reload flag;
+the composition's tempo, notes, instruments and samples remain those of the
+loaded music. Reapplied saved settings mark the project as modified.
 `-ym-library /path/to/ym-recordings` indexes candidate YM alternatives for SNDH
 files whose native score is not available. A title match is a version hint;
 the user chooses the recording before playback or reconstruction.
@@ -106,6 +110,9 @@ mode. F9 maps note keys to instruments played at middle C. **Help** provides
 separate keyboard, effects, instruments, native format/YM and MIDI references.
 MIDI notes received in Record/Edit are written into the mapped voice's native
 pattern columns and participate in undo, including same-note retriggers.
+While playback is running, **Pattern**, **Song** and **Record** switch modes
+without restarting the row, envelope state or audio. In song mode, pressing
+**Song** again stops playback.
 
 In **Sequences**, choose **Generate / morph** to create envelopes or oscillations.
 The selected sequence's length defines the generated length. Ramps hold their
