@@ -504,7 +504,7 @@ func (a *App) Update() error {
 	for {
 		select {
 		case data := <-a.midiData:
-			a.midiDecoder.Feed(data, func(message []byte) { a.synth.Edit(func(e *replay.Engine) { midi.ApplyMapped(e, message) }) })
+			a.midiDecoder.Feed(data, a.receiveMIDI)
 		default:
 			goto midiDone
 		}

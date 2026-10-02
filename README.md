@@ -84,6 +84,8 @@ currently playing row.
 **Record** starts song playback with note entry enabled; **Stop** leaves recording
 mode. F9 maps note keys to instruments played at middle C. **Help** provides
 separate keyboard, effects, instruments, native format/YM and MIDI references.
+MIDI notes received in Record/Edit are written into the mapped voice's native
+pattern columns and participate in undo, including same-note retriggers.
 
 In **Sequences**, choose **Generate / morph** to create envelopes or oscillations.
 The selected sequence's length defines the generated length. Ramps hold their

@@ -25,10 +25,12 @@ type Voice struct {
 	PWMLocked                          bool
 	Triggered                          bool
 	ParametersDirty                    bool
+	PreviewTriggers                    uint64
 }
 type PCMVoice struct {
 	Sample, Note, Volume byte
 	Triggered            bool
+	PreviewTriggers      uint64
 }
 
 type Engine struct {
@@ -239,7 +241,9 @@ func (e *Engine) Trigger(channel int, note, instrument byte) {
 	if instrument > 0 {
 		e.Voices[channel].ParametersDirty = true
 	}
+	count := e.Voices[channel].PreviewTriggers + 1
 	e.parse(channel, model.Cell{Note: note, Instrument: instrument}, false)
+	e.Voices[channel].PreviewTriggers = count
 	e.pending[channel] = true
 }
 
@@ -251,7 +255,7 @@ func (e *Engine) TriggerSample(channel int, note, sample byte) {
 	for note >= 68 && e.Project.Song.State[49] != 4 {
 		note -= 12
 	}
-	e.DMA[channel] = PCMVoice{Sample: sample, Note: note}
+	e.DMA[channel] = PCMVoice{Sample: sample, Note: note, PreviewTriggers: e.DMA[channel].PreviewTriggers + 1}
 	e.pendingDMA[channel] = true
 }
 func (e *Engine) parse(ch int, cell model.Cell, muted bool) {
