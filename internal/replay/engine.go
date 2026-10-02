@@ -44,6 +44,7 @@ type Engine struct {
 	Ticks                           uint64
 	MasterVolume, Pan, Bass, Treble int
 	pending                         [3]bool
+	pendingDMA                      [2]bool
 }
 
 func New(p *model.Project) *Engine {
@@ -55,6 +56,7 @@ func (e *Engine) Reset() {
 	e.Voices = [3]Voice{}
 	e.DMA = [2]PCMVoice{}
 	e.pending = [3]bool{}
+	e.pendingDMA = [2]bool{}
 	e.Registers = [14]byte{}
 	e.Registers[7] = 255
 	e.Position, e.Row, e.TickInRow = 0, 0, 0
@@ -81,6 +83,8 @@ func (e *Engine) Play(pattern bool) {
 func (e *Engine) Stop() {
 	e.Playing = false
 	e.pending = [3]bool{}
+	// The audio renderer consumes a stop trigger at the next sequencer tick.
+	e.pendingDMA = [2]bool{true, true}
 	e.Voices = [3]Voice{}
 	e.DMA = [2]PCMVoice{}
 	e.Registers[7] = 255
@@ -94,7 +98,8 @@ func (e *Engine) Tick() {
 		e.pending[i] = false
 	}
 	for i := range e.DMA {
-		e.DMA[i].Triggered = false
+		e.DMA[i].Triggered = e.pendingDMA[i]
+		e.pendingDMA[i] = false
 	}
 	if e.Playing && e.TickInRow == 0 {
 		for ch := range 3 {
@@ -158,6 +163,15 @@ func (e *Engine) Trigger(channel int, note, instrument byte) {
 	}
 	e.parse(channel, model.Cell{Note: note, Instrument: instrument}, false)
 	e.pending[channel] = true
+}
+
+// TriggerSample previews a signed PCM bank independently of song playback.
+func (e *Engine) TriggerSample(channel int, note, sample byte) {
+	if channel < 0 || channel >= 2 || sample > 8 {
+		return
+	}
+	e.DMA[channel] = PCMVoice{Sample: sample, Note: note}
+	e.pendingDMA[channel] = true
 }
 func (e *Engine) parse(ch int, cell model.Cell, muted bool) {
 	v := &e.Voices[ch]

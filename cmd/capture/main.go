@@ -49,6 +49,7 @@ func main() {
 	output := flag.String("output", "captures/tracker.png", "PNG output")
 	tab := flag.String("tab", "Patterns", "tracker view")
 	instrument := flag.Int("instrument", 1, "selected instrument, 1 through 32")
+	tools := flag.Bool("sequence-tools", false, "show the sequence generator")
 	flag.Parse()
 	app, e := ui.New(model.Demo(), "", true)
 	if e != nil {
@@ -57,6 +58,7 @@ func main() {
 	defer app.Close()
 	app.SetTab(*tab)
 	app.SelectInstrument(*instrument - 1)
+	app.SetSequenceTools(*tools)
 	ebiten.SetWindowSize(1280, 800)
 	ebiten.SetWindowTitle("MaxYMiser Go — interface capture")
 	if e = ebiten.RunGame(&capture{app: app, output: *output}); e != nil {

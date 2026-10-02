@@ -9,6 +9,7 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
 	"github.com/hajimehoshi/ebiten/v2/vector"
+	"github.com/olivierh59500/go-MaxYMiser/internal/edit"
 	"github.com/olivierh59500/go-MaxYMiser/internal/export"
 	"github.com/olivierh59500/go-MaxYMiser/internal/midi"
 	"github.com/olivierh59500/go-MaxYMiser/internal/model"
@@ -54,6 +55,9 @@ type App struct {
 	hasCopy                                                            bool
 	synth                                                              *replay.Synth
 	view                                                               model.Project
+	generatorLow, generatorHigh, generatorCycles, morphDestination     string
+	generatorShape                                                     edit.Shape
+	generatorSigned, sequenceTools                                     bool
 	player                                                             *audio.Player
 	font                                                               *text.GoTextFaceSource
 	projectPath, status, tab                                           string
@@ -75,6 +79,8 @@ func New(p *model.Project, projectPath string, mute bool) (*App, error) {
 		return nil, err
 	}
 	a := &App{synth: replay.NewSynth(replay.New(p), 48000), font: face, projectPath: projectPath, status: "Ready · Space plays · Enter edits · Ctrl+S saves", tab: "Patterns", midiData: make(chan []byte, 64), exportResults: make(chan error, 1), octave: 4, step: 1, directory: "."}
+	a.generatorLow, a.generatorHigh, a.generatorCycles = "0000", "000F", "1"
+	a.generatorShape, a.morphDestination = edit.Ramp, "03"
 	if !mute {
 		context := audio.CurrentContext()
 		if context == nil {
@@ -278,15 +284,19 @@ func (a *App) drawPatterns(dst *ebiten.Image, e *replay.Engine) {
 func (a *App) drawSong(dst *ebiten.Image, e *replay.Engine) {
 	p := e.Project
 	rect(dst, 24, 192, 1232, 482, panel)
-	a.text(dst, "SONG ORDER · four independent pattern lists", 42, 208, 15, fg)
-	a.btn(dst, "Add position", 1010, 204, 150, 34, "order:add", false)
+	a.text(dst, "SONG ORDER", 42, 208, 15, fg)
+	a.btn(dst, fmt.Sprintf("Length %02X", p.Song.Length), 260, 204, 160, 34, "song-length", false)
+	a.btn(dst, fmt.Sprintf("Repeat %02X", p.Song.Repeat), 434, 204, 160, 34, "song-repeat", false)
+	a.btn(dst, "Title / artist", 612, 204, 190, 34, "song-info", false)
+	a.btn(dst, "Add position", 820, 204, 172, 34, "order:add", false)
+	a.btn(dst, "Remove last", 1008, 204, 174, 34, "order:remove", false)
 	start := min(a.scroll, max(0, int(p.Song.Length)-18))
 	for pos := start; pos < int(p.Song.Length) && pos < start+18; pos++ {
 		y := 252 + (pos-start)*22
 		if pos == e.Position {
 			rect(dst, 40, float32(y), 1200, 22, color.RGBA{31, 70, 67, 255})
 		}
-		a.text(dst, fmt.Sprintf("%02X", pos), 50, float64(y+2), 13, dim)
+		a.btn(dst, fmt.Sprintf("%02X", pos), 42, y, 80, 22, fmt.Sprintf("position:%d", pos), pos == e.Position)
 		for ch := 0; ch < 4; ch++ {
 			a.btn(dst, fmt.Sprintf("%02X", p.Song.Orders[pos][ch]), 160+ch*248, y, 206, 22, fmt.Sprintf("order:%d:%d", pos, ch), false)
 		}
@@ -332,6 +342,12 @@ func (a *App) drawSequences(dst *ebiten.Image, e *replay.Engine) {
 	s := e.Project.Bank.Sequences[a.sequence]
 	a.btn(dst, fmt.Sprintf("Length %02X", s.Length), 472, 203, 146, 32, "seq-length", false)
 	a.btn(dst, fmt.Sprintf("Repeat %02X", s.Repeat), 632, 203, 146, 32, "seq-repeat", false)
+	a.btn(dst, "Generate / morph", 820, 203, 198, 32, "seq-tools", a.sequenceTools)
+	a.btn(dst, "Clear", 1032, 203, 96, 32, "seq-clear", false)
+	if a.sequenceTools {
+		a.drawSequenceTools(dst, e)
+		return
+	}
 	for i := 0; i < 63; i++ {
 		x := 42 + (i%9)*134
 		y := 260 + (i/9)*49
@@ -360,7 +376,14 @@ func (a *App) drawSamples(dst *ebiten.Image, e *replay.Engine) {
 	}
 	a.btn(dst, "Import PCM / WAV", 42, 570, 200, 38, "import-sample", false)
 	a.btn(dst, "Clear sample", 258, 570, 176, 38, "clear-sample", false)
-	a.text(dst, "STe has two independent sample voices; DigiDrums use the YM channel DAC.", 42, 636, 12, dim)
+	a.btn(dst, "+1.5 dB", 450, 570, 118, 38, "sample-gain:1.5", false)
+	a.btn(dst, "−1.5 dB", 580, 570, 118, 38, "sample-gain:-1.5", false)
+	a.btn(dst, "Tune", 710, 570, 116, 38, "sample-tune", false)
+	a.btn(dst, "Trim", 838, 570, 116, 38, "sample-trim", false)
+	a.btn(dst, "Sign / unsign", 966, 570, 160, 38, "sample-sign", false)
+	a.btn(dst, "Save PCM", 42, 622, 150, 34, "sample-save", false)
+	a.btn(dst, "Preview", 208, 622, 128, 34, "sample-preview", false)
+	a.text(dst, "Tune: semitones (0.125 = fine step) · Trim: start,length in bytes · Ctrl+Z undoes edits.", 354, 636, 11, dim)
 }
 func (a *App) drawSettings(dst *ebiten.Image, e *replay.Engine) {
 	rect(dst, 24, 192, 1232, 482, panel)
@@ -597,6 +620,12 @@ func (a *App) enterNote(note byte) {
 	a.synth.Edit(func(e *replay.Engine) {
 		if a.channel < 3 {
 			e.Trigger(a.channel, note, byte(a.instrument+1))
+		} else {
+			dmaChannel := 0
+			if a.field >= 3 {
+				dmaChannel = 1
+			}
+			e.TriggerSample(dmaChannel, note, byte(a.sample+1))
 		}
 		playing = e.Playing
 		if a.editing {
@@ -687,6 +716,9 @@ func (a *App) enterField(r rune) {
 	}
 }
 func (a *App) action(name string) {
+	if a.soundAction(name) {
+		return
+	}
 	if strings.HasPrefix(name, "tab:") {
 		a.tab = strings.TrimPrefix(name, "tab:")
 		return
@@ -767,6 +799,15 @@ func (a *App) action(name string) {
 		e, _ := a.synth.Snapshot()
 		a.modal = fmt.Sprintf("Order %d channel %d", x, y)
 		a.entry = fmt.Sprintf("%02X", e.Project.Song.Orders[x][y])
+		return
+	}
+	if _, err := fmt.Sscanf(name, "position:%d", &x); err == nil {
+		a.synth.Edit(func(e *replay.Engine) {
+			e.Position = x
+			e.Patterns = e.Project.Song.Orders[x]
+			e.Row, e.TickInRow = 0, 0
+		})
+		a.selectChannel(a.channel)
 		return
 	}
 	switch name {
@@ -919,9 +960,11 @@ func (a *App) action(name string) {
 		a.modal = "Import raw PCM or WAV sample"
 		a.entry = ""
 	case "clear-sample":
+		a.remember()
 		a.synth.Edit(func(e *replay.Engine) { e.Project.Bank.Samples[a.sample] = model.Sample{} })
 		a.dirty = true
 	case "order:add":
+		a.remember()
 		a.synth.Edit(func(e *replay.Engine) {
 			if e.Project.Song.Length < 255 {
 				at := int(e.Project.Song.Length)
@@ -930,6 +973,27 @@ func (a *App) action(name string) {
 			}
 		})
 		a.dirty = true
+	case "order:remove":
+		a.remember()
+		a.synth.Edit(func(e *replay.Engine) {
+			if e.Project.Song.Length > 1 {
+				e.Project.Song.Length--
+				e.Project.Song.Repeat = min(e.Project.Song.Repeat, e.Project.Song.Length-1)
+				e.Position = min(e.Position, int(e.Project.Song.Length)-1)
+				e.Patterns = e.Project.Song.Orders[e.Position]
+			}
+		})
+		a.dirty = true
+	case "song-length", "song-repeat":
+		e, _ := a.synth.Snapshot()
+		if name == "song-length" {
+			a.modal, a.entry = "Song length", fmt.Sprintf("%02X", e.Project.Song.Length)
+		} else {
+			a.modal, a.entry = "Song repeat", fmt.Sprintf("%02X", e.Project.Song.Repeat)
+		}
+	case "song-info":
+		e, _ := a.synth.Snapshot()
+		a.modal, a.entry = "Song title / artist", e.Project.Title+" / "+e.Project.Author
 	case "export":
 		a.modal = "Export WAV"
 		a.entry = filepath.Join(a.directory, "maxymiser.wav")
@@ -956,6 +1020,9 @@ func (a *App) save(path string) {
 func (a *App) applyModal() {
 	modal, entry := a.modal, strings.TrimSpace(a.entry)
 	a.modal = ""
+	if a.soundModal(modal, entry) {
+		return
+	}
 	var x, y int
 	switch {
 	case strings.HasPrefix(modal, "Open music"):
@@ -990,6 +1057,16 @@ func (a *App) applyModal() {
 	case modal == "Instrument name":
 		a.remember()
 		a.synth.Edit(func(e *replay.Engine) { e.Project.Bank.Instruments[a.instrument].SetName(entry) })
+		a.dirty = true
+	case modal == "Song title / artist":
+		a.remember()
+		parts := strings.SplitN(entry, "/", 2)
+		a.synth.Edit(func(e *replay.Engine) {
+			e.Project.Title = strings.TrimSpace(parts[0])
+			if len(parts) == 2 {
+				e.Project.Author = strings.TrimSpace(parts[1])
+			}
+		})
 		a.dirty = true
 	case strings.HasPrefix(modal, "Import raw"):
 		var err error
@@ -1035,6 +1112,7 @@ func (a *App) applyModal() {
 				e.MasterVolume = max(0, min(127, n))
 			case "timers":
 				e.TimerMask = byte(n) & 7
+				e.Project.Song.State[36] = e.TimerMask
 			}
 		})
 	default:
@@ -1046,10 +1124,21 @@ func (a *App) applyModal() {
 		a.remember()
 		a.synth.Edit(func(e *replay.Engine) {
 			switch {
+			case modal == "Song length":
+				length := max(1, min(255, int(n)))
+				for at := int(e.Project.Song.Length); at < length; at++ {
+					e.Project.Song.Orders[at] = e.Project.Song.Orders[at-1]
+				}
+				e.Project.Song.Length = byte(length)
+				e.Project.Song.Repeat = min(e.Project.Song.Repeat, byte(length-1))
+				e.Position = min(e.Position, length-1)
+			case modal == "Song repeat":
+				e.Project.Song.Repeat = byte(min(int(n), int(e.Project.Song.Length)-1))
 			case modal == "Sequence length":
 				e.Project.Bank.Sequences[a.sequence].Length = byte(max(1, min(63, n)))
+				e.Project.Bank.Sequences[a.sequence].Repeat = min(e.Project.Bank.Sequences[a.sequence].Repeat, e.Project.Bank.Sequences[a.sequence].Length-1)
 			case modal == "Sequence repeat":
-				e.Project.Bank.Sequences[a.sequence].Repeat = byte(min(62, n))
+				e.Project.Bank.Sequences[a.sequence].Repeat = byte(min(int(n), max(0, int(e.Project.Bank.Sequences[a.sequence].Length)-1)))
 			case strings.HasPrefix(modal, "Sequence word "):
 				fmt.Sscanf(modal, "Sequence word %d", &x)
 				e.Project.Bank.Sequences[a.sequence].Values[x] = uint16(n)
@@ -1058,6 +1147,13 @@ func (a *App) applyModal() {
 				e.Project.Bank.Instruments[a.instrument][x] = byte(n)
 			case strings.HasPrefix(modal, "Order "):
 				fmt.Sscanf(modal, "Order %d channel %d", &x, &y)
+				if n >= 240 && n != 253 && n != 254 && n != 255 {
+					a.status = "Use 00–EF for patterns, FD for a jam loop, FE for note-off, or FF for empty"
+					return
+				}
+				for n < 240 && len(e.Project.Song.Patterns) <= int(n) {
+					e.Project.Song.Patterns = append(e.Project.Song.Patterns, model.Pattern{})
+				}
 				e.Project.Song.Orders[x][y] = byte(n)
 			}
 			e.Project.Bank.SequenceCount = max(e.Project.Bank.SequenceCount, a.sequence+1)
@@ -1072,6 +1168,9 @@ func (a *App) CaptureState() string {
 
 // SetTab selects the initial workspace, also used by the capture command.
 func (a *App) SetTab(name string) { a.tab = name }
+
+// SetSequenceTools selects the generation workspace for interface captures.
+func (a *App) SetSequenceTools(enabled bool) { a.sequenceTools = enabled }
 
 // SelectInstrument selects the editable definition, not a channel's cached
 // playback parameters. Linked sequences are read from the same voice bank.

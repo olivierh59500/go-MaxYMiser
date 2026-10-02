@@ -167,3 +167,26 @@ func TestInstrumentRetriggerRestoresParametersChangedByEffects(t *testing.T) {
 		t.Fatal("same-instrument retrigger retained an effect-modified parameter")
 	}
 }
+
+func TestBothPCMSampleVoicesCanBePreviewedWithoutSongPlayback(t *testing.T) {
+	p := model.New()
+	p.Bank.Samples[0].PCM = make([]byte, 2000)
+	for i := range p.Bank.Samples[0].PCM {
+		p.Bank.Samples[0].PCM[i] = 64
+	}
+	e := New(p)
+	e.TriggerSample(1, 60, 1)
+	s := NewSynth(e, 48000)
+	pcm := make([]byte, 4000)
+	if _, err := s.Read(pcm); err != nil {
+		t.Fatal(err)
+	}
+	if e.Playing || !s.pcm[1].active || binary.LittleEndian.Uint16(pcm[:2]) == 0 {
+		t.Fatal("second PCM preview was silent or required song transport")
+	}
+	e.Stop()
+	s.Read(pcm)
+	if s.pcm[1].active {
+		t.Fatal("stop did not silence a previewed PCM voice")
+	}
+}

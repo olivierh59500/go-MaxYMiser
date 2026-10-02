@@ -21,13 +21,18 @@ trying the editor. External MaxYMiser files are not needed to launch it.
 
 - **Patterns**: three YM voices, or the two STe sample voices carried by the
   fourth native pattern stream; note, instrument, volume and two effect columns.
-- **Song**: the four independent pattern lists making up the arrangement.
+- **Song**: the four independent pattern lists making up the arrangement,
+  selectable positions, length/repeat and title/artist editing. Assigning a new
+  ordinary pattern ID creates its editable pattern automatically.
 - **Instruments**: both banks of 16 instruments, detune masks, sequence links,
   envelope, timer, sample and PWM parameters. Linked sequence values are shown
   beside the direct settings; click the values to open that sequence. Sequence
   definitions are shared by every instrument referring to the same ID.
-- **Sequences**: up to 256 native 16-bit sequences, with length and repeat.
-- **Samples**: eight banks of signed PCM, with raw PCM and 8/16-bit WAV import.
+- **Sequences**: up to 256 native 16-bit sequences, with length and repeat,
+  ramp/triangle/sine/square generation, signed words, copying and morphing.
+- **Samples**: eight banks of signed PCM, with raw PCM and 8/16-bit WAV import,
+  gain, tuning with interpolation, trimming, sign conversion, PCM save and
+  independent preview.
 - **YM**: original YM playback, live register inspection and proposed tracker
   reconstruction, with optional composer-corpus evidence.
 - **Settings**: playback rate, speed, edit step, octave, volume, timer mask and
@@ -58,6 +63,15 @@ synthesizer output.
 Instrument and sequence values use hexadecimal notation. Playback settings use
 decimal notation. Notes entered during playback and recording target the
 currently playing row.
+
+In **Sequences**, choose **Generate / morph** to create envelopes or oscillations.
+The selected sequence's length defines the generated length. Ramps hold their
+last value; oscillations loop. Morphing fills IDs between two endpoints with the
+same length and repeat. **Samples** supports 1.5 dB gain steps and decimal tuning
+in semitones, including 0.125-semitone fine steps. These operations support undo.
+Sample preview uses the Go PCM voice; its pitch reference is 8287 Hz at C4.
+Title and artist are runtime/export metadata; the separate native MYS/MYV format
+does not contain SNDH title/artist tags.
 
 ## Native files and audio
 
