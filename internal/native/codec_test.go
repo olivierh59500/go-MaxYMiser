@@ -67,3 +67,25 @@ func TestVoiceBankRoundTripRetainsSequencesSignedSamplesAndTrailers(t *testing.T
 		t.Fatal("out-of-range sample pointer accepted")
 	}
 }
+
+func TestDisabledPCMTrackMayKeepAnUnstoredPatternReference(t *testing.T) {
+	p := model.New()
+	p.Song.State[49] = 0
+	p.Song.Orders[0][3] = 173
+	raw, err := EncodeSong(p.Song)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := DecodeSong(raw)
+	if err != nil || got.Orders[0][3] != 173 {
+		t.Fatalf("disabled PCM reference not preserved: %v", err)
+	}
+	got.State[49] = 2
+	raw, err = EncodeSong(got)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = DecodeSong(raw); err == nil {
+		t.Fatal("active PCM track accepted an absent pattern")
+	}
+}

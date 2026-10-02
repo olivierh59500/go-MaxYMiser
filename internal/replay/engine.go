@@ -161,7 +161,9 @@ func (e *Engine) parseRow() {
 	for channel := 0; channel < 3; channel++ {
 		e.parse(channel, e.cell(e.Patterns[channel], e.Row), e.Mutes&(1<<channel) != 0)
 	}
-	e.parseDMA(e.cell(e.Patterns[3], e.Row))
+	if e.Project.Song.State[49] != 0 {
+		e.parseDMA(e.cell(e.Patterns[3], e.Row))
+	}
 	e.rowParsed = true
 }
 

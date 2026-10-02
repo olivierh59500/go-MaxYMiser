@@ -53,7 +53,12 @@ func DecodeSong(data []byte) (model.Song, error) {
 		song.Patterns = append(song.Patterns, pattern)
 	}
 	for pos := 0; pos < int(song.Length); pos++ {
-		for _, id := range song.Orders[pos] {
+		for channel, id := range song.Orders[pos] {
+			// The native replay does not parse DMA patterns in disabled mode.
+			// Older saves retain stale fourth-track IDs; preserve them verbatim.
+			if channel == 3 && song.State[49] == 0 {
+				continue
+			}
 			if id < 240 && int(id) >= len(song.Patterns) {
 				return song, fmt.Errorf("native: missing pattern %d at song position %d", id, pos)
 			}

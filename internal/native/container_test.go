@@ -90,3 +90,29 @@ func TestSNDHMetadataWordsInTitleAreNotTreatedAsHeaderTags(t *testing.T) {
 		t.Fatalf("title text overwrote another metadata field: %+v %v", got, err)
 	}
 }
+
+func TestBinaryReplayWrapperSongLengthExcludesNonPatternFooter(t *testing.T) {
+	p := model.Demo()
+	bank, err := EncodeVoiceBank(p.Bank)
+	if err != nil {
+		t.Fatal(err)
+	}
+	song, err := EncodeSong(p.Song)
+	if err != nil {
+		t.Fatal(err)
+	}
+	prefix := make([]byte, 64)
+	copy(prefix[12:], "SNDH")
+	for i, value := range []uint32{12, uint32(len(bank) + 8), uint32(len(song))} {
+		at := 16 + i*6
+		prefix[at], prefix[at+1] = 0x20, 0xfc
+		binary.BigEndian.PutUint32(prefix[at+2:], value)
+	}
+	raw := append(prefix, bank...)
+	raw = append(raw, song...)
+	raw = append(raw, []byte("ignored native footer")...)
+	got, err := DecodeContainer(raw)
+	if err != nil || len(got.Song.Patterns) != len(p.Song.Patterns) {
+		t.Fatalf("binary wrapper footer became a pattern: %v", err)
+	}
+}

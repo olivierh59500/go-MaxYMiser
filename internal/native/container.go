@@ -88,6 +88,18 @@ func DecodeContainers(data []byte) ([]EmbeddedProject, error) {
 		}
 		for _, songAt := range candidates {
 			songEnd := len(plain)
+			// Binary replay wrappers initialize three long values: voice
+			// offset, song offset, song byte length. Read this known sequence
+			// rather than treating alignment/footer bytes as more patterns.
+			for at := 16; at+18 <= min(len(plain), 2048); at += 2 {
+				if bytes.Equal(plain[at:at+6], []byte{0x20, 0xfc, 0, 0, 0, 12}) && plain[at+6] == 0x20 && plain[at+7] == 0xfc && plain[at+12] == 0x20 && plain[at+13] == 0xfc {
+					length := int(binary.BigEndian.Uint32(plain[at+14:]))
+					offset := int(binary.BigEndian.Uint32(plain[at+8:]))
+					if start-8+offset == songAt && length >= songHeader && songAt+length <= len(plain) {
+						songEnd = min(songEnd, songAt+length)
+					}
+				}
+			}
 			for _, boundary := range songs {
 				if boundary > songAt && boundary < songEnd {
 					songEnd = boundary
