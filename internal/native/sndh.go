@@ -18,6 +18,7 @@ type SNDHTemplate struct {
 	Version  byte
 	bankAt   int
 	pointers int
+	copied   *MultiSNDHTemplate
 }
 
 func ParseSNDHTemplate(data []byte) (SNDHTemplate, error) {
@@ -32,6 +33,9 @@ func ParseSNDHTemplate(data []byte) (SNDHTemplate, error) {
 	}
 	if len(projects) != 1 || DeclaredSubtunes(plain) > 1 {
 		return template, fmt.Errorf("native: multi-tune replay wrapper cannot export a single song; select a single-song replay template")
+	}
+	if copied, err := parseCopiedSNDHTemplate(plain, 1); err == nil {
+		return SNDHTemplate{Prefix: copied.Prefix, Version: projects[0].Bank.Version, bankAt: len(copied.Prefix), pointers: copied.pointers, copied: &copied}, nil
 	}
 	inst := bytes.Index(plain, []byte("MYM1INST"))
 	if inst < 40 {
@@ -66,6 +70,9 @@ func ParseSNDHTemplate(data []byte) (SNDHTemplate, error) {
 // EncodeSNDH replaces editable payloads and metadata while preserving the
 // template's executable prefix and its original entry-point addresses.
 func EncodeSNDH(template SNDHTemplate, project *model.Project, duration time.Duration) ([]byte, error) {
+	if template.copied != nil {
+		return encodeCopiedSNDH(*template.copied, []*model.Project{project}, []time.Duration{duration}, 1)
+	}
 	if template.bankAt != len(template.Prefix) || template.pointers != template.bankAt-8 || template.Version > 1 || len(template.Prefix) < 16 {
 		return nil, fmt.Errorf("native: invalid SNDH replay template")
 	}

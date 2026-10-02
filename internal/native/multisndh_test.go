@@ -3,6 +3,7 @@ package native
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -23,13 +24,13 @@ func syntheticMultiSelector(t *testing.T, projects []*model.Project) []byte {
 	copy(prefix[20:], "Author")
 	copy(prefix[48:], "TITL")
 	copy(prefix[52:], "Collection")
-	copy(prefix[80:], "##02\x00TC200\x00")
+	copy(prefix[80:], fmt.Sprintf("##%02d\x00TC200\x00", len(projects)))
 	copy(prefix[92:], "TIME")
 	copy(prefix[100:], "HDNS")
 	copy(prefix[160:], []byte{0x41, 0xfa, 0xff, 0xfe, 0xd1, 0xfc})
 	binary.BigEndian.PutUint32(prefix[166:], 500-160)
 	template := MultiSNDHTemplate{Prefix: prefix, pointers: 500}
-	for slot := 0; slot < 2; slot++ {
+	for slot := range projects {
 		at := 192 + slot*40
 		for _, offset := range []int{0, 6, 12} {
 			copy(prefix[at+offset:], []byte{0x20, 0xfc})

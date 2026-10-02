@@ -87,7 +87,7 @@ complete suite has passed again with the macOS display available, including
 reservation of saved PCM references during MYI import and undoable sample-length
 editing. The current final backend check also passes `go vet`,
 re-verifies all 8,778 example replay calls and retains the SNDH corpus totals:
-690 editable imports, 880 subtunes and 658 unchanged single-song export/reload
+690 editable imports, 880 subtunes and 666 unchanged single-song export/reload
 checks. The previously reported corpus issues and hardware limits remain open
 compatibility boundaries rather than evidence of complete Atari emulation.
 
@@ -118,3 +118,8 @@ Instrument copying retains a sounding destination's parameters and sequence
 phase, then reloads its replaced bank definition on the next sequenced trigger.
 Regression checks exercise consecutive score rows, unrelated sounding voices
 and undo, so an unchanged instrument number cannot retain stale parameters.
+
+Single-song binary replay wrappers now export through verified relative voice,
+song-copy and rate operands, supporting eight additional corpus files. Both
+direct and adjusted PC-relative offset tables are covered. Export retains the
+outer call rate, executable prefix and entry points, with strict source bounds.

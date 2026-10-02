@@ -34,11 +34,24 @@ func ParseMultiSNDHTemplate(data []byte) (MultiSNDHTemplate, error) {
 	if count < 2 {
 		return template, fmt.Errorf("native: complete native multi-song source required")
 	}
+	return parseCopiedSNDHTemplate(plain, count)
+}
+
+// parseCopiedSNDHTemplate also accepts a single-song binary replay wrapper.
+// Its initializer writes voice/song offsets and a bounded song-copy length.
+func parseCopiedSNDHTemplate(plain []byte, count int) (MultiSNDHTemplate, error) {
+	var template MultiSNDHTemplate
+	if count < 1 || count > 99 {
+		return template, fmt.Errorf("native: invalid copied-song count")
+	}
 	for at := 16; at+10 <= min(len(plain), 2048); at += 2 {
-		if !bytes.Equal(plain[at:at+2], []byte{0x41, 0xfa}) || !bytes.Equal(plain[at+4:at+6], []byte{0xd1, 0xfc}) {
+		if !bytes.Equal(plain[at:at+2], []byte{0x41, 0xfa}) {
 			continue
 		}
-		base := int64(at+2) + int64(int16(binary.BigEndian.Uint16(plain[at+2:]))) + int64(int32(binary.BigEndian.Uint32(plain[at+6:])))
+		base := int64(at+2) + int64(int16(binary.BigEndian.Uint16(plain[at+2:])))
+		if bytes.Equal(plain[at+4:at+6], []byte{0xd1, 0xfc}) {
+			base += int64(int32(binary.BigEndian.Uint32(plain[at+6:])))
+		}
 		if base < 16 || base+12 >= int64(len(plain)) {
 			continue
 		}
@@ -90,7 +103,11 @@ func ParseMultiSNDHTemplate(data []byte) (MultiSNDHTemplate, error) {
 // song, song-length and rate-address operands. Executable code and slot count
 // remain those of the supplied runtime template.
 func EncodeMultiSNDH(template MultiSNDHTemplate, projects []*model.Project, durations []time.Duration) ([]byte, error) {
-	if len(projects) != len(template.slots) || len(projects) < 2 || len(durations) != len(projects) || template.pointers+12 != len(template.Prefix) {
+	return encodeCopiedSNDH(template, projects, durations, 2)
+}
+
+func encodeCopiedSNDH(template MultiSNDHTemplate, projects []*model.Project, durations []time.Duration, minimum int) ([]byte, error) {
+	if len(projects) != len(template.slots) || len(projects) < minimum || len(durations) != len(projects) || template.pointers+12 != len(template.Prefix) {
 		return nil, fmt.Errorf("native: multi-song export must replace every template slot")
 	}
 	out := append([]byte(nil), template.Prefix...)
@@ -149,7 +166,7 @@ func EncodeMultiSNDH(template MultiSNDHTemplate, projects []*model.Project, dura
 	if err := setSNDHDurations(out[:len(template.Prefix)], durations, rate); err != nil {
 		return nil, err
 	}
-	if _, err := ParseMultiSNDHTemplate(out); err != nil {
+	if _, err := parseCopiedSNDHTemplate(out, len(projects)); err != nil {
 		return nil, fmt.Errorf("native: generated multi-song selector: %w", err)
 	}
 	return out, nil

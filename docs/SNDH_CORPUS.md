@@ -6,7 +6,7 @@ The other files contain different replay routines and are not editable MaxYMiser
 projects merely because they share the SNDH container format.
 
 The current audit imports 690 files containing 880 editable native subtunes.
-658 files use supported single-song replay templates. All 658 export/reload checks
+666 files use supported single-song replay templates. All 666 export/reload checks
 preserve serialized song data, voice banks and title/author metadata exactly.
 This verifies editable data handling, not audio fidelity across those songs.
 
@@ -22,7 +22,7 @@ The collection exposed independent INST/DIGI versions, alternate bank/song/sampl
 ordering, multiple native subtunes and metadata words that resemble SNDH tags.
 Regression fixtures cover these cases without copying the source compositions.
 
-The current report contains 49 issues: 14 import failures, 32 unsupported
+The current report contains 41 issues: 14 import failures, 24 unsupported
 single-song export templates, and three declared-count discrepancies. These
 categories can refer to the same container. Issues include:
 
@@ -96,6 +96,22 @@ also be empty, and the unchanged strict decoder must still validate every
 nonempty sample. Hatari 2.1 by Dma-Sc and Vrien by Frequent import through this
 layout. Missing or truncated nonempty waveforms remain rejected.
 
+## Single-song binary replay wrappers
+
+Eight additional files use a binary-replay initializer that writes relative voice
+and song offsets, an explicit song-copy length and the address of the song's
+internal rate. The offset table can be addressed with a direct PC-relative LEA or
+a LEA followed by an immediate address adjustment. Export validates all these
+operands, replaces both payloads and rebuilds their offsets, length and rate
+pointer. The outer SNDH call rate remains independent of the song's internal rate.
+The executable prefix and entry points remain those of the supplied template.
+
+This supports Colony by Modmate and seven Tomchi files: 0ompa main, Chom, Muda,
+Smoke Town, ltc1B, Ltc01 Ouacances and Ngup (looped). Constructed regressions
+exercise both address forms, payload growth and corrupt operands. All eight
+native export/reload checks preserve the serialized musical data and metadata.
+Other unverified wrappers remain rejected.
+
 ## Subtunes and export templates
 
 Several native songs can share one voice bank. The importer retains all their
@@ -107,6 +123,11 @@ Terraboink declares 20 songs with one decoded payload; Nano Cave declares seven
 with six; Randomazer declares nine with eight.
 Selector aliases, cue positions or unsupported payloads require further native
 analysis. These collections are imported partially and recorded as such.
+
+Randomazer's outer selector has nine pairs of relative SNDH offsets and playback
+rates. The ninth addresses a separate TC200 player without native MaxYMiser song
+or instrument tags; only the first eight songs have editable MaxYMiser payloads.
+The declared count is therefore not evidence of a missing ninth MaxYMiser bank.
 
 Nano Cave's initializer has an explicit native payload table for songs 1–6.
 These table slots use a different order from the physical bank layout. The
