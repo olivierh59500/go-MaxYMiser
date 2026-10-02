@@ -46,12 +46,12 @@ var helpText = [][]string{
 	{
 		"MYS stores arrangement/patterns; MYV instruments, sequences and samples.",
 		"Open MYS auto-loads matching MYV. MYI import allocates independent links.",
-		"Own MaxYMiser SNDH exposes subtunes; other SNDH replay formats are not scores.",
+		"Own MaxYMiser SNDH exposes subtunes; other players need a source decoder.",
 		"Native SNDH export needs a local replay template selected in Settings.",
 		"ICE applies to native saves; WAV export runs separately from playback.",
 		"YM records chip output. Reconstruction proposes data, not unique source recovery.",
 		"Range/grid selects a passage and row spacing; coarse grids can omit modulation.",
-		"Composer profiles and arrangement comparisons attach reviewable evidence.",
+		"Composer/paired profiles attach evidence; verified recipes can improve sounds.",
 		"Listen YM / Listen score retains the reference. Save writes editable data.",
 	},
 	{

@@ -48,7 +48,9 @@ trying the editor. External MaxYMiser files are not needed to launch it.
   references, including sequence-selection commands in both effect columns.
 - **YM**: original YM playback, live register inspection and proposed tracker
   reconstruction, with optional composer-corpus evidence and source-labelled
-  profiles learned from verified SNDH/YM pairs.
+  profiles learned from verified SNDH/YM pairs. On the one-frame grid, labelled
+  instrument recipes are retained where their measured replay improves the
+  candidate while preserving its volume accuracy.
 - **Settings**: playback rate, speed, edit step, octave, volume, timer mask,
   saved Jam mode, one/two-voice/native-rate PCM modes, native CNF exchange and
   macOS MIDI input.

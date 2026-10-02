@@ -2,6 +2,15 @@
 // Original driver: Gareth Morris / gwEm.
 package replay
 
+// TonePeriod returns the native equal-tempered table entry used by square-wave
+// voices. This is also useful when converting another player's pitch tables.
+func TonePeriod(note int) uint16 {
+	if note < 0 || note >= len(tonePeriods) {
+		return 0
+	}
+	return tonePeriods[note]
+}
+
 var tonePeriods = [...]uint16{
 	15289, 14431, 13621, 12856, 12135, 11454, 10811, 10204, 9631, 9091, 8581, 8099,
 	7645, 7215, 6810, 6428, 6067, 5727, 5405, 5102, 4816, 4545, 4290, 4050,

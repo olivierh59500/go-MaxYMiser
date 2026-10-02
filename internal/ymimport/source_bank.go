@@ -1,0 +1,113 @@
+package ymimport
+
+import (
+	"fmt"
+
+	"github.com/olivierh59500/go-MaxYMiser/internal/model"
+)
+
+type SourceBankReport struct {
+	Converted   []int          `json:"converted_source_instruments"`
+	Unsupported map[int]string `json:"unsupported_source_instruments"`
+	Warnings    []string       `json:"warnings"`
+}
+
+// SourceVoiceBank translates known square-wave envelope and arpeggio behavior
+// to native editable sequences. Unsupported synthesis is explicit, not replaced
+// by a generic sound. The source ID maps to MaxYMiser's one-based ID+1.
+func SourceVoiceBank(score SourceScore) (model.VoiceBank, SourceBankReport, error) {
+	bank := model.VoiceBank{Version: 1, SampleVersion: 1, SequenceCount: 1}
+	report := SourceBankReport{Unsupported: map[int]string{}, Warnings: []string{"Converted definitions retain square-wave volume and arpeggio behavior. Pattern-controlled vibrato, slides, hardware programs and pitch-table rounding are not part of this bank conversion."}}
+	sequenceIDs := map[model.Sequence]byte{}
+	add := func(sequence model.Sequence) (byte, error) {
+		if id, ok := sequenceIDs[sequence]; ok {
+			return id, nil
+		}
+		if bank.SequenceCount == model.MaxSequences {
+			return 0, fmt.Errorf("source: converted bank exceeds native sequence capacity")
+		}
+		id := byte(bank.SequenceCount)
+		bank.Sequences[id] = sequence
+		bank.SequenceCount++
+		sequenceIDs[sequence] = id
+		return id, nil
+	}
+	for _, source := range score.Instruments {
+		if source.ID < 0 || source.ID >= model.MaxInstruments || len(source.Settings) != 6 {
+			return bank, report, fmt.Errorf("source: invalid instrument definition")
+		}
+		var reason string
+		switch {
+		case source.Settings[0] != 0:
+			reason = "native hardware-effect flags are not yet translated"
+		case source.Settings[1] >= 128:
+			reason = "extended native pitch/noise program is not yet translated"
+		case len(source.VolumeSequence) == 0:
+			reason = "empty native volume sequence"
+		case len(source.Arpeggio.Values) == 0:
+			reason = "native arpeggio data is missing"
+		}
+		if reason != "" {
+			report.Unsupported[source.ID] = reason
+			continue
+		}
+		volume := model.Sequence{}
+		for n, value := range source.VolumeSequence {
+			count := int(source.Settings[5]) + 1
+			if n == 0 {
+				count = int(source.Settings[5])
+				if len(source.VolumeSequence) == 1 {
+					count = max(1, count)
+				}
+			}
+			if value > 15 || int(volume.Length)+count > len(volume.Values) {
+				reason = "volume program exceeds the native editable sequence range"
+				break
+			}
+			// Native trigger preloads the first byte before decrementing its
+			// counter. The first value lasts N calls; subsequent ones last N+1.
+			for repeat := 0; repeat < count; repeat++ {
+				volume.Values[volume.Length] = uint16(value)
+				volume.Length++
+			}
+		}
+		volume.Repeat = volume.Length - 1
+		arpeggio := model.Sequence{}
+		arp := source.Arpeggio
+		if arp.StepFrames < 1 || arp.Repeat < 0 || arp.Repeat >= len(arp.Values) || len(arp.Values)*arp.StepFrames > len(arpeggio.Values) {
+			reason = "arpeggio timing exceeds the native editable sequence range"
+		} else {
+			for _, value := range arp.Values {
+				if value < -32768 || value > 32767 {
+					return bank, report, fmt.Errorf("source: invalid signed arpeggio value")
+				}
+				for repeat := 0; repeat < arp.StepFrames; repeat++ {
+					arpeggio.Values[arpeggio.Length] = uint16(int16(value))
+					arpeggio.Length++
+				}
+			}
+			arpeggio.Repeat = byte(arp.Repeat * arp.StepFrames)
+			if arp.Repeat == len(arp.Values)-1 {
+				arpeggio.Repeat = arpeggio.Length - 1
+			}
+		}
+		if reason != "" {
+			report.Unsupported[source.ID] = reason
+			continue
+		}
+		inst := &bank.Instruments[source.ID]
+		inst.SetName(fmt.Sprintf("Source %02X", source.ID))
+		inst[17], inst[19], inst[32] = 4, 4, 1
+		sequences := []model.Sequence{volume, arpeggio, {Values: [63]uint16{0x100}, Length: 1}}
+		for n, offset := range []int{48, 49, 51} {
+			sequence := sequences[n]
+			id, err := add(sequence)
+			if err != nil {
+				return bank, report, err
+			}
+			inst[offset] = id
+		}
+		report.Converted = append(report.Converted, source.ID)
+	}
+	return bank, report, nil
+}

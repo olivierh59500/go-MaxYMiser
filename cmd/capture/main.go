@@ -6,6 +6,7 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/olivierh59500/go-MaxYMiser/internal/model"
 	"github.com/olivierh59500/go-MaxYMiser/internal/ui"
+	"github.com/olivierh59500/go-MaxYMiser/internal/ymimport"
 	"image"
 	"image/png"
 	"log"
@@ -52,6 +53,9 @@ func main() {
 	tools := flag.Bool("sequence-tools", false, "show the sequence generator")
 	browser := flag.Bool("file-browser", false, "show the file browser")
 	song := flag.String("song", "", "open a music file through the GUI workflow before capture")
+	paired := flag.String("paired-profile", "", "source-labelled profile for the YM workspace")
+	reconstruct := flag.Bool("reconstruct", false, "apply the YM reconstruction workflow before capture")
+	end := flag.Int("end-frame", 0, "exclusive reconstruction end frame")
 	flag.Parse()
 	app, e := ui.New(model.Demo(), "", true)
 	if e != nil {
@@ -66,6 +70,15 @@ func main() {
 			log.Fatal(e)
 		}
 	}
+	if *paired != "" {
+		if e = app.LoadPairedProfile(*paired); e != nil {
+			log.Fatal(e)
+		}
+	}
+	if *reconstruct {
+		app.ReconstructYM(ymimport.ReconstructionOptions{EndFrame: *end, FramesPerRow: 1})
+	}
+	app.SetTab(*tab)
 	if *browser {
 		app.ShowFileBrowser()
 	}

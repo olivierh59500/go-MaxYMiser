@@ -94,9 +94,9 @@ uses instruction signatures and file-relative pointer validation, retains the
 original 27 referenced patterns and 32 instrument definitions, and simulates
 the source note/control timing. The alternate instrument-bank command and
 additional subtunes are rejected until their layouts are verified.
-Instrument extraction currently retains the six base settings and volume
-sequence. The separate pitch, noise and hardware-effect sequences are not yet
-translated into MaxYMiser definitions.
+Instrument extraction retains the six base settings, the volume sequence and
+the signed arpeggio sequence, including its cadence and hold/repeat behavior.
+The separate noise and hardware-effect programs are not yet fully translated.
 
 Native execution under Hatari provided 298 note events with their source
 offsets, instrument IDs, timing and legato flags. Every event agreed with the
@@ -106,6 +106,9 @@ remain external local inputs; they are not included in the repository.
 ```sh
  go run ./cmd/ympair -sndh /path/to/Last_Ninja.sndh \
    -ym "/path/to/Last Ninja.ym" -frames 6000 -output last-ninja-paired.json
+
+ go run ./cmd/ympair -sndh /path/to/Last_Ninja.sndh \
+   -output source-score.json -bank source-instruments.myv
 
  go run ./cmd/ymimport -input /path/to/music.ym \
    -paired-profile last-ninja-paired.json -output candidate.mys
@@ -124,6 +127,10 @@ before treating two versions as identical sound definitions.
 
 The labelled model stores normalized feature prototypes associated with native
 instrument IDs. The last chronological quarter is excluded from training.
+The first few native envelope values refine each training boundary within two
+YM frames of the global alignment. This accounts for trigger sampling without
+changing the source note timeline. Events crossing the training cutoff are
+excluded rather than leaking later register values into an example.
 Ambiguous matches and unfamiliar sounds produce no label. Source IDs belong
 to that original bank; the same number in another song does not identify the
 same instrument. Neither distance nor matching margin is a probability.
@@ -131,9 +138,9 @@ same instrument. Neither distance nor matching margin is a probability.
 For the supplied standard Last Ninja pair, the first 6,000 source frames align
 at an offset of six YM frames: 846/849 eligible tonal events agree. The held-out
 section contains 358 examples of instruments encountered during training:
-205 labels are correct, 144 are left unresolved, and nine are incorrect. This
-is about 96% precision among accepted labels, but only 57% coverage as correct
-labels. Validation still uses repeated material from one song; these numbers
+313 labels are correct and 45 are left unresolved, with no accepted incorrect
+labels in this test. This is about 87% coverage as correct labels. Validation
+still uses repeated material from one song; these numbers
 do not establish performance on another composition or on all Mad Max music.
 
 In the application, **YM → Paired source profile** loads the generated JSON;
@@ -141,9 +148,41 @@ In the application, **YM → Paired source profile** loads the generated JSON;
 composer evidence. `-paired-profile /path/to/profile.json` selects the same
 profile at startup. The analysis report records each accepted event's source
 instrument, channel, frame range, feature distance and competing-label margin.
-The generated MaxYMiser synthesis settings remain approximate. Translating
-source modulation commands and improving event segmentation are subsequent
-steps; a source-labelled match alone does not restore the original sound.
+
+### Editable instrument conversion
+
+`ympair -bank` writes a native MYV containing the supported square-wave
+envelopes and arpeggios. Source ID zero maps to tracker instrument 01, and so
+on. Unsupported hardware programs retain their source data in the JSON and
+are listed in the separate MYV analysis report; they do not become invented
+generic instruments. Last Ninja currently yields 24 translated definitions
+and eight unsupported ones. The original first-step envelope cadence is
+preserved, including speed-zero envelopes advancing before the first output.
+Native execution checks covered 52 triggered notes and 1,186 volume-register
+values with no mismatches. Pattern-controlled vibrato and slides remain
+outside this base bank conversion.
+
+Paired training also produces editable instrument recipes for registered
+volume, relative pitch, vibrato correction, mixer and noise sequences. Different
+phases of the same source sound can yield different recipes. They are synthesis
+candidates extracted from labelled output, not a claim that the original
+tracker used those MaxYMiser settings. Envelope and timer programs requiring
+another replay model are omitted.
+
+On the default one-frame reconstruction grid, the importer tries a bounded
+set of source-labelled recipes. It renders each candidate and accepts it only
+where register error decreases without increasing volume error or changing a
+previously correct mixer state. Shared patterns are cloned before a selected
+occurrence is edited, and the following transcription state is restored. A
+coarser grid keeps the ordinary transcription with source labels only.
+
+For the first 6,000 Last Ninja frames, 126 passages accepted a recipe. The
+total absolute tone-period error decreased from 73,149 to 68,648 units across
+audible tone frames; total volume error remained zero and the mixer mismatch
+count remained 2,021. This is a measured pitch improvement, not complete audio
+fidelity. The remaining mixer discrepancies, continuous modulation phases,
+hardware programs and native pattern structure need further reconstruction.
+The report includes the before/after error for every accepted passage.
 
 ## Comparing arrangements from different composers
 

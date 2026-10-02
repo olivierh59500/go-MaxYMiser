@@ -16,6 +16,7 @@ type Report struct {
 	SourceLabels                             []SourceEvidence
 	SourcePlayer                             string
 	SourceLabelRate                          int
+	RecipeApplications                       []RecipeApplication
 }
 type timbre struct {
 	Tone, Noise, Envelope bool

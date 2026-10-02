@@ -45,10 +45,9 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		report.SourcePlayer = p.Source.Player
-		report.SourceLabelRate = trace.Rate
-		report.SourceLabels = p.SourceEvidence(trace)
-		report.Warnings = append(report.Warnings, "Source-labelled matches identify candidates from the paired bank; the generated MaxYMiser sound settings remain approximate.")
+		if err := ymimport.ApplyPairedRecipes(candidate, &report, trace, p); err != nil {
+			log.Fatal(err)
+		}
 	}
 	if err = project.Save(candidate, *output); err != nil {
 		log.Fatal(err)
@@ -60,5 +59,5 @@ func main() {
 	if err = os.WriteFile(*output+".analysis.json", append(data, '\n'), 0644); err != nil {
 		log.Fatal(err)
 	}
-	fmt.Printf("%d candidate instruments, %d patterns, %d positions, %d corpus matches, %d source-labelled matches\n", report.Instruments, report.Patterns, report.Positions, len(report.Evidence), len(report.SourceLabels))
+	fmt.Printf("%d candidate instruments, %d patterns, %d positions, %d corpus matches, %d source-labelled matches, %d improved instrument passages\n", report.Instruments, report.Patterns, report.Positions, len(report.Evidence), len(report.SourceLabels), len(report.RecipeApplications))
 }

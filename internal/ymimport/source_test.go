@@ -21,6 +21,8 @@ func sourceFixture() []byte {
 	pointer(0x1ee0, 0x1f00)
 	pointer(0x1ee4, 0x2400)
 	pointer(0x1ee8, 0x2300)
+	pointer(0x824, 0x2601)
+	copy(b[0x2600:], []byte{0, 0, 7, 12, 0x8f})
 	pointer(0x2300, 0x2310)
 	b[0x22c0] = 3
 	for i := 0; i < 32; i++ {

@@ -23,14 +23,15 @@ type PairedPrototype struct {
 }
 
 type PairedProfile struct {
-	Version     int               `json:"version"`
-	Source      SourceScore       `json:"source"`
-	YMFile      string            `json:"ym_file"`
-	Alignment   PairAlignment     `json:"alignment"`
-	TrainingEnd int               `json:"training_end_source_frame"`
-	Prototypes  []PairedPrototype `json:"prototypes"`
-	Validation  PairValidation    `json:"validation"`
-	Warnings    []string          `json:"warnings"`
+	Version     int                `json:"version"`
+	Source      SourceScore        `json:"source"`
+	YMFile      string             `json:"ym_file"`
+	Alignment   PairAlignment      `json:"alignment"`
+	TrainingEnd int                `json:"training_end_source_frame"`
+	Prototypes  []PairedPrototype  `json:"prototypes"`
+	Validation  PairValidation     `json:"validation"`
+	Warnings    []string           `json:"warnings"`
+	Recipes     []InstrumentRecipe `json:"instrument_recipes,omitempty"`
 }
 
 type PairValidation struct {
@@ -127,8 +128,9 @@ func abs(v int) int {
 }
 
 type labelledFeatures struct {
-	event    SourceEvent
-	features []int16
+	event      SourceEvent
+	features   []int16
+	start, end int
 }
 
 func sourceFeatures(score SourceScore, trace Trace, alignment PairAlignment) []labelledFeatures {
@@ -145,19 +147,61 @@ func sourceFeatures(score SourceScore, trace Trace, alignment PairAlignment) []l
 				// The next decoded source event is needed to bound the example.
 				continue
 			}
-			start := e.Frame + alignment.Offset
+			start := alignedSourceOnset(score, trace, e, alignment)
 			end := min(start+64, len(trace.Frames))
-			end = min(end, events[i+1].Frame+alignment.Offset)
+			end = min(end, alignedSourceOnset(score, trace, events[i+1], alignment))
 			if e.Rest || !e.Retrigger || e.Instrument < 0 || start < 0 || start >= len(trace.Frames) || end-start < 3 {
 				continue
 			}
 			if trace.Frames[start][8+ch]&31 == 0 {
 				continue
 			}
-			results = append(results, labelledFeatures{e, eventFeatures(trace, ch, start, end)})
+			results = append(results, labelledFeatures{e, eventFeatures(trace, ch, start, end), start, end})
 		}
 	}
 	return results
+}
+
+// Register recordings may sample a trigger one frame before or after the
+// globally aligned boundary. Native envelope values locate that boundary;
+// no target-only inference uses source note times from this operation.
+func alignedSourceOnset(score SourceScore, trace Trace, e SourceEvent, alignment PairAlignment) int {
+	at := e.Frame + alignment.Offset
+	if e.Rest || !e.Retrigger || e.Instrument < 0 || e.Instrument >= len(score.Instruments) {
+		return at
+	}
+	inst := score.Instruments[e.Instrument]
+	if len(inst.Settings) != 6 || len(inst.VolumeSequence) == 0 {
+		return at
+	}
+	best, error := at, math.Inf(1)
+	for candidate := at - 2; candidate <= at+2; candidate++ {
+		if candidate < 0 || candidate+3 > len(trace.Frames) {
+			continue
+		}
+		current := 0.0
+		index, count := 0, int(inst.Settings[5])
+		for frame := 0; frame < 3; frame++ {
+			count--
+			if count < 0 {
+				count = int(inst.Settings[5])
+				index = min(index+1, len(inst.VolumeSequence)-1)
+			}
+			got := trace.Frames[candidate+frame][8+e.Channel]
+			if got&16 != 0 {
+				current += 16
+			} else {
+				current += math.Abs(float64(int(got) - int(inst.VolumeSequence[index])))
+			}
+		}
+		if note, ok := tracePitch(trace, e.Channel, candidate); ok && inst.Settings[0]&0x7f == 0 {
+			current += float64(abs(note - e.Note - alignment.Transpose))
+		}
+		if current < error || current == error && abs(candidate-at) < abs(best-at) {
+			best, error = candidate, current
+		}
+	}
+	return best
 }
 
 // LearnPair uses native event boundaries and IDs for the training targets. The
@@ -181,7 +225,7 @@ func LearnPair(score SourceScore, trace Trace, ymFile string) (PairedProfile, er
 	byID := map[string]int{}
 	known := map[int]bool{}
 	for _, f := range labelled {
-		if f.event.Frame >= p.TrainingEnd {
+		if f.event.Frame >= p.TrainingEnd || f.end > p.TrainingEnd+alignment.Offset {
 			continue
 		}
 		id := fmt.Sprint(f.event.Instrument) + ":" + signature("source", f.features)
@@ -196,6 +240,7 @@ func LearnPair(score SourceScore, trace Trace, ymFile string) (PairedProfile, er
 	if len(p.Prototypes) == 0 {
 		return p, fmt.Errorf("pair: no labelled training events")
 	}
+	p.Recipes = learnRecipes(score, trace, alignment, p.TrainingEnd)
 	for _, f := range labelled {
 		if f.event.Frame < p.TrainingEnd {
 			continue
@@ -312,6 +357,19 @@ func LoadPairedProfile(path string) (PairedProfile, error) {
 	for _, prototype := range p.Prototypes {
 		if prototype.Instrument < 0 || prototype.Instrument >= len(p.Source.Instruments) || len(prototype.Features) != 80 {
 			return p, fmt.Errorf("pair: invalid instrument label or feature dimensions")
+		}
+	}
+	if len(p.Recipes) > 100000 {
+		return p, fmt.Errorf("pair: too many instrument recipes")
+	}
+	for _, recipe := range p.Recipes {
+		if recipe.SourceInstrument < 0 || recipe.SourceInstrument >= len(p.Source.Instruments) || recipe.Frames < 1 || recipe.Frames > 63 || recipe.Note < 2 || recipe.Note > 127 || len(recipe.Features) != 80 || math.IsNaN(recipe.RegisterError) || math.IsInf(recipe.RegisterError, 0) || recipe.RegisterError < 0 {
+			return p, fmt.Errorf("pair: invalid instrument recipe")
+		}
+		for _, s := range recipe.Sequences {
+			if s.Length < 1 || s.Length > 63 || s.Repeat >= s.Length {
+				return p, fmt.Errorf("pair: invalid instrument recipe sequence")
+			}
 		}
 	}
 	return p, nil

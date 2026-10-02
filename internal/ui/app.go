@@ -1047,18 +1047,18 @@ func (a *App) action(name string) {
 			a.status = err.Error()
 			return
 		}
-		a.remember()
-		a.synth.Edit(func(e *replay.Engine) { e.Project = candidate; e.Reset() })
 		if a.corpus != nil {
 			report.AuthorProfile = a.corpus.Author
 			report.Evidence = a.corpus.Evidence(trace)
 		}
 		if a.pairedProfile != nil {
-			report.SourcePlayer = a.pairedProfile.Source.Player
-			report.SourceLabelRate = trace.Rate
-			report.SourceLabels = a.pairedProfile.SourceEvidence(trace)
-			report.Warnings = append(report.Warnings, "Source-labelled matches are candidates from the paired bank; MaxYMiser sound settings remain approximate.")
+			if err := ymimport.ApplyPairedRecipes(candidate, &report, trace, *a.pairedProfile); err != nil {
+				a.status = err.Error()
+				return
+			}
 		}
+		a.remember()
+		a.synth.Edit(func(e *replay.Engine) { e.Project = candidate; e.Reset() })
 		a.ymReport = &report
 		a.pattern, a.row, a.channel = 0, 0, 0
 		a.projectPath = ""
@@ -1648,7 +1648,7 @@ func (a *App) drawYM(dst *ebiten.Image) {
 	a.btn(dst, "Listen YM", 876, 246, 152, 34, "ym:reference", r.Active)
 	a.btn(dst, "Listen score", 1038, 246, 194, 34, "ym:score", !r.Active)
 	a.btn(dst, fmt.Sprintf("Range %d:%d · grid %d", a.ymOptions.StartFrame, a.ymOptions.EndFrame, a.ymOptions.FramesPerRow), 520, 205, 344, 30, "ym:range", false)
-	a.btn(dst, "Paired source profile", 350, 205, 154, 30, "ym:paired-profile", a.pairedProfile != nil)
+	a.btn(dst, "Paired profile", 350, 205, 154, 30, "ym:paired-profile", a.pairedProfile != nil)
 	a.text(dst, fmt.Sprintf("%d:%02d / %d:%02d", r.Position/60000, (r.Position/1000)%60, r.Duration/60000, (r.Duration/1000)%60), 968, 217, 18, accent)
 	labels := []string{"Tone A low", "Tone A high", "Tone B low", "Tone B high", "Tone C low", "Tone C high", "Noise period", "Mixer", "Volume A", "Volume B", "Volume C", "Envelope low", "Envelope high", "Envelope shape"}
 	for reg, label := range labels {
@@ -1663,7 +1663,7 @@ func (a *App) drawYM(dst *ebiten.Image) {
 			label += fmt.Sprintf(" · %d corpus matches", len(a.ymReport.Evidence))
 		}
 		if a.pairedProfile != nil {
-			label += fmt.Sprintf(" · %d source labels", len(a.ymReport.SourceLabels))
+			label += fmt.Sprintf(" · %d source labels · %d improved passages", len(a.ymReport.SourceLabels), len(a.ymReport.RecipeApplications))
 		}
 		a.text(dst, label, 42, 626, 13, purple)
 	}
@@ -1671,7 +1671,7 @@ func (a *App) drawYM(dst *ebiten.Image) {
 		frame := int(r.Position) * a.ymReport.SourceLabelRate / 1000
 		labels := [3]string{"?", "?", "?"}
 		for _, evidence := range a.ymReport.SourceLabels {
-			if evidence.Start <= frame && frame < evidence.End && evidence.Channel >= 0 && evidence.Channel < 3 {
+			if evidence.Start <= frame && frame < evidence.End && evidence.Channel >= 0 && evidence.Channel < 3 && r.Active && r.Registers[8+evidence.Channel]&31 != 0 {
 				labels[evidence.Channel] = fmt.Sprintf("%02X", evidence.Instrument)
 			}
 		}

@@ -25,10 +25,20 @@ type SourceScore struct {
 }
 
 type SourceInstrument struct {
-	ID             int    `json:"id"`
-	Offset         int    `json:"offset"`
-	Settings       []byte `json:"settings"`
-	VolumeSequence []byte `json:"volume_sequence"`
+	ID             int            `json:"id"`
+	Offset         int            `json:"offset"`
+	Settings       []byte         `json:"settings"`
+	VolumeSequence []byte         `json:"volume_sequence"`
+	Arpeggio       SourceSequence `json:"arpeggio"`
+}
+
+// SourceSequence retains byte-level timing separately from the tracker row
+// speed. Values are signed semitone offsets, with explicit hold/loop behavior.
+type SourceSequence struct {
+	Offset     int   `json:"offset"`
+	StepFrames int   `json:"step_frames"`
+	Values     []int `json:"values"`
+	Repeat     int   `json:"repeat"`
 }
 
 type SourcePattern struct {
@@ -159,7 +169,14 @@ func decodeMadMaxLastNinja(data []byte, subtune, frames int) (SourceScore, error
 		if end == len(data) || end-at == 64 {
 			return score, fmt.Errorf("source: unterminated instrument %d volume sequence", id)
 		}
-		score.Instruments = append(score.Instruments, SourceInstrument{id, at - 6, append([]byte(nil), data[at-6:at]...), append([]byte(nil), data[at:end]...)})
+		instrument := SourceInstrument{ID: id, Offset: at - 6, Settings: append([]byte(nil), data[at-6:at]...), VolumeSequence: append([]byte(nil), data[at:end]...)}
+		if instrument.Settings[1] < 128 {
+			instrument.Arpeggio, err = decodeSourceArpeggio(r, 0x824+shift, int(instrument.Settings[1]))
+			if err != nil {
+				return score, fmt.Errorf("source: instrument %d arpeggio: %w", id, err)
+			}
+		}
+		score.Instruments = append(score.Instruments, instrument)
 	}
 	patternIDs := map[int]bool{}
 	for ch := range score.Orders {

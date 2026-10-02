@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 
+	"github.com/olivierh59500/go-MaxYMiser/internal/native"
 	"github.com/olivierh59500/go-MaxYMiser/internal/ymimport"
 )
 
@@ -17,6 +18,7 @@ func main() {
 	subtune := flag.Int("subtune", 0, "zero-based source subtune")
 	frames := flag.Int("frames", 6000, "source timeline frame limit")
 	output := flag.String("output", "source-score.json", "source labels JSON")
+	bankPath := flag.String("bank", "", "export translated native MYV square/envelope/arpeggio instruments")
 	flag.Parse()
 	raw, err := os.ReadFile(*source)
 	if err != nil {
@@ -49,6 +51,27 @@ func main() {
 	}
 	if err := os.WriteFile(*output, append(data, '\n'), 0644); err != nil {
 		log.Fatal(err)
+	}
+	if *bankPath != "" {
+		bank, report, err := ymimport.SourceVoiceBank(score)
+		if err != nil {
+			log.Fatal(err)
+		}
+		data, err := native.EncodeVoiceBank(bank)
+		if err != nil {
+			log.Fatal(err)
+		}
+		if err := os.WriteFile(*bankPath, data, 0644); err != nil {
+			log.Fatal(err)
+		}
+		data, err = json.MarshalIndent(report, "", "  ")
+		if err != nil {
+			log.Fatal(err)
+		}
+		if err := os.WriteFile(*bankPath+".analysis.json", append(data, '\n'), 0644); err != nil {
+			log.Fatal(err)
+		}
+		fmt.Printf("Translated %d source instruments; %d unsupported definitions retained in the source report\n", len(report.Converted), len(report.Unsupported))
 	}
 	notes := 0
 	for _, event := range score.Events {
