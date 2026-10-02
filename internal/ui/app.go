@@ -242,7 +242,7 @@ func (a *App) Draw(dst *ebiten.Image) {
 		y1 := float32(723) - wave[i+1]*24
 		vector.StrokeLine(dst, x0, y0, x1, y1, 1, accent, false)
 	}
-	a.text(dst, a.status, 24, 768, 12, dim)
+	a.text(dst, a.fitText(a.status, 12, 936), 24, 768, 12, dim)
 	a.text(dst, fmt.Sprintf("Octave %d · step %d · %s", a.octave, a.step, map[bool]string{true: "EDIT", false: "PREVIEW"}[a.editing]), 984, 768, 12, purple)
 	if a.modal != "" {
 		if a.browser != nil {
@@ -450,7 +450,7 @@ func (a *App) drawSequences(dst *ebiten.Image, e *replay.Engine) {
 		a.text(dst, fmt.Sprintf("%02X", i), float64(x), float64(y), 11, dim)
 		a.btn(dst, fmt.Sprintf("%04X", s.Values[i]), x+30, y-5, 94, 35, fmt.Sprintf("seq-value:%d", i), i < int(s.Length))
 	}
-	a.text(dst, "Values are native 16-bit words. Repeat at the last step holds its final value.", 42, 646, 12, dim)
+	a.text(dst, "Values are native 16-bit words. Repeat at the last step holds its final value.", 410, 647, 12, dim)
 }
 func (a *App) drawSamples(dst *ebiten.Image, e *replay.Engine) {
 	rect(dst, 24, 192, 1232, 482, panel)

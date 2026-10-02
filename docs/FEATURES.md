@@ -44,3 +44,13 @@ WAV re-export streams to a staged file with bounded buffers, preserving the
 previous complete audio until the replacement is rendered and synced. Existing
 permissions are retained; failed reads/writes/commits leave the old output intact.
 The UI renderer keeps composition editing and live playback independent.
+
+The complete `go test -race ./...` suite has also passed with the macOS display
+available, including the UI regressions for source-inspection recovery,
+independent subtune editing, unused-slot selection and repeated background WAV
+export. Window captures checked the pattern, arrangement, instrument, sequence,
+sample, block-edit and settings panels, sequence generation, native file browsing,
+converted/failed source previews and the complete collection export controls.
+Sequence help text and long status messages were adjusted to preserve readable
+clipboard and transport controls. These checks verify those editor workflows;
+they do not extend the hardware or source-player coverage stated above.
