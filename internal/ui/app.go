@@ -50,6 +50,7 @@ type App struct {
 	corpus                                                             *ymimport.Corpus
 	ymPath                                                             string
 	ymReport                                                           *ymimport.Report
+	ymOptions                                                          ymimport.ReconstructionOptions
 	midiInput                                                          *midi.Input
 	midiOutput                                                         *midi.Output
 	midiDestinations                                                   []midi.Destination
@@ -95,6 +96,7 @@ func New(p *model.Project, projectPath string, mute bool) (*App, error) {
 	a.generatorLow, a.generatorHigh, a.generatorCycles = "0000", "000F", "1"
 	a.generatorShape, a.morphDestination = edit.Ramp, "03"
 	a.exportDuration = 30 * time.Second
+	a.ymOptions.FramesPerRow = 1
 	a.blockLast, a.pasteMode, a.columnMask = 63, edit.Overwrite, edit.AllColumns
 	if !mute {
 		context := audio.CurrentContext()
@@ -937,7 +939,7 @@ func (a *App) action(name string) {
 			a.status = err.Error()
 			return
 		}
-		candidate, report, err := ymimport.Reconstruct(trace)
+		candidate, report, err := ymimport.ReconstructSelection(trace, a.ymOptions)
 		if err != nil {
 			a.status = err.Error()
 			return
@@ -955,6 +957,8 @@ func (a *App) action(name string) {
 		a.status = fmt.Sprintf("Reconstructed candidate: %d instruments, %d patterns. Compare with the original YM.", report.Instruments, report.Patterns)
 	case "ym:profile":
 		a.beginFileBrowser("Load composer profile (.json)", "", false)
+	case "ym:range":
+		a.modal, a.entry = "YM range (first,last,row frames)", fmt.Sprintf("%d,%d,%d", a.ymOptions.StartFrame, a.ymOptions.EndFrame, a.ymOptions.FramesPerRow)
 	case "ym:reference":
 		a.synth.SelectReference(true)
 	case "ym:score":
@@ -1197,6 +1201,21 @@ func (a *App) applyModal() {
 	}
 	var x, y int
 	switch {
+	case modal == "YM range (first,last,row frames)":
+		parts := strings.Split(entry, ",")
+		if len(parts) != 3 {
+			a.status = "Enter decimal first,last,row frames (last 0 = end; row 0 = estimate)"
+			return
+		}
+		first, e1 := strconv.Atoi(strings.TrimSpace(parts[0]))
+		last, e2 := strconv.Atoi(strings.TrimSpace(parts[1]))
+		grid, e3 := strconv.Atoi(strings.TrimSpace(parts[2]))
+		if e1 != nil || e2 != nil || e3 != nil || first < 0 || last < 0 || grid < 0 || grid > 16 {
+			a.status = "Invalid YM range/grid values"
+			return
+		}
+		a.ymOptions = ymimport.ReconstructionOptions{StartFrame: first, EndFrame: last, FramesPerRow: grid}
+		a.status = "YM reconstruction selection updated; reference retained"
 	case modal == "Load SNDH replay template":
 		raw, err := os.ReadFile(entry)
 		if err == nil {
@@ -1516,6 +1535,7 @@ func (a *App) loadYMBytes(data []byte) error {
 	}
 	a.tab = "YM"
 	a.ymReport = nil
+	a.ymOptions = ymimport.ReconstructionOptions{FramesPerRow: 1}
 	a.status = "YM reference loaded · register stream, not tracker patterns"
 	return nil
 }
@@ -1532,6 +1552,7 @@ func (a *App) drawYM(dst *ebiten.Image) {
 	a.btn(dst, "Reconstruct", 710, 246, 156, 34, "ym:infer", false)
 	a.btn(dst, "Listen YM", 876, 246, 152, 34, "ym:reference", r.Active)
 	a.btn(dst, "Listen score", 1038, 246, 194, 34, "ym:score", !r.Active)
+	a.btn(dst, fmt.Sprintf("Range %d:%d · grid %d", a.ymOptions.StartFrame, a.ymOptions.EndFrame, a.ymOptions.FramesPerRow), 520, 205, 344, 30, "ym:range", false)
 	a.text(dst, fmt.Sprintf("%d:%02d / %d:%02d", r.Position/60000, (r.Position/1000)%60, r.Duration/60000, (r.Duration/1000)%60), 968, 217, 18, accent)
 	labels := []string{"Tone A low", "Tone A high", "Tone B low", "Tone B high", "Tone C low", "Tone C high", "Noise period", "Mixer", "Volume A", "Volume B", "Volume C", "Envelope low", "Envelope high", "Envelope shape"}
 	for reg, label := range labels {

@@ -50,6 +50,25 @@ A Roll out 1 test currently proposes five timbres, 32 frame-grid patterns and
 25 order positions, with 28 corpus matches. This is an editable transcription;
 its patterns are not claimed to be the original composition's patterns.
 
+## Selection and proposed row grids
+
+Long recordings can be reconstructed in a selected frame range. `-start-frame`
+and `-end-frame` use the original YM timeline, with an exclusive end; zero end
+means the entire recording. `-row-frames` selects how many source frames make
+one editable tracker row. The default one-frame grid retains the finest timing.
+
+```sh
+ go run ./cmd/ymimport -input /path/to/music.ym \
+   -start-frame 500 -end-frame 3500 -row-frames 6 -output excerpt.mys
+```
+
+The YM workspace's **Range / grid** control exposes the same options. Zero row
+spacing requests an onset-alignment estimate, and the analysis report records
+the ranked candidates. A coarser grid samples states and can omit vibrato,
+arpeggio or envelope changes within the row. It is a proposed arrangement,
+not proof of the original tracker speed. The original YM remains independently
+available for listening and register inspection.
+
 ## Limits
 
 The first transcription stage uses a frame grid and semitone pitch estimates.

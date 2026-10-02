@@ -133,6 +133,10 @@ The graphical editor renders WAVs in the background; choose the duration in
 
 ## YM reconstruction and composer profiles
 
+**Range / grid** selects the source frame interval and proposed row spacing.
+The default frame grid retains timing detail; coarser grids create fewer rows
+and can omit modulation within them. The analysis records this approximation.
+
 Reconstruction estimates notes, timbres and recurring 64-frame patterns. It
 cannot recover the original instrument names, private sequence definitions or
 pattern boundaries uniquely. A pitch change can be a new note, an arpeggio,

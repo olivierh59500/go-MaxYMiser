@@ -11,6 +11,8 @@ type Report struct {
 	Evidence                                 []Evidence
 	Frames, Instruments, Patterns, Positions int
 	Warnings                                 []string
+	StartFrame, EndFrame, FramesPerRow       int
+	GridCandidates                           []GridCandidate
 }
 type timbre struct {
 	Tone, Noise, Envelope bool

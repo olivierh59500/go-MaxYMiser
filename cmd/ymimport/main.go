@@ -15,6 +15,9 @@ func main() {
 	input := flag.String("input", "", "YM recording")
 	output := flag.String("output", "candidate.mys", "native output song")
 	profile := flag.String("profile", "", "composer corpus JSON")
+	start := flag.Int("start-frame", 0, "first reference frame to reconstruct")
+	end := flag.Int("end-frame", 0, "exclusive last frame; 0 uses the whole recording")
+	grid := flag.Int("row-frames", 1, "frames per proposed tracker row; 0 estimates a supported grid")
 	flag.Parse()
 	raw, err := os.ReadFile(*input)
 	if err != nil {
@@ -24,7 +27,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	candidate, report, err := ymimport.Reconstruct(trace)
+	candidate, report, err := ymimport.ReconstructSelection(trace, ymimport.ReconstructionOptions{StartFrame: *start, EndFrame: *end, FramesPerRow: *grid})
 	if err != nil {
 		log.Fatal(err)
 	}
