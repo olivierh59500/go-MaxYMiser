@@ -12,6 +12,8 @@ type SourceBankReport struct {
 	Warnings    []string       `json:"warnings"`
 }
 
+const sourceVolumeRangeReason = "volume program exceeds the native editable sequence range"
+
 // SourceVoiceBank translates known envelope, arpeggio and noise-attack behavior
 // to native editable sequences. Unsupported synthesis is explicit, not replaced
 // by a generic sound. The source ID maps to MaxYMiser's one-based ID+1.
@@ -65,7 +67,7 @@ func SourceVoiceBank(score SourceScore) (model.VoiceBank, SourceBankReport, erro
 				}
 			}
 			if value > 15 || int(volume.Length)+count > len(volume.Values) {
-				reason = "volume program exceeds the native editable sequence range"
+				reason = sourceVolumeRangeReason
 				break
 			}
 			// Native trigger preloads the first byte before decrementing its

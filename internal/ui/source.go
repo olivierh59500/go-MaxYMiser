@@ -146,6 +146,12 @@ func (a *App) drawSource(dst *ebiten.Image) {
 		if reason, ok := report.Bank.Unsupported[sound.ID]; ok {
 			state = reason
 		}
+		for _, id := range report.ScoreVolumeInstruments {
+			if sound.ID == id {
+				state = "volume in generated score / arpeggio in sound"
+				break
+			}
+		}
 		a.text(dst, fmt.Sprintf("%02X  settings % X  ·  %s", sound.ID, sound.Settings, state), 42, float64(391+n*26), 11, fg)
 	}
 	a.btn(dst, "Previous sounds", 42, 616, 176, 30, "source:previous", false)

@@ -8,17 +8,19 @@ import (
 )
 
 type SourceProjectReport struct {
-	Player               string           `json:"player"`
-	StartFrame           int              `json:"start_frame"`
-	EndFrame             int              `json:"end_frame"`
-	Events               int              `json:"events"`
-	Patterns             int              `json:"generated_patterns"`
-	Positions            int              `json:"positions"`
-	Bank                 SourceBankReport `json:"bank"`
-	UnsupportedEvents    int              `json:"unsupported_instrument_events"`
-	ModulationSegments   int              `json:"pitch_modulation_segments"`
-	UntranslatedCommands map[byte]int     `json:"untranslated_pattern_commands"`
-	Warnings             []string         `json:"warnings"`
+	Player                 string           `json:"player"`
+	StartFrame             int              `json:"start_frame"`
+	EndFrame               int              `json:"end_frame"`
+	Events                 int              `json:"events"`
+	Patterns               int              `json:"generated_patterns"`
+	Positions              int              `json:"positions"`
+	Bank                   SourceBankReport `json:"bank"`
+	UnsupportedEvents      int              `json:"unsupported_instrument_events"`
+	ModulationSegments     int              `json:"pitch_modulation_segments"`
+	ScoreVolumeInstruments []int            `json:"pattern_volume_instruments,omitempty"`
+	ScoreVolumeChanges     int              `json:"pattern_volume_changes,omitempty"`
+	UntranslatedCommands   map[byte]int     `json:"untranslated_pattern_commands"`
+	Warnings               []string         `json:"warnings"`
 }
 
 // SourceProject places verified source notes on a one-frame editable grid.
@@ -39,11 +41,12 @@ func SourceProject(score SourceScore, start, end int) (*model.Project, SourcePro
 	if positions > 255 {
 		return nil, report, fmt.Errorf("source: selected excerpt exceeds 255 arrangement positions")
 	}
-	bank, bankReport, err := SourceVoiceBank(score)
+	bank, bankReport, volumeInstruments, err := prepareSourceProjectBank(score)
 	if err != nil {
 		return nil, report, err
 	}
 	report.Bank = bankReport
+	report.ScoreVolumeInstruments = volumeInstruments
 	for id := range bankReport.Unsupported {
 		bank.Instruments[id].SetName(fmt.Sprintf("Source %02X ?", id))
 	}
@@ -114,6 +117,14 @@ func SourceProject(score SourceScore, start, end int) (*model.Project, SourcePro
 			}
 		}
 		report.Warnings = append(report.Warnings, "The excerpt's initial sounding notes restart their envelopes; the original earlier modulation phase is not restored.")
+	}
+	volumeChanges, err := applySourceVolume(score, rows, start, volumeInstruments)
+	if err != nil {
+		return nil, report, err
+	}
+	report.ScoreVolumeChanges = volumeChanges
+	if len(volumeInstruments) > 0 {
+		report.Warnings = append(report.Warnings, "Long ordinary-tone envelopes use exact pattern volume levels. These sound definitions need their generated score to retain envelope timing; standalone MYV preview holds a constant level.")
 	}
 	segments, err := applySourceModulation(score, rows, &bank, start)
 	if err != nil {

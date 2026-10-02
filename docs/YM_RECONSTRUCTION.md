@@ -103,11 +103,11 @@ An audit of the supplied Mad Max SNDH directory checked all 357 files, each with
 a distinct unpacked payload, against the source decoders with a 6,000-frame
 analysis limit. The current decoders extract 48 files: the two Last Ninja
 versions and 46 classic files from the Best in Galaxy collection. Of these,
-45 produce an editable 6,000-frame excerpt. Two excerpts contain source note
-127, whose current pitch interpretation lies outside the verified tracker
-mapping; one exceeds the native 240-pattern capacity. All three remain
-inspectable and can produce shorter editable ranges. A further classic file has an invalid
-arpeggio definition; 308 files use other player layouts. These counts describe
+44 produce an editable 6,000-frame excerpt with long-envelope conversion.
+Two excerpts contain source note 127, whose current pitch interpretation lies outside the verified tracker
+mapping; two exceed the native 240-pattern capacity. All four remain
+inspectable and can produce shorter editable ranges. A further classic file has
+an invalid arpeggio definition; 308 files use other player layouts. These counts describe
 source extraction and conversion coverage, not full audio fidelity or cross-song
 model accuracy.
 
@@ -142,14 +142,15 @@ Native execution verifies 223 Ace 2 and 289 Commando note triggers across 1,200
 calls each, including their timestamps, source offsets, instrument IDs and
 legato flags. Commando includes 27 fixed-pitch triggers. Sanxion Title stops at
 frame 8,628 in both implementations, with all following native volume registers
-zero. A separate pitch comparison checks 1,200 Ace 2 vibrato deltas after a
-native save/reload; it isolates modulation using a controlled constant-volume
-voice because that source instrument's long envelope is not yet converted.
+zero. Native save/reload and rendering now retain both the source instrument's
+long volume envelope and all 1,200 verified Ace 2 vibrato deltas, without a
+replacement constant-volume voice. A separate synthetic native score checks
+660 volume-register values through timed decay, legato and retrigger.
 
 The Ace 2 SNDH/YM pair aligns at two YM frames with 518/518 eligible tonal events
 agreeing. In the held-out chronological section, 228 of 302 known instrument
 events are labelled correctly, 73 remain unresolved and one accepted label is
-incorrect. This remains a same-song evaluation. Long envelopes, fixed-pitch
+incorrect. This remains a same-song evaluation. Fixed-pitch
 hardware programs and additional mixer/noise effects can remain unconverted;
 recognized source notes do not imply complete editable sound reproduction.
 
@@ -177,8 +178,9 @@ editable native MYS/MYV pair and writes a conversion report alongside it:
 The original source IDs remain in `source-labels.json`. Generated patterns use
 64 tracker rows at one source frame per row; they are not a recovery of the
 source player's variable-length pattern encoding. A shortened last pattern
-ends at the selected frame. Cropping a sounding note restarts its envelope;
-earlier modulation phase is not restored.
+ends at the selected frame. Cropping a sounding note restarts its instrument
+sequences; long envelopes represented by score volume retain their source
+volume phase. Earlier arpeggio/mixer phase is not restored.
 
 The graphical **Open** action also recognizes the supported source players. Its
 inspection view retains original labels even if the default excerpt cannot be
@@ -196,7 +198,9 @@ the selection boundary must have a verified mapping. Values are not clamped or
 substituted with arbitrary notes.
 
 In the supplied corpus, Crazy Comets and Sanxion Loader convert over frames
-`0:2000`, while Hunter Patrol converts over `0:3000`. These are editable excerpts
+`0:2000`, while Hunter Patrol and Geoff Capes Strongman convert over `0:3000`.
+Long-envelope volume commands make the latter's complete default excerpt exceed
+the native pattern capacity. These are editable excerpts
 with their normal unsupported-sound report; the shorter selections do not prove
 complete original sound or full-song conversion.
 
@@ -233,6 +237,33 @@ from MaxYMiser's base pitch table. These checks establish the modulation values
 and timing, not complete audio parity with the original song.
 Repeated zero arpeggio words are treated as a constant zero arpeggio too; their
 presence does not disable otherwise supported vibrato or pitch-slide conversion.
+
+### Long volume envelopes in the score
+
+Ordinary tone definitions whose expanded volume sequence exceeds 63 words can
+retain their complete envelope in the generated pattern volume column. Their
+bank definition holds level 15; native column attenuation writes exact source
+levels 0–15 at each required frame. This leaves the two effect columns available
+for independent pitch modulation and other commands.
+
+The source envelope's first value lasts N calls, later values last N+1, and the
+final value holds. Retrigger rewinds the pointer; legato reloads cadence without
+rewinding it. Classic `90` pauses the pointer and applies its separately timed
+volume decay. Cropped excerpts keep the source volume at their starting frame.
+Original source settings and envelope bytes remain unchanged in the inspection.
+
+The conversion report lists `pattern_volume_instruments` and the number of
+volume commands. The source view identifies these definitions as driven by
+their score. A standalone MYV cannot encode that longer envelope and its base
+preview holds a constant level; keep the generated MYS/MYV pair for playback.
+Other unsupported hardware programs remain silent and explicitly reported.
+Additional volume rows can increase the number of distinct native patterns;
+conversion rejects capacity overflow rather than dropping envelope changes.
+
+The first 6,000 Ace 2 frames now produce 92 patterns and 314 score-volume
+commands, with no note events using an unsupported definition in that excerpt.
+This verifies the translated volume/pitch behavior described above, not every
+original mixer/noise command or complete analog sound fidelity.
 
 With `-ym`, it first aligns source notes with the register recording. The
 search supports a recording lead-in and a constant pitch transposition, and

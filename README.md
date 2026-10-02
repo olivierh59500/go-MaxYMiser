@@ -106,6 +106,10 @@ source programs and period-table rounding still require work. **Save as** writes
 MYS/MYV pair, preserving the original executable. This is partial editable import,
 not complete playback of arbitrary Mad Max SNDH files.
 The decoded noise-attack programs also become editable mixer/noise sequences.
+Long ordinary-tone volume envelopes use the generated score's native volume
+column, retaining their independent timing, legato and retrigger behavior.
+The source view identifies these sounds; their standalone bank preview holds
+a constant volume, so their envelope playback requires the generated MYS/MYV pair.
 The standard Last Ninja bank currently translates all 32 definitions, including
 the two finite automatic drum-pitch programs. Other source layouts and period
 rounding remain outside a claim of complete original playback.
