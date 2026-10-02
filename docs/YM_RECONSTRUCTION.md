@@ -103,9 +103,10 @@ An audit of the supplied Mad Max SNDH directory checked all 357 files, each with
 a distinct unpacked payload, against the source decoders with a 6,000-frame
 analysis limit. The current decoders extract 48 files: the two Last Ninja
 versions and 46 classic files from the Best in Galaxy collection. Of these,
-45 produce an editable 6,000-frame excerpt. Two excerpts contain note commands
-without an assigned source instrument; one exceeds the native 240-pattern
-capacity and needs a shorter range. A further classic file has an invalid
+45 produce an editable 6,000-frame excerpt. Two excerpts contain source note
+127, whose current pitch interpretation lies outside the verified tracker
+mapping; one exceeds the native 240-pattern capacity. All three remain
+inspectable and can produce shorter editable ranges. A further classic file has an invalid
 arpeggio definition; 308 files use other player layouts. These counts describe
 source extraction and conversion coverage, not full audio fidelity or cross-song
 model accuracy.
@@ -179,13 +180,25 @@ source player's variable-length pattern encoding. A shortened last pattern
 ends at the selected frame. Cropping a sounding note restarts its envelope;
 earlier modulation phase is not restored.
 
-The graphical **Open** action also recognizes the supported source player. Its
-inspection view retains the current composition and audio until **Import editable
+The graphical **Open** action also recognizes the supported source players. Its
+inspection view retains original labels even if the default excerpt cannot be
+converted. The current composition and audio remain active until **Import editable
 excerpt** is selected. It lists raw base settings, converted sounds, unsupported
 definitions and untranslated commands. Source imports have an independent MYS/MYV
 save destination and retain no foreign executable as a MaxYMiser export template.
 Opening an unrelated native project, a YM or a new project clears the old source
 inspection. Dropped source SNDH files use the same inspection workflow.
+Conversion failures display their specific reason and replace the import button
+with **Choose another excerpt**. Selecting a valid range makes import available;
+an invalid selection retains the previous valid preview. Excluded out-of-range
+source pitches do not invalidate a selected interval, but a pitch sounding at
+the selection boundary must have a verified mapping. Values are not clamped or
+substituted with arbitrary notes.
+
+In the supplied corpus, Crazy Comets and Sanxion Loader convert over frames
+`0:2000`, while Hunter Patrol converts over `0:3000`. These are editable excerpts
+with their normal unsupported-sound report; the shorter selections do not prove
+complete original sound or full-song conversion.
 
 For the first 6,000 standard Last Ninja frames, conversion produces 114 generated
 patterns and 94 order positions. Saving and reloading the native

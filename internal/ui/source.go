@@ -18,15 +18,32 @@ func (a *App) inspectSource(raw []byte, path string) error {
 	if err != nil {
 		return err
 	}
+	a.inspectDecodedSource(score, path)
+	return nil
+}
+
+// Recognized source data remain inspectable when the selected native excerpt
+// cannot be encoded. Failed conversion never becomes an importable preview.
+func (a *App) inspectDecodedSource(score ymimport.SourceScore, path string) {
 	p, report, err := ymimport.SourceProject(score, 0, score.Frames)
-	if err != nil {
-		return err
-	}
 	a.sourceScore, a.sourcePreview, a.sourceReport = &score, p, &report
 	a.sourcePath, a.sourcePage = path, 0
+	a.sourceConversionError = ""
 	a.tab = "YM"
 	a.status = fmt.Sprintf("Recognized %s; source labels are available; current composition retained", score.Player)
-	return nil
+	if err != nil {
+		a.sourcePreview = nil
+		a.sourceConversionError = err.Error()
+		// Capacity or pitch failures can occur before a bank report is built.
+		// Original sound definitions remain useful independently of the excerpt.
+		if report.Bank.Unsupported == nil {
+			_, bankReport, bankErr := ymimport.SourceVoiceBank(score)
+			if bankErr == nil {
+				report.Bank = bankReport
+			}
+		}
+		a.status = "Source data recognized; choose another excerpt: " + err.Error()
+	}
 }
 
 func (a *App) sourceAction(action string) bool {
@@ -34,6 +51,7 @@ func (a *App) sourceAction(action string) bool {
 	case "source:close":
 		a.sourceScore, a.sourcePreview, a.sourceReport = nil, nil, nil
 		a.sourcePath = ""
+		a.sourceConversionError = ""
 	case "source:previous":
 		a.sourcePage = max(0, a.sourcePage-1)
 	case "source:next":
@@ -47,6 +65,10 @@ func (a *App) sourceAction(action string) bool {
 		}
 	case "source:import":
 		if a.sourcePreview == nil || a.sourceReport == nil {
+			a.status = "Choose a convertible source excerpt before importing"
+			if a.sourceConversionError != "" {
+				a.status += ": " + a.sourceConversionError
+			}
 			return true
 		}
 		p := a.sourcePreview.Clone()
@@ -86,6 +108,7 @@ func (a *App) sourceModal(modal, entry string) bool {
 		return true
 	}
 	a.sourcePreview, a.sourceReport = p, &report
+	a.sourceConversionError = ""
 	a.status = "Source excerpt updated; current composition retained"
 	return true
 }
@@ -95,12 +118,19 @@ func (a *App) drawSource(dst *ebiten.Image) {
 	a.text(dst, "SNDH SOURCE DATA · "+filepath.Base(a.sourcePath), 42, 212, 17, fg)
 	a.text(dst, fmt.Sprintf("%s · %d source patterns · %d original instrument IDs", score.Player, len(score.Patterns), len(score.Instruments)), 42, 251, 12, accent)
 	a.btn(dst, fmt.Sprintf("Excerpt %d:%d", report.StartFrame, report.EndFrame), 42, 279, 204, 32, "source:range", false)
-	a.btn(dst, "Import editable excerpt", 260, 279, 254, 32, "source:import", false)
+	if a.sourcePreview != nil {
+		a.btn(dst, "Import editable excerpt", 260, 279, 254, 32, "source:import", false)
+	} else {
+		a.btn(dst, "Choose another excerpt", 260, 279, 254, 32, "source:range", false)
+	}
 	a.btn(dst, "Close source", 1060, 279, 160, 32, "source:close", false)
 	a.text(dst, fmt.Sprintf("%d translated sounds · %d unsupported · %d affected note events", len(report.Bank.Converted), len(report.Bank.Unsupported), report.UnsupportedEvents), 42, 330, 13, purple)
 	detail := "Unsupported definitions stay silent. Pattern effects and some modulation are not converted."
 	if report.ModulationSegments > 0 {
 		detail = fmt.Sprintf("%d pitch segments · vibrato/slide for ordinary tones; unsupported programs stay silent.", report.ModulationSegments)
+	}
+	if a.sourceConversionError != "" {
+		detail = a.sourceConversionError
 	}
 	a.text(dst, detail, 42, 358, 12, dim)
 	for n := 0; n < 8; n++ {
@@ -110,6 +140,9 @@ func (a *App) drawSource(dst *ebiten.Image) {
 		}
 		sound := score.Instruments[index]
 		state := "translated volume / arpeggio"
+		if report.Bank.Unsupported == nil {
+			state = "original definition retained; conversion unavailable"
+		}
 		if reason, ok := report.Bank.Unsupported[sound.ID]; ok {
 			state = reason
 		}

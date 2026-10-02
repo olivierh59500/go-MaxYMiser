@@ -19,8 +19,9 @@ replay validation and hardware-specific integration.
 
 Source extraction covers the verified Last Ninja and classic Best in Galaxy
 player families. The current Mad Max audit decodes 48/357 supplied SNDH files;
-45 produce an editable 6,000-frame excerpt. Other layouts, unassigned initial
-instruments and native capacity limits remain explicit. See
+45 produce an editable 6,000-frame excerpt; the remaining three stay inspectable
+and support shorter valid selections. Other layouts, unverified pitch mappings
+and native capacity limits remain explicit. See
 [YM reconstruction](YM_RECONSTRUCTION.md) for the measured scope.
 
 Native register evidence currently includes 8,778 complete replay calls across

@@ -111,3 +111,32 @@ func TestSourceExcerptRejectsInvalidEventsAndNativeCapacityOverflow(t *testing.T
 		t.Fatal("native arrangement capacity overflow was accepted")
 	}
 }
+
+func TestSourceExcerptCanExcludeAnUnrepresentableSourcePitch(t *testing.T) {
+	score, err := DecodeSource(sourceFixture(), 0, 25)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := range score.Events {
+		if score.Events[i].Frame == 6 {
+			score.Events[i].Note = 139
+		}
+	}
+	if _, _, err := SourceProject(score, 0, 6); err != nil {
+		t.Fatalf("an excluded source pitch prevented a valid earlier excerpt: %v", err)
+	}
+	if _, _, err := SourceProject(score, 6, 12); err == nil {
+		t.Fatal("an unrepresentable pitch was silently clamped inside the excerpt")
+	}
+	if _, _, err := SourceProject(score, 8, 12); err == nil {
+		t.Fatal("an unrepresentable held pitch was copied to the selection boundary")
+	}
+	p, _, err := SourceProject(score, 12, 20)
+	if err != nil {
+		t.Fatalf("a preceding source pitch prevented a valid later excerpt: %v", err)
+	}
+	cell := p.Song.Patterns[p.Song.Orders[0][0]][0]
+	if cell.Note != 88 || cell.Instrument != 4 {
+		t.Fatal("later excerpt lost its first valid source note and instrument")
+	}
+}

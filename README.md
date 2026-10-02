@@ -89,12 +89,16 @@ has been decoded. Source decoders cover the Mad Max Last Ninja player and a
 verified classic player used by Best in Galaxy; see
 [YM reconstruction](docs/YM_RECONSTRUCTION.md) for commands,
 verification results and the current scope.
-Opening a convertible SNDH recognized by these source decoders displays its original note and
+Opening a SNDH recognized by these source decoders displays its original note and
 instrument identifiers in **YM → SNDH source data**. Inspection preserves the
 current composition and playback. The view lists translated definitions,
 unsupported synthesis and untranslated pattern commands before **Import editable
 excerpt** replaces the score. **Excerpt start:end** selects a range within the
 first 6,000 decoded frames; longer analysis is available through `ympair`.
+If the default excerpt exceeds native capacity or contains an unverified pitch,
+its source definitions remain visible and **Choose another excerpt** selects a
+convertible interval. Failed conversion preserves the current composition and
+never becomes an importable preview.
 Imported source notes use a one-frame grid with generated 64-row patterns.
 Unsupported sounds remain silent and named with `?`. Native vibrato and pitch
 slide are translated for ordinary tones with a constant zero arpeggio; other

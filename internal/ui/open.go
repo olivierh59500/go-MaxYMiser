@@ -49,6 +49,7 @@ func (a *App) OpenMusic(path string) error {
 func (a *App) acceptVoiceBank(bank model.VoiceBank, path string) {
 	a.sourceScore, a.sourcePreview, a.sourceReport = nil, nil, nil
 	a.sourcePath = ""
+	a.sourceConversionError = ""
 	a.remember()
 	a.synth.CloseYM()
 	a.synth.Edit(func(e *replay.Engine) { e.Stop(); e.Project.Bank = bank })
@@ -61,6 +62,7 @@ func (a *App) acceptProject(p *model.Project, path, savePath string) {
 	a.collectionSource = nil
 	a.sourceScore, a.sourcePreview, a.sourceReport = nil, nil, nil
 	a.sourcePath = ""
+	a.sourceConversionError = ""
 	reloaded := a.reloadConfiguration(&p.Song)
 	var subtunes []native.EmbeddedProject
 	if strings.EqualFold(filepath.Ext(path), ".snd") || strings.EqualFold(filepath.Ext(path), ".sndh") {

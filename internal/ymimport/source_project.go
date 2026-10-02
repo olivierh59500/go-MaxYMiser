@@ -64,7 +64,7 @@ func SourceProject(score SourceScore, start, end int) (*model.Project, SourcePro
 			return nil, report, fmt.Errorf("source: invalid event channel, frame or ordering")
 		}
 		lastFrame[event.Channel] = event.Frame
-		if !event.Rest && (event.Instrument < 0 || event.Instrument >= len(score.Instruments) || score.Instruments[event.Instrument].ID != event.Instrument || event.Note < 2 || event.Note > 127) {
+		if !event.Rest && (event.Instrument < 0 || event.Instrument >= len(score.Instruments) || score.Instruments[event.Instrument].ID != event.Instrument) {
 			return nil, report, fmt.Errorf("source: event references an invalid note or instrument")
 		}
 		if event.Frame < start {
@@ -73,6 +73,9 @@ func SourceProject(score SourceScore, start, end int) (*model.Project, SourcePro
 		}
 		if event.Frame >= end {
 			continue
+		}
+		if !event.Rest && (event.Note < 2 || event.Note > 127) {
+			return nil, report, fmt.Errorf("source: pitch %d at frame %d has no verified tracker mapping; choose a range without it", event.Note, event.Frame)
 		}
 		cell := &rows[event.Frame-start][event.Channel]
 		if event.Rest {
@@ -101,6 +104,9 @@ func SourceProject(score SourceScore, start, end int) (*model.Project, SourcePro
 		}
 		for channel, e := range held {
 			if e != nil && !e.Rest && rows[0][channel].Note == 0 {
+				if e.Note < 2 || e.Note > 127 {
+					return nil, report, fmt.Errorf("source: the pitch sounding on channel %d at the excerpt start has no verified tracker mapping; choose another start frame", channel)
+				}
 				rows[0][channel] = model.Cell{Note: byte(e.Note), Instrument: byte(e.Instrument + 1)}
 				if _, unsupported := bankReport.Unsupported[e.Instrument]; unsupported {
 					report.UnsupportedEvents++

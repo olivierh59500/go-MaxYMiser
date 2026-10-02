@@ -58,6 +58,7 @@ type App struct {
 	sourcePreview                                                      *model.Project
 	sourceReport                                                       *ymimport.SourceProjectReport
 	sourcePath                                                         string
+	sourceConversionError                                              string
 	sourcePage                                                         int
 	ymPath                                                             string
 	ymReport                                                           *ymimport.Report
@@ -1243,6 +1244,7 @@ func (a *App) action(name string) {
 		a.collectionSource = nil
 		a.sourceScore, a.sourcePreview, a.sourceReport = nil, nil, nil
 		a.sourcePath = ""
+		a.sourceConversionError = ""
 		a.subtunes = nil
 		a.subtuneIndex = 0
 		if _, ok := a.synth.Reference(); ok {
@@ -1775,6 +1777,7 @@ func (a *App) loadYMBytes(data []byte) error {
 	}
 	a.sourceScore, a.sourcePreview, a.sourceReport = nil, nil, nil
 	a.sourcePath = ""
+	a.sourceConversionError = ""
 	a.ymData = append([]byte(nil), data...)
 	if strings.EqualFold(filepath.Ext(a.projectPath), ".ym") {
 		a.projectPath = ""

@@ -3,6 +3,7 @@ package ui
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/olivierh59500/go-MaxYMiser/internal/model"
@@ -82,5 +83,61 @@ func TestSourceImportCreatesAnIndependentEditablePairAndKeepsOriginalLabels(t *t
 	app.action("new")
 	if app.sourceScore != nil || app.sourcePreview != nil {
 		t.Fatal("new project retained a stale source view")
+	}
+}
+
+func TestRecognizedSourceWithFailedConversionRemainsInspectable(t *testing.T) {
+	app := sourceInspectionApp(t)
+	score := *app.sourceScore
+	score.Events = append([]ymimport.SourceEvent(nil), score.Events...)
+	score.Events[1].Note = 139
+	app.synth.Edit(func(e *replay.Engine) { e.Play(false) })
+	app.inspectDecodedSource(score, "restricted-pitch.sndh")
+	e, _ := app.synth.Snapshot()
+	if app.sourceScore == nil || app.sourcePreview != nil || app.sourceReport == nil || app.sourceConversionError == "" || app.tab != "YM" {
+		t.Fatal("failed excerpt conversion discarded the recognized source inspection")
+	}
+	if e.Project.Title != "First signal" || !e.Playing || app.projectPath != "current.mys" || app.dirty {
+		t.Fatal("source inspection changed the editable composition or playback")
+	}
+	app.action("source:import")
+	if !strings.Contains(app.status, "Choose a convertible source excerpt") || app.dirty {
+		t.Fatal("failed conversion became importable or lacked an explanation")
+	}
+	app.action("source:range")
+	app.entry = "0:6"
+	app.applyModal()
+	if app.sourcePreview == nil || app.sourceConversionError != "" || app.sourceReport.EndFrame != 6 {
+		t.Fatalf("a valid shorter selection could not replace the failed preview: %s", app.status)
+	}
+	app.action("source:import")
+	if !app.dirty || app.projectPath != "" {
+		t.Fatal("the recovered excerpt did not enter the independent native editing workflow")
+	}
+}
+
+func TestSourceCapacityFailureKeepsItsBankAndRecoversWithAShorterRange(t *testing.T) {
+	app := sourceInspectionApp(t)
+	score := *app.sourceScore
+	score.Frames = 256 * model.Rows
+	app.inspectDecodedSource(score, "long-source.sndh")
+	if app.sourceScore == nil || app.sourcePreview != nil || app.sourceReport == nil || len(app.sourceReport.Bank.Converted) != 1 || app.sourceConversionError == "" {
+		t.Fatal("capacity failure hid the original sound definitions")
+	}
+	app.action("source:range")
+	app.entry = "0:128"
+	app.applyModal()
+	if app.sourcePreview == nil || app.sourceConversionError != "" {
+		t.Fatalf("source capacity failure could not recover through selection: %s", app.status)
+	}
+	app.sourceConversionError = "old conversion error"
+	app.action("source:close")
+	if app.sourceScore != nil || app.sourceReport != nil || app.sourceConversionError != "" {
+		t.Fatal("closing the source retained stale conversion state")
+	}
+	app.sourceConversionError = "old conversion error"
+	app.action("new")
+	if app.sourceConversionError != "" {
+		t.Fatal("a new project retained a source conversion error")
 	}
 }
