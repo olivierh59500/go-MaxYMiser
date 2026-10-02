@@ -49,12 +49,13 @@ type PairValidation struct {
 }
 
 type SourceEvidence struct {
-	Channel    int     `json:"channel"`
-	Start      int     `json:"ym_start_frame"`
-	End        int     `json:"ym_end_frame"`
-	Instrument int     `json:"source_instrument"`
-	Distance   float64 `json:"feature_distance"`
-	Margin     float64 `json:"runner_up_distance_margin"`
+	Channel        int      `json:"channel"`
+	Start          int      `json:"ym_start_frame"`
+	End            int      `json:"ym_end_frame"`
+	Instrument     int      `json:"source_instrument"`
+	Distance       float64  `json:"feature_distance"`
+	Margin         float64  `json:"runner_up_distance_margin"`
+	TrainingGroups []string `json:"supporting_composition_groups,omitempty"`
 }
 
 func tracePitch(trace Trace, ch, at int) (int, bool) {
@@ -329,7 +330,8 @@ func (p PairedProfile) MatchSource(features []int16) (int, float64, float64, boo
 	if math.IsInf(second, 1) {
 		margin = 100
 	}
-	return id, best, margin, id >= 0 && best <= 3 && margin >= 0.15
+	supported := p.Corpus == nil || p.Corpus.MinimumGroups <= 1 || id >= 0 && id < len(p.Corpus.InstrumentGroups) && len(p.Corpus.InstrumentGroups[id]) >= p.Corpus.MinimumGroups
+	return id, best, margin, supported && id >= 0 && best <= 3 && margin >= 0.15
 }
 
 // SourceEvidence applies learned labels to independently detected YM events.
@@ -343,7 +345,11 @@ func (p PairedProfile) SourceEvidence(trace Trace) []SourceEvidence {
 		for _, e := range ExtractEvents(trace, ch) {
 			id, distance, margin, ok := p.MatchSource(e.Features)
 			if ok {
-				results = append(results, SourceEvidence{ch, e.Start, e.End, id, distance, margin})
+				evidence := SourceEvidence{Channel: ch, Start: e.Start, End: e.End, Instrument: id, Distance: distance, Margin: margin}
+				if p.Corpus != nil && id < len(p.Corpus.InstrumentGroups) {
+					evidence.TrainingGroups = append([]string(nil), p.Corpus.InstrumentGroups[id]...)
+				}
+				results = append(results, evidence)
 			}
 		}
 	}
@@ -414,6 +420,21 @@ func LoadPairedProfile(path string) (PairedProfile, error) {
 				return p, fmt.Errorf("pair: invalid or duplicate corpus instrument identity")
 			}
 			seen[key] = true
+		}
+		if p.Corpus.MinimumGroups < 0 || p.Corpus.MinimumGroups > 256 || len(p.Corpus.InstrumentGroups) != 0 && len(p.Corpus.InstrumentGroups) != len(p.Source.Instruments) {
+			return p, fmt.Errorf("pair: invalid corpus definition support")
+		}
+		for _, groups := range p.Corpus.InstrumentGroups {
+			seen := map[string]bool{}
+			for _, group := range groups {
+				if !containsGroup(p.Corpus.Groups, group) || seen[group] {
+					return p, fmt.Errorf("pair: unknown or duplicate supporting composition")
+				}
+				seen[group] = true
+			}
+		}
+		if len(p.Corpus.InstrumentGroups) == 0 {
+			p.Warnings = appendUnique(p.Warnings, "This legacy corpus profile lacks per-definition composition support; retrain it to use a stricter support threshold.")
 		}
 	}
 	return p, nil

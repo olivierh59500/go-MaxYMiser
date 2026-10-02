@@ -28,10 +28,12 @@ type PairedCorpusSource struct {
 // Corpus instrument IDs identify complete definitions shared by a player
 // family. File offsets, bank-local IDs and resolved arpeggio IDs are excluded.
 type PairedCorpusInfo struct {
-	Clock          uint32               `json:"chip_clock_hz"`
-	Groups         []string             `json:"training_composition_groups"`
-	Sources        []PairedCorpusSource `json:"training_sources"`
-	InstrumentKeys []string             `json:"instrument_definition_sha256"`
+	Clock            uint32               `json:"chip_clock_hz"`
+	Groups           []string             `json:"training_composition_groups"`
+	Sources          []PairedCorpusSource `json:"training_sources"`
+	InstrumentKeys   []string             `json:"instrument_definition_sha256"`
+	InstrumentGroups [][]string           `json:"instrument_composition_groups,omitempty"`
+	MinimumGroups    int                  `json:"minimum_supporting_compositions,omitempty"`
 }
 
 type CrossSongCounts struct {
@@ -55,12 +57,13 @@ type CrossSongFold struct {
 }
 
 type CrossSongReport struct {
-	Version      int                  `json:"version"`
-	Pairs        []PairedCorpusSource `json:"verified_pairs"`
-	Folds        []CrossSongFold      `json:"leave_one_composition_out"`
-	SourceBounds CrossSongCounts      `json:"total_source_boundaries"`
-	YMOnsets     CrossSongCounts      `json:"total_independent_ym_onsets"`
-	Warnings     []string             `json:"warnings"`
+	Version       int                  `json:"version"`
+	MinimumGroups int                  `json:"minimum_supporting_compositions,omitempty"`
+	Pairs         []PairedCorpusSource `json:"verified_pairs"`
+	Folds         []CrossSongFold      `json:"leave_one_composition_out"`
+	SourceBounds  CrossSongCounts      `json:"total_source_boundaries"`
+	YMOnsets      CrossSongCounts      `json:"total_independent_ym_onsets"`
+	Warnings      []string             `json:"warnings"`
 }
 
 type preparedPair struct {
@@ -186,6 +189,10 @@ func trainPreparedPairs(pairs []preparedPair, recipes bool) (PairedProfile, erro
 				i.ID, i.Offset, i.Arpeggio.Offset = id, 0, 0
 				p.Source.Instruments = append(p.Source.Instruments, i)
 				p.Corpus.InstrumentKeys = append(p.Corpus.InstrumentKeys, key)
+				p.Corpus.InstrumentGroups = append(p.Corpus.InstrumentGroups, nil)
+			}
+			if !containsGroup(p.Corpus.InstrumentGroups[id], pair.song.Group) {
+				p.Corpus.InstrumentGroups[id] = append(p.Corpus.InstrumentGroups[id], pair.song.Group)
 			}
 			local[f.event.Instrument] = id
 			featureKey := fmt.Sprint(id) + ":" + signature("source", f.features)
@@ -219,12 +226,25 @@ func trainPreparedPairs(pairs []preparedPair, recipes bool) (PairedProfile, erro
 		p.Corpus.Groups = append(p.Corpus.Groups, group)
 	}
 	sort.Strings(p.Corpus.Groups)
+	for _, groups := range p.Corpus.InstrumentGroups {
+		sort.Strings(groups)
+	}
 	p.Warnings = []string{
 		"Instrument labels identify complete definitions within this player family, not bank-local instrument numbers.",
 		"This profile contains no source-score times or original pattern IDs for any target recording.",
 		"Whole-composition validation is separate from this model trained on all listed groups; see the corpus evaluation report.",
+		"Per-definition composition support is retained separately from feature similarity; raising the required support can reduce both false labels and coverage.",
 	}
 	return p, nil
+}
+
+func containsGroup(groups []string, target string) bool {
+	for _, group := range groups {
+		if group == target {
+			return true
+		}
+	}
+	return false
 }
 
 // LearnPairedCorpus trains only from the explicitly supplied recordings. Source
@@ -336,7 +356,16 @@ func evaluatePreparedPair(p PairedProfile, pair preparedPair) (CrossSongCounts, 
 // group. Classification at known source boundaries is reported separately from
 // end-to-end recognition using YM-only event detection.
 func ValidatePairedCorpus(songs []PairedSong, progress func(string)) (CrossSongReport, error) {
-	report := CrossSongReport{Version: 1}
+	return ValidatePairedCorpusWithSupport(songs, 1, progress)
+}
+
+// ValidatePairedCorpusWithSupport applies the selected independent-composition
+// support threshold to every held-out fold, including missing/rejected labels.
+func ValidatePairedCorpusWithSupport(songs []PairedSong, minimum int, progress func(string)) (CrossSongReport, error) {
+	report := CrossSongReport{Version: 1, MinimumGroups: minimum}
+	if minimum < 1 || minimum > 256 {
+		return report, fmt.Errorf("corpus: supporting composition threshold must be 1–256")
+	}
 	pairs, err := preparePairs(songs)
 	if err != nil {
 		return report, err
@@ -365,6 +394,7 @@ func ValidatePairedCorpus(songs []PairedSong, progress func(string)) (CrossSongR
 		if err != nil {
 			return report, err
 		}
+		p.Corpus.MinimumGroups = minimum
 		fold := CrossSongFold{HeldOutGroup: held, Training: p.Corpus.Groups}
 		for _, pair := range pairs {
 			if pair.song.Group != held {

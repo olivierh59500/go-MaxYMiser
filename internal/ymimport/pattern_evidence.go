@@ -21,6 +21,7 @@ type PatternEvidence struct {
 	Patterns []int   `json:"possible_source_patterns"`
 	Distance float64 `json:"feature_distance"`
 	Known    bool    `json:"known_source_pair,omitempty"`
+	Motif    int     `json:"repeated_ym_phrase,omitempty"`
 }
 
 type PatternValidation struct {

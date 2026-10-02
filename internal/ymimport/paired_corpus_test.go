@@ -142,3 +142,64 @@ func TestCrossSongCountsIncludeUnknownAcceptedDefinitions(t *testing.T) {
 		t.Fatalf("unknown source definitions were hidden: %+v", report.SourceBounds)
 	}
 }
+
+func TestCorpusSupportCountsCompositionsInsteadOfRecordingVariants(t *testing.T) {
+	songs := []PairedSong{corpusPairFixture("alpha", 0, false), corpusPairFixture("alpha", 1, false), corpusPairFixture("beta", 2, false)}
+	p, err := LearnPairedCorpus(songs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, groups := range p.Corpus.InstrumentGroups {
+		if len(groups) != 2 || groups[0] != "alpha" || groups[1] != "beta" {
+			t.Fatal("arrangements of one composition inflated support:", groups)
+		}
+	}
+	features := p.Prototypes[0].Features
+	p.Corpus.MinimumGroups = 2
+	if _, _, _, ok := p.MatchSource(features); !ok {
+		t.Fatal("independently supported sound was rejected")
+	}
+	id := p.Prototypes[0].Instrument
+	p.Corpus.InstrumentGroups[id] = []string{"alpha"}
+	if _, _, _, ok := p.MatchSource(features); ok {
+		t.Fatal("single-composition sound passed stricter support")
+	}
+	p.Corpus.MinimumGroups = 1
+	if _, _, _, ok := p.MatchSource(features); !ok {
+		t.Fatal("default policy changed existing similarity candidates")
+	}
+}
+
+func TestStrictCorpusValidationReportsLostCoverageAndUnknownRejections(t *testing.T) {
+	songs := []PairedSong{corpusPairFixture("alpha", 0, false), corpusPairFixture("beta", 1, false)}
+	songs[1].Score.Instruments[0].Settings[4]++
+	r, err := ValidatePairedCorpusWithSupport(songs, 2, nil)
+	if err != nil || r.MinimumGroups != 2 || r.SourceBounds.Known == 0 || r.SourceBounds.Unknown == 0 || r.SourceBounds.Abstained != r.SourceBounds.Known || r.SourceBounds.UnknownAccepted != 0 {
+		t.Fatalf("strict rejection hid lost coverage: %+v, %v", r, err)
+	}
+}
+
+func TestCorpusSupportProvenanceSurvivesReloadAndRejectsForgedGroups(t *testing.T) {
+	p, err := LearnPairedCorpus([]PairedSong{corpusPairFixture("alpha", 0, false), corpusPairFixture("beta", 1, false)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	p.Corpus.MinimumGroups = 2
+	path := filepath.Join(t.TempDir(), "supported.json")
+	if err := SavePairedProfile(p, path); err != nil {
+		t.Fatal(err)
+	}
+	loaded, err := LoadPairedProfile(path)
+	if err != nil || loaded.Corpus.MinimumGroups != 2 || len(loaded.Corpus.InstrumentGroups[0]) != 2 {
+		t.Fatalf("support policy or provenance was lost: %v", err)
+	}
+	for _, bad := range [][]string{{"alpha", "alpha"}, {"invented"}} {
+		p.Corpus.InstrumentGroups[0] = bad
+		if err := SavePairedProfile(p, path); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := LoadPairedProfile(path); err == nil {
+			t.Fatal("invalid independent-composition support was accepted")
+		}
+	}
+}

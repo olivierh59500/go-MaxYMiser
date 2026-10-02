@@ -137,3 +137,13 @@ retunes all held voices on the same call, with pitch-only events preserving
 envelope/modulation phase. Two constructed fixtures each retain 24 original
 native-call pitch-table comparisons. Other player families remain outside this
 verified source import, including additional Last Ninja subtunes.
+
+YM reconstruction retains direct tone-period curves in editable V sequences,
+with transactional capacity checks and sampled-grid timing. Two real excerpts
+retain 6,674 active tone-period comparisons after MYS/MYV save/reload. Repeated
+melody/rhythm candidates also appear without a source profile, reusing the
+cross-recording matcher rather than inferring original pattern identities.
+Corpus sound labels now retain independent-composition support and an optional
+minimum threshold, with the same policy in complete held-out evaluation. The
+five-composition strict result abstains on every known definition; its loss of
+coverage remains explicit rather than being reported as improved accuracy.

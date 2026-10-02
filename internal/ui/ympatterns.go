@@ -40,13 +40,13 @@ func (a *App) ymPatternAction(action string) bool {
 }
 
 func (a *App) drawYMPatterns(dst *ebiten.Image) {
-	title := "SOURCE PATTERN CANDIDATES"
+	title := "PHRASE AND SOURCE PATTERN CANDIDATES"
 	if a.ymReport != nil && a.ymReport.KnownSourcePair {
 		title = "PATTERNS FROM THE PAIRED SOURCE"
 	}
 	a.text(dst, title, 42, 303, 15, fg)
 	if a.ymReport == nil || len(a.ymReport.SourcePatterns) == 0 {
-		a.text(dst, "Load a paired profile, then Reconstruct to search for known source phrases.", 42, 351, 12, dim)
+		a.text(dst, "Reconstruct to find repeated YM melodies. A paired profile also proposes source patterns.", 42, 351, 12, dim)
 		return
 	}
 	hits := a.ymReport.SourcePatterns
@@ -65,11 +65,14 @@ func (a *App) drawYMPatterns(dst *ebiten.Image) {
 		if hit.Known {
 			label = fmt.Sprintf("%s  %5d:%5d  source %s  paired recording", []string{"A", "B", "C"}[hit.Channel], hit.Start, hit.End, strings.Join(ids, " / "))
 		}
+		if hit.Motif != 0 {
+			label = fmt.Sprintf("%s  %5d:%5d  repeated YM phrase %02d  rhythm difference %.3f", []string{"A", "B", "C"}[hit.Channel], hit.Start, hit.End, hit.Motif, hit.Distance)
+		}
 		a.btn(dst, label, 42, 343+n*37, 1152, 33, fmt.Sprintf("ym:pattern-hit:%d", id), false)
 	}
-	instruction := "Click a passage to hear the original YM. Multiple IDs mean the source pattern is ambiguous."
+	instruction := "Click to hear the original YM. Repeated phrase IDs belong to this analysis; source IDs may be ambiguous."
 	if a.ymReport.KnownSourcePair {
-		instruction = "Click a passage to hear the paired recording. Source IDs are known; time ranges use the profile alignment."
+		instruction = "Click to hear the YM. Paired source IDs are known; repeated phrase IDs belong to this analysis."
 	}
 	a.text(dst, instruction, 42, 590, 12, dim)
 	a.btn(dst, "Previous", 42, 625, 142, 30, "ym:patterns-prev", false)

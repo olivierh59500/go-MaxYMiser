@@ -94,6 +94,7 @@ func main() {
 	frames := flag.Int("frames", 6000, "decoded source frame limit for each recording")
 	output := flag.String("output", "cross-song-report.json", "whole-composition validation report")
 	modelPath := flag.String("model", "", "optional corpus profile for YM reconstruction in the tracker")
+	minimum := flag.Int("min-compositions", 1, "independent training compositions required for a sound label")
 	flag.Parse()
 	if *manifestPath == "" {
 		log.Fatal("manifest is required")
@@ -102,7 +103,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	report, err := ymimport.ValidatePairedCorpus(songs, func(group string) { fmt.Printf("Held out: %s\n", group) })
+	report, err := ymimport.ValidatePairedCorpusWithSupport(songs, *minimum, func(group string) { fmt.Printf("Held out: %s\n", group) })
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -112,6 +113,7 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
+		model.Corpus.MinimumGroups = *minimum
 	}
 	if err := writeJSON(*output, report); err != nil {
 		log.Fatal(err)

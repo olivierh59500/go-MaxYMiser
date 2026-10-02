@@ -39,6 +39,12 @@ func ApplyPairedRecipes(project *model.Project, report *Report, trace Trace, pro
 		report.Warnings = appendUnique(report.Warnings, "Corpus sound labels are experimental similarity candidates; an unseen native definition can resemble a stored sound.")
 	}
 	known, matched := profile.KnownPatternEvidence(trace, report.StartFrame, report.EndFrame)
+	var repeated []PatternEvidence
+	for _, hit := range report.SourcePatterns {
+		if hit.Motif != 0 {
+			repeated = append(repeated, hit)
+		}
+	}
 	if matched {
 		report.SourcePatterns = known
 		report.KnownSourcePair = true
@@ -49,6 +55,7 @@ func ApplyPairedRecipes(project *model.Project, report *Report, trace Trace, pro
 			report.SourcePatterns[i].End += report.StartFrame
 		}
 	}
+	report.SourcePatterns = append(report.SourcePatterns, repeated...)
 	if report.FramesPerRow != 1 {
 		report.Warnings = appendUnique(report.Warnings, "Source instrument recipes require the one-frame reconstruction grid; labels remain available on coarser grids.")
 		return nil
@@ -189,6 +196,7 @@ func ApplyPairedRecipes(project *model.Project, report *Report, trace Trace, pro
 			}
 		}
 		report.RecipeApplications = append(report.RecipeApplications, RecipeApplication{label.Instrument, int(id), label.Channel, label.Start, label.Start + length, before, after})
+		report.ExactTonePeriods = false
 	}
 	report.Instruments, report.Patterns = used, len(project.Song.Patterns)
 	if len(report.RecipeApplications) > 0 {

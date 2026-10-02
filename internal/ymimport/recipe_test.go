@@ -8,6 +8,20 @@ import (
 	"github.com/olivierh59500/go-MaxYMiser/internal/replay"
 )
 
+// Recipe insertion also accepts edited or legacy scores without direct pitch
+// curves. Remove those curves to exercise its improvement path independently.
+func roundedRecipeCandidate(p *model.Project, report *Report) {
+	for i := range p.Song.Patterns {
+		for row := range p.Song.Patterns[i] {
+			cell := &p.Song.Patterns[i][row]
+			if cell.Effect1 == 'V' {
+				cell.Effect1, cell.Parameter1 = 0, 0
+			}
+		}
+	}
+	report.ExactTonePeriods = false
+}
+
 func TestPairedRecipeFitsLearnedPeriodTrajectoryAtOtherOctaves(t *testing.T) {
 	for _, scale := range []float64{0.5, 2} {
 		trace, _ := Decode(simpleYM3(8))
@@ -30,6 +44,7 @@ func TestPairedRecipeFitsLearnedPeriodTrajectoryAtOtherOctaves(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		roundedRecipeCandidate(p, &report)
 		if err := ApplyPairedRecipes(p, &report, trace, profile); err != nil {
 			t.Fatal(err)
 		}
@@ -77,6 +92,7 @@ func TestPairedRecipesImprovePitchWithoutChangingLevelOrSharedOccurrences(t *tes
 	if err != nil {
 		t.Fatal(err)
 	}
+	roundedRecipeCandidate(p, &report)
 	before, _ := reconstructionFrames(p, 128)
 	if err := ApplyPairedRecipes(p, &report, trace, profile); err != nil {
 		t.Fatal(err)

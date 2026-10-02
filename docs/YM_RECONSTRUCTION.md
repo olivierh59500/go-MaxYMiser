@@ -577,3 +577,49 @@ second-song fixture verifies another 24 calls, its independent three-call step
 speed and selected note periods. These compare source interpretation against
 the original period table; existing Go/source period-rounding and unsupported
 hardware-program limits remain unchanged. The executable remains local.
+
+## Register pitch curves and repeated YM phrases
+
+Reconstruction keeps readable note columns and adds editable `V` sequences for
+the difference between each rounded note and the recorded tone period. At the
+one-frame grid, the target is the recorded period, converted to the Go chip's
+2 MHz clock. Curve changes preserve timing across shared pattern occurrences,
+note triggers and native MYS/MYV save/reload. Coarser grids hold each sampled
+period for the chosen number of calls; they still omit modulation between rows.
+The report's `ExactTonePeriods` identifies successful direct curve retention,
+not complete waveform reconstruction. Applying a learned replacement clears
+that flag because its sound follows a separately measured approximation.
+
+Curve allocation is transactional. Native pattern/sequence capacity or an
+unrepresentable period leaves the original rounded-note candidate intact and
+adds a warning. Hardware envelopes, timer effects and DigiDrums retain the
+previous scope; tone-period preservation does not recover those programs.
+Two 1,200-frame real excerpts, Warhawk and Commando, respectively retain 3,404
+and 3,270 active tone-period comparisons after native-pair save/reload.
+
+The Patterns view also finds repeated eight-note melodies without a paired
+source profile. It reuses the cross-recording interval/rhythm matcher, including
+transposition and tempo variants, excluding held tones, generic scales and
+overlapping windows on one voice. The local phrase IDs belong to this analysis;
+they are not claimed as original tracker pattern IDs. Clicking a passage seeks
+the unchanged YM reference. Warhawk and Commando expose 176 and 122 detected
+passages in these excerpts; those counts are similarity evidence, not a verified
+original arrangement.
+
+## Independent composition support
+
+Corpus profiles retain the independent composition groups supporting each full
+instrument definition. Several recordings of one composition count once. Each
+proposed label carries that provenance separately from feature distance and
+runner-up margin. Profile loading validates supporting groups and duplicate
+entries; older profiles remain readable with an explicit provenance warning.
+
+`ympaircorpus -min-compositions 2` requires two independent training compositions
+before accepting a sound label. The default is one, preserving earlier similarity
+candidates. Evaluation uses the same policy in every complete held-out fold.
+On the existing five-composition corpus, the default retains 89/207 known source
+events and 643 accepted unfamiliar-definition events. Requiring two accepts
+neither known nor unfamiliar definitions: all 207 known events are abstained.
+This stricter policy loses all measured known-label coverage here, so it is an
+optional conservative filter rather than evidence of better recognition.
+More independent training compositions are needed to establish useful transfer.

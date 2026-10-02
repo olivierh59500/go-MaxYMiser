@@ -101,6 +101,9 @@ go run ./cmd/maxymiser -defaults /path/to/native-workspace \
   distinct from known source IDs. On the one-frame grid, labelled
   instrument recipes are retained where their measured replay improves the
   candidate while preserving its volume accuracy.
+  Direct tone-period curves retain pitch between rounded semitones as editable
+  sequences. The Patterns view also proposes repeating YM melodies without a
+  source profile; its local phrase IDs are distinct from original pattern IDs.
 - **Settings**: playback rate, speed, edit step, octave, volume, timer mask,
   saved Jam mode, one/two-voice/native-rate PCM modes, native CNF exchange and
   macOS MIDI input.

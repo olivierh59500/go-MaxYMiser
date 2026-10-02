@@ -20,6 +20,7 @@ type Report struct {
 	RecipeApplications                       []RecipeApplication
 	SourcePatterns                           []PatternEvidence
 	KnownSourcePair                          bool
+	ExactTonePeriods                         bool
 }
 type timbre struct {
 	Tone, Noise, Envelope bool
@@ -157,6 +158,12 @@ func Reconstruct(trace Trace) (*model.Project, Report, error) {
 	report.Warnings = appendUnique(report.Warnings, "Notes and repeated 64-frame patterns are inferred; they are not the original tracker structure.")
 	if trace.Effects {
 		report.Warnings = appendUnique(report.Warnings, "DigiDrums and timer effects remain in the YM reference and are not recovered as source instruments.")
+	}
+	if exact, err := preserveToneCurves(p, trace); err == nil {
+		p, report.ExactTonePeriods = exact, true
+		report.Patterns = len(p.Song.Patterns)
+	} else {
+		report.Warnings = appendUnique(report.Warnings, "Exact tone-period curves were not retained: "+err.Error())
 	}
 	return p, report, nil
 }

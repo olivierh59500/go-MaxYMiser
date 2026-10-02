@@ -87,9 +87,22 @@ func ReconstructSelection(trace Trace, options ReconstructionOptions) (*model.Pr
 		return nil, report, err
 	}
 	project.Song.SetSpeed(step)
+	if report.ExactTonePeriods {
+		for i := range project.Bank.Instruments {
+			project.Bank.Instruments[i][32] = byte(step)
+		}
+	}
 	report.Frames = end - start
 	report.StartFrame, report.EndFrame, report.FramesPerRow = start, end, step
 	report.GridCandidates = EstimateGrid(trace)
+	phrases := trace
+	phrases.Frames = trace.Frames[start:end]
+	report.SourcePatterns = RepeatedPhrases(phrases)
+	for i := range report.SourcePatterns {
+		report.SourcePatterns[i].Start += start
+		report.SourcePatterns[i].End += start
+	}
+	report.SourceLabelRate = trace.Rate
 	if step > 1 {
 		report.Warnings = appendUnique(report.Warnings, fmt.Sprintf("Proposed %d-frame row grid samples register states; modulation within rows may differ from the original YM.", step))
 	}
