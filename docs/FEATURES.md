@@ -6,7 +6,7 @@ replay validation and hardware-specific integration.
 
 | Area | Implemented | Remaining verification or work |
 | --- | --- | --- |
-| Tracker | Three YM voices, two PCM voices, both effect columns, live/step note entry, copy/paste, undo/redo | Block operations, row insertion/removal, pattern transposition and instrument remapping |
+| Tracker | Three YM voices, two PCM voices, both effect columns, live/step note entry, masked block cut/copy/paste, paste modes, row insert/delete, expand/shrink, transpose/remap, undo/redo | Song-wide remapping and additional editing shortcuts |
 | Arrangement | Independent pattern lists, length/repeat, position selection, Jam markers | More live resequencing scenarios and MIDI next-pattern controllers |
 | Instruments | 32 definitions, scalar/mask editing, linked sequence values, individual MYI exchange | More native MYI legacy/sample fixtures, copy/remap convenience |
 | Sequences | 256 sequences, length/repeat, generation, signed values, copying and morphing | Range modification and additional shortcuts |

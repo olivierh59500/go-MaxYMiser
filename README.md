@@ -35,6 +35,8 @@ trying the editor. External MaxYMiser files are not needed to launch it.
 - **Samples**: eight banks of signed PCM, with raw PCM and 8/16-bit WAV import,
   gain, tuning with interpolation, trimming, sign conversion, PCM save and
   independent preview.
+- **Edit**: row ranges, masked block copy/cut/paste with overwrite/overlay/underlay,
+  row insertion/deletion, expand/shrink, transposition, attenuation and sound remap.
 - **YM**: original YM playback, live register inspection and proposed tracker
   reconstruction, with optional composer-corpus evidence.
 - **Settings**: playback rate, speed, edit step, octave, volume, timer mask,
@@ -60,7 +62,9 @@ synthesizer output.
 | Open / save | Ctrl+O / Ctrl+S |
 | Undo / redo | Ctrl+Z / Ctrl+Y |
 | Jam mode | F10 |
-| Copy / paste pattern | Ctrl+C / Ctrl+V |
+| Copy / paste selected row range | Ctrl+C / Ctrl+V |
+| Cut selected row range | Ctrl+X |
+| Insert / delete row | Insert / Delete |
 
 Instrument and sequence values use hexadecimal notation. Playback settings use
 decimal notation. Notes entered during playback and recording target the
@@ -75,6 +79,10 @@ Sample preview uses the Go PCM voice and native note-rate table: 8287 Hz at C3
 and 16574 Hz at C4. Notes above the native range wrap down by octaves.
 Title and artist are runtime/export metadata; the separate native MYS/MYV format
 does not contain SNDH title/artist tags.
+The **Edit** workspace applies operations to the pattern selected in **Patterns**.
+Full-track copy/paste starts at row zero; smaller blocks paste at the cursor.
+Expand/shrink keep displaced rows in the block clipboard. PCM transposition and
+remapping operate on both sample voices and preserve their volume columns.
 
 ## Native files and audio
 

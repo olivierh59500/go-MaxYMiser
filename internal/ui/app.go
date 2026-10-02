@@ -53,6 +53,10 @@ type App struct {
 	undo, redo                                                         []*model.Project
 	copied                                                             model.Pattern
 	hasCopy                                                            bool
+	blockClipboard                                                     []model.Cell
+	blockFirst, blockLast                                              int
+	pasteMode                                                          edit.PasteMode
+	columnMask                                                         edit.ColumnMask
 	synth                                                              *replay.Synth
 	view                                                               model.Project
 	generatorLow, generatorHigh, generatorCycles, morphDestination     string
@@ -81,6 +85,7 @@ func New(p *model.Project, projectPath string, mute bool) (*App, error) {
 	a := &App{synth: replay.NewSynth(replay.New(p), 48000), font: face, projectPath: projectPath, status: "Ready · Space plays · Enter edits · Ctrl+S saves", tab: "Patterns", midiData: make(chan []byte, 64), exportResults: make(chan error, 1), octave: 4, step: 1, directory: "."}
 	a.generatorLow, a.generatorHigh, a.generatorCycles = "0000", "000F", "1"
 	a.generatorShape, a.morphDestination = edit.Ramp, "03"
+	a.blockLast, a.pasteMode, a.columnMask = 63, edit.Overwrite, edit.AllColumns
 	if !mute {
 		context := audio.CurrentContext()
 		if context == nil {
@@ -146,9 +151,9 @@ func (a *App) Draw(dst *ebiten.Image) {
 	a.btn(dst, "Stop", 952, 20, 74, 36, "stop", false)
 	a.btn(dst, "Record", 1034, 20, 90, 36, "record", a.editing)
 	a.btn(dst, "Export", 1132, 20, 122, 36, "export", false)
-	tabs := []string{"Patterns", "Song", "Instruments", "Sequences", "Samples", "YM", "Settings", "Help"}
+	tabs := []string{"Patterns", "Song", "Instruments", "Sequences", "Samples", "Edit", "YM", "Settings", "Help"}
 	for i, name := range tabs {
-		a.btn(dst, name, 24+i*154, 88, 144, 36, "tab:"+name, a.tab == name)
+		a.btn(dst, name, 24+i*137, 88, 127, 36, "tab:"+name, a.tab == name)
 	}
 	rect(dst, 24, 136, 1232, 44, panel)
 	a.text(dst, p.Title, 38, 147, 16, fg)
@@ -165,6 +170,8 @@ func (a *App) Draw(dst *ebiten.Image) {
 		a.drawSequences(dst, &e)
 	case "Samples":
 		a.drawSamples(dst, &e)
+	case "Edit":
+		a.drawPatternTools(dst, &e)
 	case "YM":
 		a.drawYM(dst)
 	case "Settings":
@@ -546,14 +553,15 @@ func (a *App) keyboard() {
 			return
 		}
 		if inpututil.IsKeyJustPressed(ebiten.KeyC) {
-			a.synth.Edit(func(e *replay.Engine) { a.copied = e.Project.Song.Patterns[a.pattern]; a.hasCopy = true })
-			a.status = "Pattern copied"
+			a.patternAction("block-copy")
 			return
 		}
-		if inpututil.IsKeyJustPressed(ebiten.KeyV) && a.hasCopy {
-			a.remember()
-			a.synth.Edit(func(e *replay.Engine) { e.Project.Song.Patterns[a.pattern] = a.copied })
-			a.dirty = true
+		if inpututil.IsKeyJustPressed(ebiten.KeyV) {
+			a.patternAction("block-paste")
+			return
+		}
+		if inpututil.IsKeyJustPressed(ebiten.KeyX) {
+			a.patternAction("block-cut")
 			return
 		}
 		if inpututil.IsKeyJustPressed(ebiten.KeyS) {
@@ -563,6 +571,15 @@ func (a *App) keyboard() {
 			a.action("open")
 		}
 		return
+	}
+	if a.tab != "Patterns" {
+		return
+	}
+	if inpututil.IsKeyJustPressed(ebiten.KeyInsert) {
+		a.patternAction("row-insert")
+	}
+	if inpututil.IsKeyJustPressed(ebiten.KeyDelete) {
+		a.patternAction("row-delete")
 	}
 	if inpututil.IsKeyJustPressed(ebiten.KeyF10) {
 		a.action("jam")
@@ -617,7 +634,7 @@ func (a *App) keyboard() {
 			}
 		}
 	}
-	if a.field > 0 && a.editing {
+	if a.field > 0 && a.editing && !(a.channel == 3 && a.field == 3) {
 		for _, r := range ebiten.AppendInputChars(nil) {
 			a.enterField(r)
 		}
@@ -676,7 +693,7 @@ func (a *App) editCell(fn func(*model.Cell)) {
 	a.dirty = true
 }
 func (a *App) enterField(r rune) {
-	if a.field == 3 || a.field == 5 {
+	if a.channel < 3 && (a.field == 3 || a.field == 5) {
 		r = []rune(strings.ToUpper(string(r)))[0]
 		if r >= '0' && r <= 'Z' {
 			a.editCell(func(c *model.Cell) {
@@ -703,6 +720,10 @@ func (a *App) enterField(r rune) {
 			target = &c.Volume
 		case 4:
 			target = &c.Parameter1
+		case 5:
+			if a.channel == 3 {
+				target = &c.Effect2
+			}
 		case 6:
 			target = &c.Parameter2
 		}
@@ -714,7 +735,7 @@ func (a *App) enterField(r rune) {
 		} else {
 			*target = (*target & 240) | byte(value)
 		}
-		if a.field == 2 {
+		if a.field == 2 || a.channel == 3 && a.field == 5 {
 			*target = byte(value)
 			if *target == 0 {
 				*target = 16
@@ -727,6 +748,9 @@ func (a *App) enterField(r rune) {
 	}
 }
 func (a *App) action(name string) {
+	if a.patternAction(name) {
+		return
+	}
 	if a.soundAction(name) {
 		return
 	}
@@ -952,9 +976,11 @@ func (a *App) action(name string) {
 	case "pat:-":
 		a.pattern = max(0, a.pattern-1)
 	case "clear-pattern":
+		a.remember()
 		a.synth.Edit(func(e *replay.Engine) { e.Project.Song.Patterns[a.pattern] = model.Pattern{} })
 		a.dirty = true
 	case "copy-pattern":
+		a.remember()
 		a.synth.Edit(func(e *replay.Engine) {
 			if len(e.Project.Song.Patterns) < 240 {
 				e.Project.Song.Patterns = append(e.Project.Song.Patterns, e.Project.Song.Patterns[a.pattern])
@@ -1042,6 +1068,9 @@ func (a *App) save(path string) {
 func (a *App) applyModal() {
 	modal, entry := a.modal, strings.TrimSpace(a.entry)
 	a.modal = ""
+	if a.patternModal(modal, entry) {
+		return
+	}
 	if a.soundModal(modal, entry) {
 		return
 	}
