@@ -54,3 +54,12 @@ converted/failed source previews and the complete collection export controls.
 Sequence help text and long status messages were adjusted to preserve readable
 clipboard and transport controls. These checks verify those editor workflows;
 they do not extend the hardware or source-player coverage stated above.
+
+The latest native-instrument allocation and direct sample-length changes have
+passed their backend regression checks with the race detector and compile into
+the application. Their two newest UI regressions remain pending while the
+macOS session is locked. The current final backend check also passes `go vet`,
+re-verifies all 8,778 example replay calls and retains the SNDH corpus totals:
+689 editable imports, 869 subtunes and 658 unchanged single-song export/reload
+checks. The previously reported corpus issues and hardware limits remain open
+compatibility boundaries rather than evidence of complete Atari emulation.
