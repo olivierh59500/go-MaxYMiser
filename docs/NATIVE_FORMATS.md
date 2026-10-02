@@ -86,6 +86,12 @@ Optimized wrappers can place tracker data before or after the complete bank.
 The importer locates actual sample boundaries through relative pointers and
 validates candidate song/bank pairs. `DecodeContainers` exposes independently
 editable subtunes; `DecodeContainer` selects the first accepted pair.
+Copying selectors can arrange songs differently from physical payload order.
+The importer recognizes a bounded 68000 instruction sequence and validates
+every table target against a decoded bank before adopting the original order.
+An unresolved, duplicate or out-of-file target leaves the generic decoded
+ordering unchanged. Native payload counts and header-declared song counts
+remain distinct, especially for collections mixing several replay formats.
 
 ### Native SNDH export
 

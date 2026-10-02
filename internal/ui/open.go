@@ -71,7 +71,7 @@ func (a *App) acceptProject(p *model.Project, path, savePath string) {
 	a.initializeSubtuneWorkspaces()
 	a.status = fmt.Sprintf("Loaded %s · %d patterns · %d native subtune(s)", filepath.Base(path), len(p.Song.Patterns), max(1, len(subtunes)))
 	if declared := native.DeclaredSubtunes(p.ReplaySource); declared > len(subtunes) {
-		a.status += fmt.Sprintf(" · header declares %d songs; some payloads need another selector layout", declared)
+		a.status += fmt.Sprintf(" · header declares %d songs; some use another player or an unsupported layout", declared)
 	}
 	if reloaded {
 		a.status += " · personal configuration reapplied"

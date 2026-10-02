@@ -51,6 +51,7 @@ func DecodeContainers(data []byte) ([]EmbeddedProject, error) {
 		return nil, fmt.Errorf("native: container has no editable voice bank/song")
 	}
 	var projects []EmbeddedProject
+	var bankStarts []int
 	var firstError error
 	usedSongs := map[int]bool{}
 	for _, inst := range insts {
@@ -166,6 +167,7 @@ func DecodeContainers(data []byte) ([]EmbeddedProject, error) {
 				continue
 			}
 			projects = append(projects, EmbeddedProject{Song: song, Bank: voice, Title: containerText(plain, "TITL"), Author: containerText(plain, "COMM")})
+			bankStarts = append(bankStarts, start)
 			usedSongs[songAt] = true
 			if len(insts) > 1 {
 				break
@@ -178,9 +180,10 @@ func DecodeContainers(data []byte) ([]EmbeddedProject, error) {
 		}
 		return nil, fmt.Errorf("native: unsupported MaxYMiser payload layout")
 	}
+	projects = reorderCopySelector(plain, projects, bankStarts)
 	for i := range projects {
 		projects[i].Subtune = i + 1
-		projects[i].Subtunes = len(projects)
+		projects[i].Subtunes = max(len(projects), DeclaredSubtunes(plain))
 	}
 	return projects, nil
 }

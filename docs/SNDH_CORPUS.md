@@ -77,6 +77,14 @@ with six; Randomazer declares nine with eight; PHF Rally 2 declares two with one
 Selector aliases, cue positions or unsupported payloads require further native
 analysis. These collections are imported partially and recorded as such.
 
+Nano Cave's initializer has an explicit native payload table for songs 1–6.
+These table slots use a different order from the physical bank layout. The
+importer now follows the validated relative table and exposes those six songs
+with their original numbering. Song 7 branches to a separate replay routine
+whose music is not a MaxYMiser payload, so it remains outside editable import.
+PHF Rally 2's first bank has displaced empty-sample pointers and nonzero data
+between its sequence records and song header; that layout remains unresolved.
+
 A multi-song executable prefix cannot safely export one replacement song while
 its selector retains references to discarded songs. Single-song template
 validation now rejects both declared and physically detected multi-song
