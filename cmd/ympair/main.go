@@ -7,8 +7,11 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/olivierh59500/go-MaxYMiser/internal/native"
+	"github.com/olivierh59500/go-MaxYMiser/internal/project"
 	"github.com/olivierh59500/go-MaxYMiser/internal/ymimport"
 )
 
@@ -19,6 +22,9 @@ func main() {
 	frames := flag.Int("frames", 6000, "source timeline frame limit")
 	output := flag.String("output", "source-score.json", "source labels JSON")
 	bankPath := flag.String("bank", "", "export translated native MYV square/envelope/arpeggio instruments")
+	scorePath := flag.String("score", "", "native MYS/MYV source-note excerpt with a conversion report")
+	startFrame := flag.Int("start-frame", 0, "first source frame in the editable excerpt")
+	endFrame := flag.Int("end-frame", 0, "exclusive final source frame; zero uses the decoded limit")
 	flag.Parse()
 	raw, err := os.ReadFile(*source)
 	if err != nil {
@@ -73,6 +79,24 @@ func main() {
 			log.Fatal(err)
 		}
 		fmt.Printf("Translated %d source instruments; %d unsupported definitions retained in the source report\n", len(report.Converted), len(report.Unsupported))
+	}
+	if *scorePath != "" {
+		p, report, err := ymimport.SourceProject(score, *startFrame, *endFrame)
+		if err != nil {
+			log.Fatal(err)
+		}
+		p.Title = strings.TrimSuffix(filepath.Base(*source), filepath.Ext(*source)) + " excerpt"
+		if err := project.Save(p, *scorePath); err != nil {
+			log.Fatal(err)
+		}
+		data, err := json.MarshalIndent(report, "", "  ")
+		if err != nil {
+			log.Fatal(err)
+		}
+		if err := os.WriteFile(*scorePath+".analysis.json", append(data, '\n'), 0644); err != nil {
+			log.Fatal(err)
+		}
+		fmt.Printf("Editable source excerpt: %d:%d frames, %d generated patterns, %d unsupported instrument events; see conversion report\n", report.StartFrame, report.EndFrame, report.Patterns, report.UnsupportedEvents)
 	}
 	notes := 0
 	for _, event := range score.Events {

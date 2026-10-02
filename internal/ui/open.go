@@ -33,6 +33,13 @@ func (a *App) OpenMusic(path string) error {
 	}
 	p, err := project.Load(path, "")
 	if err != nil {
+		if strings.EqualFold(filepath.Ext(path), ".snd") || strings.EqualFold(filepath.Ext(path), ".sndh") {
+			if raw, e := os.ReadFile(path); e == nil {
+				if e := a.inspectSource(raw, path); e == nil {
+					return nil
+				}
+			}
+		}
 		return err
 	}
 	a.acceptProject(p, path, path)
@@ -40,6 +47,8 @@ func (a *App) OpenMusic(path string) error {
 }
 
 func (a *App) acceptVoiceBank(bank model.VoiceBank, path string) {
+	a.sourceScore, a.sourcePreview, a.sourceReport = nil, nil, nil
+	a.sourcePath = ""
 	a.remember()
 	a.synth.CloseYM()
 	a.synth.Edit(func(e *replay.Engine) { e.Stop(); e.Project.Bank = bank })
@@ -49,6 +58,8 @@ func (a *App) acceptVoiceBank(bank model.VoiceBank, path string) {
 }
 
 func (a *App) acceptProject(p *model.Project, path, savePath string) {
+	a.sourceScore, a.sourcePreview, a.sourceReport = nil, nil, nil
+	a.sourcePath = ""
 	reloaded := a.reloadConfiguration(&p.Song)
 	var subtunes []native.EmbeddedProject
 	if strings.EqualFold(filepath.Ext(path), ".snd") || strings.EqualFold(filepath.Ext(path), ".sndh") {

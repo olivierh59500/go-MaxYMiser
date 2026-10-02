@@ -33,11 +33,16 @@ func main() {
 	}
 	p := model.Demo()
 	var err error
+	inspectSourceAtStartup := false
 	isYM := *song != "" && strings.EqualFold(filepath.Ext(*song), ".ym")
 	if !isYM && (*song != "" || *bank != "") {
 		p, err = project.Load(*song, *bank)
 		if err != nil {
-			log.Fatal(err)
+			if !*info && *wav == "" && *bank == "" && (strings.EqualFold(filepath.Ext(*song), ".sndh") || strings.EqualFold(filepath.Ext(*song), ".snd")) {
+				p, inspectSourceAtStartup = model.Demo(), true
+			} else {
+				log.Fatal(err)
+			}
 		}
 	}
 	if *info {
@@ -73,12 +78,21 @@ func main() {
 		}
 		return
 	}
-	app, err := ui.New(p, *song, *mute)
+	projectPath := *song
+	if inspectSourceAtStartup {
+		projectPath = ""
+	}
+	app, err := ui.New(p, projectPath, *mute)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 	defer app.Close()
+	if inspectSourceAtStartup {
+		if err := app.OpenMusic(*song); err != nil {
+			log.Fatal(err)
+		}
+	}
 	if *ymLibrary != "" {
 		if err = app.SetYMLibrary(*ymLibrary); err != nil {
 			log.Fatal(err)

@@ -66,6 +66,13 @@ func (a *App) OpenDroppedMusic(files fs.FS) error {
 	default:
 		p, err := project.LoadFS(files, path, "")
 		if err != nil {
+			if strings.EqualFold(filepath.Ext(path), ".snd") || strings.EqualFold(filepath.Ext(path), ".sndh") {
+				if raw, e := fs.ReadFile(files, path); e == nil {
+					if e := a.inspectSource(raw, path); e == nil {
+						return nil
+					}
+				}
+			}
 			return err
 		}
 		a.acceptProject(p, path, "")

@@ -88,6 +88,17 @@ Their own music data can still support reconstruction after the player format
 has been decoded. The first paired source decoder covers the Mad Max Last Ninja
 player; see [YM reconstruction](docs/YM_RECONSTRUCTION.md) for commands,
 verification results and the current scope.
+Opening a SNDH recognized by this source decoder displays its original note and
+instrument identifiers in **YM → SNDH source data**. Inspection preserves the
+current composition and playback. The view lists translated definitions,
+unsupported synthesis and untranslated pattern commands before **Import editable
+excerpt** replaces the score. **Excerpt start:end** selects a range within the
+first 6,000 decoded frames; longer analysis is available through `ympair`.
+Imported source notes use a one-frame grid with generated 64-row patterns.
+Unsupported sounds remain silent and named with `?`; source effect programs and
+some modulation still require translation. **Save as** writes a separate native
+MYS/MYV pair, preserving the original executable. This is partial editable import,
+not complete playback of arbitrary Mad Max SNDH files.
 Dropping a MYS and its matching MYV uses the same validated opening workflow.
 Both files are decoded before changing the composition or its playback; dropped
 files use **Save as** rather than treating virtual paths as filesystem targets.

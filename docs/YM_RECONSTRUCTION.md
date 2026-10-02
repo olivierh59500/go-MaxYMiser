@@ -114,7 +114,39 @@ remain external local inputs; they are not included in the repository.
    -paired-profile last-ninja-paired.json -output candidate.mys
 ```
 
-Without `-ym`, `ympair` exports only the native source tables and timeline.
+Without `-ym`, the JSON output retains the native source tables and timeline.
+The optional `-score` output translates the selected source-note excerpt to an
+editable native MYS/MYV pair and writes a conversion report alongside it:
+
+```sh
+ go run ./cmd/ympair -sndh /path/to/Last_Ninja.sndh -frames 6000 \
+   -start-frame 0 -end-frame 6000 -score source-excerpt.mys \
+   -output source-labels.json
+```
+
+The original source IDs remain in `source-labels.json`. Generated patterns use
+64 tracker rows at one source frame per row; they are not a recovery of the
+source player's variable-length pattern encoding. A shortened last pattern
+ends at the selected frame. Cropping a sounding note restarts its envelope;
+earlier modulation phase is not restored.
+
+The graphical **Open** action also recognizes the supported source player. Its
+inspection view retains the current composition and audio until **Import editable
+excerpt** is selected. It lists raw base settings, converted sounds, unsupported
+definitions and untranslated commands. Source imports have an independent MYS/MYV
+save destination and retain no foreign executable as a MaxYMiser export template.
+Opening an unrelated native project, a YM or a new project clears the old source
+inspection. Dropped source SNDH files use the same inspection workflow.
+
+For the first 6,000 standard Last Ninja frames, conversion produces 57 generated
+patterns, 94 order positions and 17 sequences. Saving and reloading the native
+pair retains all 1,561 note/rest events, including their source instrument IDs
+and timestamps, with an exact 120-second excerpt traversal. Of these events,
+192 notes use the eight unsupported source sounds. Pattern commands 82 and 84
+remain untranslated. These data checks do not establish complete sound fidelity:
+unsupported definitions stay silent and marked `?`, while the translated sounds
+retain the base volume/arpeggio behavior described below.
+
 With `-ym`, it first aligns source notes with the register recording. The
 search supports a recording lead-in and a constant pitch transposition, and
 requires at least 20 tonal events with 90% pitch agreement. It does not assume

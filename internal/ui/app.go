@@ -53,6 +53,11 @@ type App struct {
 	drumKeyboard                                                       bool
 	corpus                                                             *ymimport.Corpus
 	pairedProfile                                                      *ymimport.PairedProfile
+	sourceScore                                                        *ymimport.SourceScore
+	sourcePreview                                                      *model.Project
+	sourceReport                                                       *ymimport.SourceProjectReport
+	sourcePath                                                         string
+	sourcePage                                                         int
 	ymPath                                                             string
 	ymReport                                                           *ymimport.Report
 	ymPatternView                                                      bool
@@ -936,6 +941,9 @@ func (a *App) enterField(r rune) {
 	}
 }
 func (a *App) action(name string) {
+	if a.modal == "" && a.sourceAction(name) {
+		return
+	}
 	if a.modal == "" && a.midiClockAction(name) {
 		return
 	}
@@ -1201,6 +1209,8 @@ func (a *App) action(name string) {
 	case "bank:1":
 		a.instrument = 16 + a.instrument%16
 	case "new":
+		a.sourceScore, a.sourcePreview, a.sourceReport = nil, nil, nil
+		a.sourcePath = ""
 		a.subtunes = nil
 		a.subtuneIndex = 0
 		if _, ok := a.synth.Reference(); ok {
@@ -1398,6 +1408,9 @@ func (a *App) applyModal() {
 	}
 	modal, entry := a.modal, strings.TrimSpace(a.entry)
 	a.modal = ""
+	if a.sourceModal(modal, entry) {
+		return
+	}
 	if a.midiClockModal(modal, entry) {
 		return
 	}
@@ -1728,6 +1741,8 @@ func (a *App) loadYMBytes(data []byte) error {
 	if err := a.synth.LoadYM(data); err != nil {
 		return err
 	}
+	a.sourceScore, a.sourcePreview, a.sourceReport = nil, nil, nil
+	a.sourcePath = ""
 	a.ymData = append([]byte(nil), data...)
 	if strings.EqualFold(filepath.Ext(a.projectPath), ".ym") {
 		a.projectPath = ""
@@ -1740,6 +1755,10 @@ func (a *App) loadYMBytes(data []byte) error {
 }
 func (a *App) drawYM(dst *ebiten.Image) {
 	rect(dst, 24, 192, 1232, 482, panel)
+	if a.sourceScore != nil && a.sourceReport != nil {
+		a.drawSource(dst)
+		return
+	}
 	r, ok := a.synth.Reference()
 	if !ok {
 		a.text(dst, "Open a .ym file to listen and inspect the YM2149 registers.", 42, 222, 16, fg)
