@@ -14,7 +14,7 @@ replay validation and hardware-specific integration.
 | Native files | MYS/MYV lossless example round trips, MYI0–3 decode, MYI3 export, own SNDH import/export using a local replay template, ICE packing/unpacking verified against Atari routines | More cross-version fixtures |
 | YM | YM Player reference playback, register inspector, candidate score, composer corpus and cross-arrangement comparison | Musical-grid reconstruction, improved modulation/envelope hypotheses and reconstruction selection ranges |
 | Replay | Sequences, commands, native frequency/DAC tables, timer waveforms, PCM note rates/modes | Broader full-song and mixed-timer evidence; sample-grid timer scheduling remains distinct from cycle-exact hardware |
-| MIDI | macOS notes, program changes, controllers, transport, external clock/SPP, native channel mapping, duplicate-channel voice allocation and DMA input voices | Output ports and Sync24 hardware |
+| MIDI | macOS notes, program changes, controllers, transport, external clock/SPP, native channel mapping, duplicate-channel voice allocation, DMA input/output voices and selected CoreMIDI output ports | Physical Sync24 hardware; tighter output timestamp scheduling |
 | Workflow | Resizable modern interface, drag/drop, file browser, native save, asynchronous WAV export with selectable duration | Richer contextual help |
 
 Native register evidence currently includes 8,778 complete replay calls across

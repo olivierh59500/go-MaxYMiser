@@ -51,6 +51,11 @@ type App struct {
 	ymPath                                                             string
 	ymReport                                                           *ymimport.Report
 	midiInput                                                          *midi.Input
+	midiOutput                                                         *midi.Output
+	midiDestinations                                                   []midi.Destination
+	midiMessages                                                       [256]replay.MIDIMessage
+	subtunes                                                           []native.EmbeddedProject
+	subtuneIndex                                                       int
 	midiData                                                           chan []byte
 	midiDecoder                                                        midi.Decoder
 	undo, redo                                                         []*model.Project
@@ -106,6 +111,11 @@ func New(p *model.Project, projectPath string, mute bool) (*App, error) {
 	return a, nil
 }
 func (a *App) Close() {
+	if a.midiOutput != nil {
+		a.synth.EnableMIDIOutput(false)
+		a.flushMIDIOutput()
+		a.midiOutput.Close()
+	}
 	if a.midiInput != nil {
 		a.midiInput.Close()
 	}
@@ -317,6 +327,9 @@ func (a *App) drawSong(dst *ebiten.Image, e *replay.Engine) {
 			a.btn(dst, fmt.Sprintf("%02X", p.Song.Orders[pos][ch]), 160+ch*248, y, 206, 22, fmt.Sprintf("order:%d:%d", pos, ch), false)
 		}
 	}
+	if len(a.subtunes) > 1 {
+		a.btn(dst, fmt.Sprintf("Subtune %d / %d", a.subtuneIndex+1, len(a.subtunes)), 942, 636, 284, 28, "subtune-next", false)
+	}
 }
 func (a *App) drawInstruments(dst *ebiten.Image, e *replay.Engine) {
 	p := e.Project
@@ -418,6 +431,7 @@ func (a *App) drawSettings(dst *ebiten.Image, e *replay.Engine) {
 	a.btn(dst, "Jam mode", 860, 372, 156, 38, "jam", e.Jam)
 	a.btn(dst, "MIDI clock", 1030, 372, 168, 38, "midi-clock", e.ExternalClock)
 	a.btn(dst, "MIDI input", 670, 372, 180, 38, "midi", a.midiInput != nil)
+	a.btn(dst, "MIDI output", 670, 236, 180, 30, "midi-output", a.midiOutput != nil)
 	modes := []string{"Disabled", "One voice", "Two voices", "Native STe rate", "MIDI output"}
 	mode := int(e.Project.Song.State[49])
 	if mode >= len(modes) {
@@ -451,10 +465,19 @@ func (a *App) drawModal(dst *ebiten.Image) {
 	rect(dst, 248, 292, 784, 58, bg)
 	a.text(dst, a.entry, 260, 312, 15, accent)
 	a.text(dst, "Enter confirms · Escape cancels", 250, 376, 13, dim)
+	if a.modal == "MIDI output destination (number)" {
+		for i, item := range a.midiDestinations {
+			if i >= 4 {
+				break
+			}
+			a.text(dst, fmt.Sprintf("%d  %s", i+1, item.Name), 250, float64(390+i*22), 11, fg)
+		}
+	}
 	a.btn(dst, "Cancel", 800, 437, 100, 40, "modal:cancel", false)
 	a.btn(dst, "Apply", 918, 437, 114, 40, "modal:apply", true)
 }
 func (a *App) Update() error {
+	a.flushMIDIOutput()
 	select {
 	case result := <-a.exportResults:
 		a.exporting = false
@@ -790,6 +813,9 @@ func (a *App) enterField(r rune) {
 	}
 }
 func (a *App) action(name string) {
+	if a.modal == "" && a.midiOutputAction(name) {
+		return
+	}
 	if a.fileAction(name) {
 		return
 	}
@@ -966,7 +992,7 @@ func (a *App) action(name string) {
 		a.selectChannel(3)
 	case "pcm-mode":
 		a.remember()
-		a.synth.Edit(func(e *replay.Engine) { e.Project.Song.State[49] = (e.Project.Song.State[49] + 1) % 4 })
+		a.synth.Edit(func(e *replay.Engine) { e.Project.Song.State[49] = (e.Project.Song.State[49] + 1) % 5 })
 		a.dirty = true
 	case "midi-clock":
 		a.synth.Edit(func(e *replay.Engine) {
@@ -984,6 +1010,8 @@ func (a *App) action(name string) {
 	case "bank:1":
 		a.instrument = 16 + a.instrument%16
 	case "new":
+		a.subtunes = nil
+		a.subtuneIndex = 0
 		if _, ok := a.synth.Reference(); ok {
 			a.synth.SelectReference(false)
 		}
@@ -993,6 +1021,20 @@ func (a *App) action(name string) {
 		a.status = "New project"
 	case "open":
 		a.beginFileBrowser("Open music (.mys / .myv / .snd / .ym)", "", false)
+	case "subtune-next":
+		if len(a.subtunes) > 1 {
+			a.synth.Edit(func(e *replay.Engine) {
+				copy := e.Project.Clone()
+				a.subtunes[a.subtuneIndex].Song = copy.Song
+				a.subtunes[a.subtuneIndex].Bank = copy.Bank
+			})
+			a.remember()
+			a.subtuneIndex = (a.subtuneIndex + 1) % len(a.subtunes)
+			value := a.subtunes[a.subtuneIndex]
+			a.synth.Edit(func(e *replay.Engine) { e.Stop(); e.Project.Song = value.Song; e.Project.Bank = value.Bank; e.Reset() })
+			a.pattern, a.row = 0, 0
+			a.status = fmt.Sprintf("Selected native subtune %d of %d; export MYS/MYV or use a supported replay template", a.subtuneIndex+1, len(a.subtunes))
+		}
 	case "save":
 		if a.projectPath == "" {
 			a.beginFileBrowser("Save project (.mys + .myv)", "untitled.mys", true)
@@ -1143,6 +1185,9 @@ func (a *App) applyModal() {
 	}
 	modal, entry := a.modal, strings.TrimSpace(a.entry)
 	a.modal = ""
+	if a.midiOutputModal(modal, entry) {
+		return
+	}
 	if a.patternModal(modal, entry) {
 		return
 	}
@@ -1199,6 +1244,14 @@ func (a *App) applyModal() {
 		if err != nil {
 			a.status = err.Error()
 			return
+		}
+		a.subtunes = nil
+		a.subtuneIndex = 0
+		if strings.EqualFold(filepath.Ext(entry), ".snd") || strings.EqualFold(filepath.Ext(entry), ".sndh") {
+			raw, err := os.ReadFile(entry)
+			if err == nil {
+				a.subtunes, _ = native.DecodeContainers(raw)
+			}
 		}
 		a.synth.Edit(func(e *replay.Engine) { e.Stop(); e.Project = p; e.Reset() })
 		a.projectPath = entry

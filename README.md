@@ -185,7 +185,11 @@ editable in Settings (hexadecimal 00–0F); matching channels can allocate YM
 polyphony. The D/E assignments control the two PCM voices. MIDI clocks advance
 one tracker row per six pulses while sound sequences retain their replay rate.
 Controllers 44–47 queue patterns at the next pattern boundary.
-MIDI clock output and Sync24 hardware are not
+**MIDI output** lists macOS destinations and connects only to the selected one.
+The renderer queues transport, clock and the two PCM-pattern voices in MIDI mode.
+CoreMIDI sends are handled outside the audio callback. End-to-end output was
+checked through a temporary virtual destination; physical hardware and precise
+future-timestamp scheduling remain unverified. Physical Sync24 hardware is not
 included in this edition.
 
 ## Verification

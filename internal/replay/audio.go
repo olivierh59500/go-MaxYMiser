@@ -25,6 +25,7 @@ type Synth struct {
 	scratch          [1]int16
 	waveform         [512]float32
 	waveAt           int
+	midi             midiOutputState
 }
 type timer struct {
 	kind             byte
@@ -100,9 +101,11 @@ func (s *Synth) Read(p []byte) (int, error) {
 		if s.untilTick <= 0 {
 			s.Engine.Tick()
 			s.configure()
+			s.midiTick()
 			s.untilTick += float64(s.Rate) / float64(s.Engine.Project.Song.TickRate())
 		}
 		s.untilTick--
+		s.midiSample()
 		for ch := range 3 {
 			s.runTimer(ch)
 		}
