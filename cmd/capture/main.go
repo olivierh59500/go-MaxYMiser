@@ -51,6 +51,7 @@ func main() {
 	instrument := flag.Int("instrument", 1, "selected instrument, 1 through 32")
 	tools := flag.Bool("sequence-tools", false, "show the sequence generator")
 	browser := flag.Bool("file-browser", false, "show the file browser")
+	song := flag.String("song", "", "open a music file through the GUI workflow before capture")
 	flag.Parse()
 	app, e := ui.New(model.Demo(), "", true)
 	if e != nil {
@@ -60,6 +61,11 @@ func main() {
 	app.SetTab(*tab)
 	app.SelectInstrument(*instrument - 1)
 	app.SetSequenceTools(*tools)
+	if *song != "" {
+		if e = app.OpenMusic(*song); e != nil {
+			log.Fatal(e)
+		}
+	}
 	if *browser {
 		app.ShowFileBrowser()
 	}

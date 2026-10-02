@@ -54,6 +54,10 @@ synthesizer output.
 Open, new-path saves, individual instrument exchange, sample import/export and
 composer profile loading use the built-in file browser. Navigate folders, scroll
 the list, select a file and confirm; a full path can also be typed.
+Opening an editable native song selects its first ordinary arrangement track
+and replaces the instrument/pattern view. An unsupported SNDH shows a visible
+explanation and preserves the current composition and playback. SNDH files using
+other replay formats do not carry editable MaxYMiser instruments or patterns.
 
 ## Keyboard
 

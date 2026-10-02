@@ -81,6 +81,7 @@ type App struct {
 	octave, step, scroll                                               int
 	editing, dirty                                                     bool
 	modal, entry                                                       string
+	errorDetails                                                       []string
 	listed                                                             []fs.DirEntry
 	directory                                                          string
 	browser                                                            *fileBrowser
@@ -467,6 +468,13 @@ func (a *App) drawModal(dst *ebiten.Image) {
 	rect(dst, 0, 0, width, height, color.RGBA{0, 0, 0, 180})
 	rect(dst, 220, 224, 840, 290, panel)
 	a.text(dst, a.modal, 250, 248, 18, fg)
+	if a.modal == "Unable to open this music" {
+		for i, message := range a.errorDetails {
+			a.text(dst, message, 250, float64(295+i*37), 12, fg)
+		}
+		a.btn(dst, "Close", 918, 437, 114, 40, "modal:cancel", true)
+		return
+	}
 	rect(dst, 248, 292, 784, 58, bg)
 	a.text(dst, a.entry, 260, 312, 15, accent)
 	a.text(dst, "Enter confirms · Escape cancels", 250, 376, 13, dim)
@@ -513,29 +521,35 @@ midiDone:
 	a.mouseX, a.mouseY = ebiten.CursorPosition()
 	a.ctrl = ebiten.IsKeyPressed(ebiten.KeyControl) || ebiten.IsKeyPressed(ebiten.KeyMeta)
 	if a.modal != "" {
-		chars := ebiten.AppendInputChars(nil)
-		a.entry += string(chars)
-		if inpututil.IsKeyJustPressed(ebiten.KeyBackspace) && len(a.entry) > 0 {
-			a.entry = a.entry[:len(a.entry)-1]
-		}
-		if inpututil.IsKeyJustPressed(ebiten.KeyEscape) {
-			a.modal = ""
-			a.browser = nil
-		}
-		if inpututil.IsKeyJustPressed(ebiten.KeyEnter) {
-			a.applyModal()
-		}
-		if a.browser != nil {
-			if inpututil.IsKeyJustPressed(ebiten.KeyArrowDown) {
-				a.browser.move(1)
-				if a.browser.selected >= 0 {
-					a.entry = a.browser.entries[a.browser.selected].Name()
-				}
+		if a.modal == "Unable to open this music" {
+			if inpututil.IsKeyJustPressed(ebiten.KeyEscape) || inpututil.IsKeyJustPressed(ebiten.KeyEnter) {
+				a.modal = ""
 			}
-			if inpututil.IsKeyJustPressed(ebiten.KeyArrowUp) {
-				a.browser.move(-1)
-				if a.browser.selected >= 0 {
-					a.entry = a.browser.entries[a.browser.selected].Name()
+		} else {
+			chars := ebiten.AppendInputChars(nil)
+			a.entry += string(chars)
+			if inpututil.IsKeyJustPressed(ebiten.KeyBackspace) && len(a.entry) > 0 {
+				a.entry = a.entry[:len(a.entry)-1]
+			}
+			if inpututil.IsKeyJustPressed(ebiten.KeyEscape) {
+				a.modal = ""
+				a.browser = nil
+			}
+			if inpututil.IsKeyJustPressed(ebiten.KeyEnter) {
+				a.applyModal()
+			}
+			if a.browser != nil {
+				if inpututil.IsKeyJustPressed(ebiten.KeyArrowDown) {
+					a.browser.move(1)
+					if a.browser.selected >= 0 {
+						a.entry = a.browser.entries[a.browser.selected].Name()
+					}
+				}
+				if inpututil.IsKeyJustPressed(ebiten.KeyArrowUp) {
+					a.browser.move(-1)
+					if a.browser.selected >= 0 {
+						a.entry = a.browser.entries[a.browser.selected].Name()
+					}
 				}
 			}
 		}
@@ -1258,48 +1272,9 @@ func (a *App) applyModal() {
 			a.status = "Native SNDH exported with track duration"
 		}
 	case strings.HasPrefix(modal, "Open music"):
-		if strings.EqualFold(filepath.Ext(entry), ".myv") {
-			data, err := os.ReadFile(entry)
-			if err != nil {
-				a.status = err.Error()
-				return
-			}
-			bank, err := native.DecodeVoiceBank(data)
-			if err != nil {
-				a.status = err.Error()
-				return
-			}
-			a.remember()
-			a.synth.Edit(func(e *replay.Engine) { e.Project.Bank = bank; e.Stop() })
-			a.directory, a.status, a.dirty = filepath.Dir(entry), "Voice bank loaded", true
-			return
+		if err := a.OpenMusic(entry); err != nil {
+			a.showOpenError(entry, err)
 		}
-		if strings.EqualFold(filepath.Ext(entry), ".ym") {
-			if err := a.LoadYM(entry); err != nil {
-				a.status = err.Error()
-			}
-			return
-		}
-		a.synth.CloseYM()
-		p, err := project.Load(entry, "")
-		if err != nil {
-			a.status = err.Error()
-			return
-		}
-		a.subtunes = nil
-		a.subtuneIndex = 0
-		if strings.EqualFold(filepath.Ext(entry), ".snd") || strings.EqualFold(filepath.Ext(entry), ".sndh") {
-			raw, err := os.ReadFile(entry)
-			if err == nil {
-				a.subtunes, _ = native.DecodeContainers(raw)
-			}
-		}
-		a.synth.Edit(func(e *replay.Engine) { e.Stop(); e.Project = p; e.Reset() })
-		a.projectPath = entry
-		a.directory = filepath.Dir(entry)
-		a.pattern, a.row = 0, 0
-		a.dirty = false
-		a.status = "Loaded " + filepath.Base(entry)
 	case strings.HasPrefix(modal, "Save project"):
 		a.save(entry)
 	case modal == "Load composer profile (.json)":
