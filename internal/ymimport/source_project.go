@@ -16,6 +16,7 @@ type SourceProjectReport struct {
 	Positions            int              `json:"positions"`
 	Bank                 SourceBankReport `json:"bank"`
 	UnsupportedEvents    int              `json:"unsupported_instrument_events"`
+	ModulationSegments   int              `json:"pitch_modulation_segments"`
 	UntranslatedCommands map[byte]int     `json:"untranslated_pattern_commands"`
 	Warnings             []string         `json:"warnings"`
 }
@@ -107,6 +108,17 @@ func SourceProject(score SourceScore, start, end int) (*model.Project, SourcePro
 			}
 		}
 		report.Warnings = append(report.Warnings, "The excerpt's initial sounding notes restart their envelopes; the original earlier modulation phase is not restored.")
+	}
+	segments, err := applySourceModulation(score, rows, &bank, start)
+	if err != nil {
+		return nil, report, err
+	}
+	report.ModulationSegments = segments
+	if segments > 0 {
+		delete(report.UntranslatedCommands, 0x81)
+		delete(report.UntranslatedCommands, 0x82)
+		delete(report.UntranslatedCommands, 0x84)
+		report.Warnings = append(report.Warnings, "Native vibrato/slide timing is translated for ordinary tone programs with constant zero arpeggio. Other pitch programs remain outside this conversion.")
 	}
 	// A partial final native pattern ends at the exact selected frame instead
 	// of extending the excerpt with unrequested empty rows.

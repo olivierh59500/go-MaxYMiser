@@ -22,6 +22,17 @@ type SourceScore struct {
 	Patterns    []SourcePattern    `json:"patterns"`
 	Orders      [3][]SourceOrder   `json:"orders"`
 	Events      []SourceEvent      `json:"events"`
+	Controls    []SourceControl    `json:"controls,omitempty"`
+}
+
+// SourceControl retains a verified effect command's exact source execution
+// frame separately from note events and from the source pattern definition.
+type SourceControl struct {
+	Channel int    `json:"channel"`
+	Frame   int    `json:"frame"`
+	Offset  int    `json:"source_offset"`
+	Opcode  byte   `json:"opcode"`
+	Operand []byte `json:"operand,omitempty"`
 }
 
 type SourceInstrument struct {
@@ -246,7 +257,7 @@ func decodeMadMaxLastNinja(data []byte, subtune, frames int) (SourceScore, error
 		}
 		score.Patterns = append(score.Patterns, pattern)
 	}
-	score.Events, err = sourceTimeline(score, frames)
+	score.Events, score.Controls, err = sourceTimelineControls(score, frames)
 	return score, err
 }
 
@@ -274,6 +285,11 @@ type sourceVoice struct {
 }
 
 func sourceTimeline(score SourceScore, frames int) ([]SourceEvent, error) {
+	events, _, err := sourceTimelineControls(score, frames)
+	return events, err
+}
+
+func sourceTimelineControls(score SourceScore, frames int) ([]SourceEvent, []SourceControl, error) {
 	patterns := map[int]SourcePattern{}
 	for _, p := range score.Patterns {
 		patterns[p.ID] = p
@@ -281,12 +297,13 @@ func sourceTimeline(score SourceScore, frames int) ([]SourceEvent, error) {
 	var voices [3]sourceVoice
 	for ch := range voices {
 		if len(score.Orders[ch]) == 0 {
-			return nil, fmt.Errorf("source: channel %d has no patterns", ch)
+			return nil, nil, fmt.Errorf("source: channel %d has no patterns", ch)
 		}
 		voices[ch] = sourceVoice{delay: 1, duration: 1, instrument: -1, pattern: patterns[score.Orders[ch][0].Pattern]}
 	}
 	speed, countdown := score.Speed, 1
 	var events []SourceEvent
+	var controls []SourceControl
 	for frame := 0; frame < frames; frame++ {
 		countdown--
 		if countdown != 0 {
@@ -301,7 +318,7 @@ func sourceTimeline(score SourceScore, frames int) ([]SourceEvent, error) {
 			v.legato = false
 			for count := 0; ; count++ {
 				if count >= 4096 || v.command >= len(v.pattern.Commands) {
-					return nil, fmt.Errorf("source: invalid channel %d command flow", ch)
+					return nil, nil, fmt.Errorf("source: invalid channel %d command flow", ch)
 				}
 				c := v.pattern.Commands[v.command]
 				v.command++
@@ -310,7 +327,7 @@ func sourceTimeline(score SourceScore, frames int) ([]SourceEvent, error) {
 					if op < 128 {
 						note := int(op) + score.Orders[ch][v.order].Transpose
 						if v.instrument >= 0 && v.instrument < len(score.Instruments) && score.Instruments[v.instrument].Settings[0]&2 != 0 {
-							return nil, fmt.Errorf("source: fixed-pitch sample instrument %d is not yet supported", v.instrument)
+							return nil, nil, fmt.Errorf("source: fixed-pitch sample instrument %d is not yet supported", v.instrument)
 						}
 						events = append(events, SourceEvent{Channel: ch, Frame: frame, Pattern: v.pattern.ID, Order: v.order, Offset: c.Offset, NativeNote: int(op), Note: note + 12, Instrument: v.instrument, Retrigger: !v.legato})
 					} else {
@@ -320,6 +337,8 @@ func sourceTimeline(score SourceScore, frames int) ([]SourceEvent, error) {
 					break
 				}
 				switch {
+				case op == 0x81 || op == 0x82 || op == 0x84:
+					controls = append(controls, SourceControl{Channel: ch, Frame: frame, Offset: c.Offset, Opcode: op, Operand: append([]byte(nil), c.Operand...)})
 				case op == 0x87:
 					v.order = (v.order + 1) % len(score.Orders[ch])
 					v.pattern, v.command = patterns[score.Orders[ch][v.order].Pattern], 0
@@ -331,6 +350,7 @@ func sourceTimeline(score SourceScore, frames int) ([]SourceEvent, error) {
 					v.duration = int(op-0xe0) + 1
 				case op >= 0xc0:
 					v.instrument = int(op - 0xc0)
+					controls = append(controls, SourceControl{Channel: ch, Frame: frame, Offset: c.Offset, Opcode: op})
 				case op >= 0xb8:
 					speed = int(op-0xb8) + 1
 				}
@@ -338,5 +358,5 @@ func sourceTimeline(score SourceScore, frames int) ([]SourceEvent, error) {
 		}
 		countdown = speed
 	}
-	return events, nil
+	return events, controls, nil
 }

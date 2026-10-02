@@ -98,7 +98,11 @@ func (a *App) drawSource(dst *ebiten.Image) {
 	a.btn(dst, "Import editable excerpt", 260, 279, 254, 32, "source:import", false)
 	a.btn(dst, "Close source", 1060, 279, 160, 32, "source:close", false)
 	a.text(dst, fmt.Sprintf("%d translated sounds · %d unsupported · %d affected note events", len(report.Bank.Converted), len(report.Bank.Unsupported), report.UnsupportedEvents), 42, 330, 13, purple)
-	a.text(dst, "Unsupported definitions stay silent. Pattern effects and some modulation are not converted.", 42, 358, 12, dim)
+	detail := "Unsupported definitions stay silent. Pattern effects and some modulation are not converted."
+	if report.ModulationSegments > 0 {
+		detail = fmt.Sprintf("%d pitch segments · vibrato/slide for ordinary tones; unsupported programs stay silent.", report.ModulationSegments)
+	}
+	a.text(dst, detail, 42, 358, 12, dim)
 	for n := 0; n < 8; n++ {
 		index := a.sourcePage*8 + n
 		if index >= len(score.Instruments) {

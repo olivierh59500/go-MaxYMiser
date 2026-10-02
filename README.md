@@ -95,8 +95,9 @@ unsupported synthesis and untranslated pattern commands before **Import editable
 excerpt** replaces the score. **Excerpt start:end** selects a range within the
 first 6,000 decoded frames; longer analysis is available through `ympair`.
 Imported source notes use a one-frame grid with generated 64-row patterns.
-Unsupported sounds remain silent and named with `?`; source effect programs and
-some modulation still require translation. **Save as** writes a separate native
+Unsupported sounds remain silent and named with `?`. Native vibrato and pitch
+slide are translated for ordinary tones with a constant zero arpeggio; other
+source programs and period-table rounding still require work. **Save as** writes a separate native
 MYS/MYV pair, preserving the original executable. This is partial editable import,
 not complete playback of arbitrary Mad Max SNDH files.
 Dropping a MYS and its matching MYV uses the same validated opening workflow.

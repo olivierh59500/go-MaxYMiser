@@ -138,14 +138,37 @@ save destination and retain no foreign executable as a MaxYMiser export template
 Opening an unrelated native project, a YM or a new project clears the old source
 inspection. Dropped source SNDH files use the same inspection workflow.
 
-For the first 6,000 standard Last Ninja frames, conversion produces 57 generated
-patterns, 94 order positions and 17 sequences. Saving and reloading the native
+For the first 6,000 standard Last Ninja frames, conversion produces 86 generated
+patterns, 94 order positions and 27 sequences. Saving and reloading the native
 pair retains all 1,561 note/rest events, including their source instrument IDs
 and timestamps, with an exact 120-second excerpt traversal. Of these events,
 192 notes use the eight unsupported source sounds. Pattern commands 82 and 84
-remain untranslated. These data checks do not establish complete sound fidelity:
+are translated for ordinary tone programs with a constant zero arpeggio. These
+data checks do not establish complete sound fidelity:
 unsupported definitions stay silent and marked `?`, while the translated sounds
 retain the base volume/arpeggio behavior described below.
+
+### Source vibrato and pitch slide
+
+The source timeline retains the exact execution frame, offset and operands of
+vibrato enable/disable, pitch slide and instrument selection. Note events remain
+independent, so an effect does not become an invented note or pattern boundary.
+
+Original 68000 arithmetic probes establish the triangle's extra low-end hold,
+its octave-dependent period scale and its initial delay. Pitch-slide probes
+establish the signed 16-bit accumulator and the initial delay before updates
+occur on every subsequent replay call. A retrigger resets the vibrato delay;
+legato retains its running phase. Instrument selection and vibrato selection
+retain their distinct phase changes.
+
+The excerpt exporter writes these period deltas as editable MaxYMiser vibrato
+sequences, split before instrument retriggers and at the 63-word sequence limit.
+Rendering checks cover sequence/pattern boundaries and native bank round trips.
+The 6,000-frame example contains 1,157 assigned pitch segments, reusing sequence
+definitions. Hardware/noise programs and nonconstant source arpeggios remain
+outside this pitch conversion, and native period-table rounding still differs
+from MaxYMiser's base pitch table. These checks establish the modulation values
+and timing, not complete audio parity with the original song.
 
 With `-ym`, it first aligns source notes with the register recording. The
 search supports a recording lead-in and a constant pitch transposition, and
