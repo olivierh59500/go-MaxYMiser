@@ -54,7 +54,6 @@ type Engine struct {
 	pendingDMA                                   [2]bool
 	ExternalClock                                bool
 	clockPulses                                  int
-	clockRows                                    int
 	rowParsed                                    bool
 	NextPatterns                                 [4]byte
 	nextPatternMask                              byte
@@ -79,7 +78,7 @@ func (e *Engine) Reset() {
 	e.Playing, e.PatternMode, e.Break = false, false, false
 	e.Jam = e.Project.Song.State[39] != 0
 	e.ExternalClock = e.Project.Song.State[31]&1 != 0
-	e.clockPulses, e.clockRows, e.rowParsed = 0, 0, false
+	e.clockPulses, e.rowParsed = 0, false
 	e.NextPatterns, e.nextPatternMask = [4]byte{}, 0
 	e.NextPosition, e.PositionQueued = 0, false
 	e.Mutes = e.Project.Song.State[37]
@@ -100,13 +99,14 @@ func (e *Engine) Play(pattern bool) {
 	e.PatternMode = pattern
 	e.TickInRow = 0
 	e.Row = 0
-	e.rowParsed, e.clockPulses, e.clockRows = false, 0, 0
+	e.rowParsed, e.clockPulses = false, 0
 }
 func (e *Engine) Stop() {
 	e.Playing = false
 	e.pending = [3]bool{}
 	e.PositionQueued = false
 	e.nextPatternMask = 0
+	e.clockPulses = 0
 	// The audio renderer consumes a stop trigger at the next sequencer tick.
 	e.pendingDMA = [2]bool{true, true}
 	for i := range e.Voices {
@@ -121,6 +121,43 @@ func (e *Engine) Stop() {
 	e.Registers[8], e.Registers[9], e.Registers[10] = 0, 0, 0
 }
 func (e *Engine) Tick() {
+	if e.Playing && e.ExternalClock {
+		// In the native editor, external pulses call the whole replayer.
+		// The internal timer only services sound while playback is stopped.
+		e.EnvelopeWrite = false
+		for i := range e.Voices {
+			e.Voices[i].Triggered = false
+		}
+		for i := range e.DMA {
+			e.DMA[i].Triggered = false
+		}
+		var ym [3]bool
+		var pcm [2]bool
+		envelope := false
+		for e.clockPulses > 0 {
+			e.clockPulses--
+			e.tick(true)
+			for i := range ym {
+				ym[i] = ym[i] || e.Voices[i].Triggered
+			}
+			for i := range pcm {
+				pcm[i] = pcm[i] || e.DMA[i].Triggered
+			}
+			envelope = envelope || e.EnvelopeWrite
+		}
+		for i := range ym {
+			e.Voices[i].Triggered = ym[i]
+		}
+		for i := range pcm {
+			e.DMA[i].Triggered = pcm[i]
+		}
+		e.EnvelopeWrite = envelope
+		return
+	}
+	e.tick(false)
+}
+
+func (e *Engine) tick(external bool) {
 	e.Ticks++
 	e.EnvelopeWrite = false
 	for i := range e.Voices {
@@ -131,17 +168,8 @@ func (e *Engine) Tick() {
 		e.DMA[i].Triggered = e.pendingDMA[i]
 		e.pendingDMA[i] = false
 	}
-	if e.Playing && e.ExternalClock {
-		for e.clockRows > 0 {
-			if !e.rowParsed {
-				e.parseRow()
-			}
-			e.advanceRow()
-			e.clockRows--
-		}
-	}
 	if e.Playing && e.TickInRow == 0 {
-		if !e.ExternalClock || !e.rowParsed {
+		if !external || !e.rowParsed {
 			e.parseRow()
 		}
 	}
@@ -164,11 +192,9 @@ func (e *Engine) Tick() {
 		}
 	}
 	if e.Playing {
-		if e.ExternalClock {
-			return
-		}
 		e.TickInRow++
-		if e.TickInRow >= max(1, e.Speed) {
+		speed := max(1, e.Speed)
+		if e.TickInRow >= speed {
 			e.TickInRow = 0
 			e.advanceRow()
 		}
@@ -226,20 +252,25 @@ func (e *Engine) SelectPosition(position int) bool {
 	e.Position, e.PositionQueued = position, false
 	e.loadPosition()
 	e.Row, e.TickInRow, e.rowParsed = 0, 0, false
-	e.clockRows, e.clockPulses = 0, 0
+	e.clockPulses = 0
 	return true
 }
 
-// ClockPulse receives MIDI's 24 pulses per quarter note. Six pulses advance
-// one 1/16 tracker row; envelopes and effects retain their internal replay rate.
+// ClockPulse queues one external replay call. Clock selection normally sets six
+// pulses per row; the native speed controller can override that live value.
+// Instrument sequences and effects advance once per pulse, as in the editor.
 func (e *Engine) ClockPulse() {
 	if !e.ExternalClock || !e.Playing {
 		return
 	}
 	e.clockPulses++
-	if e.clockPulses >= 6 {
-		e.clockPulses = 0
-		e.clockRows++
+}
+
+// CompensateClockLatency queues the native number of clock pulses on Start
+// and Continue. Tick consumes them with synthesis triggers in the audio pass.
+func (e *Engine) CompensateClockLatency() {
+	if e.ExternalClock && e.Playing {
+		e.clockPulses += int(e.Project.Song.State[57])
 	}
 }
 
@@ -250,7 +281,7 @@ func (e *Engine) SetSongPointer(rows int) {
 		e.loadPosition()
 	}
 	e.Row, e.TickInRow = rows%64, 0
-	e.clockPulses, e.clockRows, e.rowParsed = 0, 0, false
+	e.clockPulses, e.rowParsed = 0, false
 }
 
 func (e *Engine) QueuePattern(channel int, pattern byte) {
@@ -448,7 +479,7 @@ func (e *Engine) effect(v *Voice, code, value byte, muted bool) {
 			v.Parameters[21] = value
 		}
 	case 'S':
-		if value >= 2 {
+		if value >= 2 && !e.ExternalClock {
 			e.Speed = int(value)
 		}
 	case 'T':

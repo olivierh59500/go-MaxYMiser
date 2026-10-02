@@ -487,7 +487,11 @@ func (a *App) drawSettings(dst *ebiten.Image, e *replay.Engine) {
 	a.text(dst, "Audio is rendered at 48 kHz. Sequencing follows the selected replay rate.", 670, 277, 13, fg)
 	a.text(dst, "The YM noise generator and envelope are shared between all three voices.", 670, 321, 12, dim)
 	a.btn(dst, "Jam mode", 860, 372, 156, 38, "jam", e.Jam)
-	a.btn(dst, "MIDI clock", 1030, 372, 168, 38, "midi-clock", e.ExternalClock)
+	clockLabel := "MIDI clock"
+	if e.Project.Song.State[31]&3 == 3 {
+		clockLabel = "Sync24 unavailable"
+	}
+	a.btn(dst, clockLabel, 1030, 372, 194, 38, "midi-clock", e.ExternalClock)
 	a.btn(dst, "MIDI input", 670, 372, 180, 38, "midi", a.midiInput != nil)
 	a.btn(dst, "MIDI output", 670, 236, 180, 30, "midi-output", a.midiOutput != nil)
 	a.btn(dst, "Load CNF", 870, 236, 160, 30, "config-load", false)
@@ -501,7 +505,8 @@ func (a *App) drawSettings(dst *ebiten.Image, e *replay.Engine) {
 		mode = 0
 	}
 	a.text(dst, "PCM mode", 670, 438, 13, dim)
-	a.btn(dst, modes[mode], 850, 426, 280, 38, "pcm-mode", false)
+	a.btn(dst, modes[mode], 850, 426, 200, 38, "pcm-mode", false)
+	a.btn(dst, fmt.Sprintf("Latency: %d", e.Project.Song.State[57]), 1064, 426, 160, 38, "midi-latency", false)
 	a.text(dst, "PCM attenuation limit", 670, 492, 13, dim)
 	a.btn(dst, fmt.Sprint(e.Project.Song.State[56]), 950, 480, 180, 38, "setting:pcm-limit", false)
 	a.btn(dst, "ICE", 1144, 480, 72, 38, "ice-packing", a.icePacking)
@@ -931,6 +936,9 @@ func (a *App) enterField(r rune) {
 	}
 }
 func (a *App) action(name string) {
+	if a.modal == "" && a.midiClockAction(name) {
+		return
+	}
 	if a.modal == "" && a.songDurationAction(name) {
 		return
 	}
@@ -1170,11 +1178,15 @@ func (a *App) action(name string) {
 		a.synth.Edit(func(e *replay.Engine) { e.Project.Song.State[49] = (e.Project.Song.State[49] + 1) % 5 })
 		a.dirty = true
 	case "midi-clock":
+		a.remember()
 		a.synth.Edit(func(e *replay.Engine) {
 			e.Stop()
-			e.ExternalClock = !e.ExternalClock
+			e.Project.Song.SetSpeed(6)
+			e.Speed = 6
+			e.ExternalClock = e.Project.Song.State[31]&3 != 1
 			if e.ExternalClock {
 				e.Project.Song.State[31] |= 1
+				e.Project.Song.State[31] &^= 2
 			} else {
 				e.Project.Song.State[31] &^= 1
 			}
@@ -1386,6 +1398,9 @@ func (a *App) applyModal() {
 	}
 	modal, entry := a.modal, strings.TrimSpace(a.entry)
 	a.modal = ""
+	if a.midiClockModal(modal, entry) {
+		return
+	}
 	if a.yearModal(modal, entry) {
 		return
 	}
@@ -1531,6 +1546,10 @@ func (a *App) applyModal() {
 			case "rate":
 				e.Project.Song.SetTickRate(n)
 			case "speed":
+				if e.ExternalClock {
+					a.status = "Select internal clock to edit row speed; external selection uses six pulses"
+					return
+				}
 				e.Project.Song.SetSpeed(n)
 				e.Speed = e.Project.Song.Speed()
 			case "octave":

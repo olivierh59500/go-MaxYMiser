@@ -12,6 +12,12 @@ import (
 )
 
 func WAV(p *model.Project, path string, duration time.Duration) error {
+	if p == nil {
+		return fmt.Errorf("export: no tracker project to render")
+	}
+	if p.Song.State[31]&1 != 0 {
+		return fmt.Errorf("export: select internal clock before rendering a tracker WAV; external pulses are unavailable offline")
+	}
 	engine := replay.New(p)
 	engine.Play(false)
 	return writeAudio(replay.NewSynth(engine, 48000), path, duration)

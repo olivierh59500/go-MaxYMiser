@@ -7,7 +7,7 @@ import (
 )
 
 func (a *App) receiveMIDI(message []byte) {
-	if command, ok := midi.MachineControl(message); ok && command == 1 || len(message) == 1 && message[0] == 0xfc {
+	if command, ok := midi.MachineControl(message); ok && command == 1 {
 		a.editing = false
 	}
 	noteEvent := len(message) >= 3 && (message[0]&0xf0 == 0x90 || message[0]&0xf0 == 0x80)
@@ -17,6 +17,9 @@ func (a *App) receiveMIDI(message []byte) {
 	}
 	changed := false
 	a.synth.Edit(func(e *replay.Engine) {
+		if len(message) == 1 && message[0] == 0xfc && e.ExternalClock && e.Project.Song.State[31]&2 == 0 {
+			a.editing = false
+		}
 		beforeYM, beforeDMA := e.Voices, e.DMA
 		beforeBank := e.Project.Bank.Instruments
 		midi.ApplyMapped(e, message)

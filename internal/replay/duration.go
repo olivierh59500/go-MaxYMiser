@@ -23,7 +23,7 @@ func MeasureSongDuration(project *model.Project) (SongDuration, error) {
 		return result, fmt.Errorf("replay: no arranged song to measure")
 	}
 	if project.Song.State[31]&1 != 0 {
-		return result, fmt.Errorf("replay: external-clock songs need an explicit export duration")
+		return result, fmt.Errorf("replay: arrangement duration cannot be inferred from an external clock")
 	}
 	e := New(project.Clone())
 	e.Play(false)

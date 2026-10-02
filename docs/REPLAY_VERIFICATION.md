@@ -94,3 +94,36 @@ independently of editor volume. Bass/treble control the Go digital shelving
 filters using 2 dB steps; default flat settings bypass processing. Frequency
 response tests verify low/high boosts and cuts. This preserves the intended
 controls but is not a transistor-level emulation of the LMC1992 analog circuit.
+
+## External clock and latency
+
+The 1.67 editor's original MIDI dispatch tests the external-clock and Sync24
+selection bits before accepting F8, Start, Continue, Stop or Song Position
+Pointer. Internal timer calls skip the playing replayer with external clock;
+each accepted pulse calls the complete routine. Instrument sequences and
+effects therefore follow the input pulses too. Stopped instrument preview
+continues to use the internal timer.
+
+Selecting a clock in the native interface sets row speed to six. Pattern `S`
+commands are ignored in external mode. Controller 21 still writes its scaled
+speed directly, so live MIDI control can override that default spacing.
+
+Start and Continue execute the normal clock routine once for each unsigned
+latency value. The Go audio pass consumes these queued calls together, retaining
+PCM and envelope triggers until the synthesizer receives them. Values retain
+their native units: pulses, rather than milliseconds or rows.
+
+Bounded calls to the original editor under Hatari in STe mode recorded:
+
+| Native operation | Latency | Row after the call | Pulses consumed in that row |
+| --- | --- | --- | --- |
+| Start | 7 | 1 | 1 |
+| Stop | 7 | 1 | 1 |
+| Continue from that stop | 7 | 2 | 2 |
+| Start from the beginning | 255 | 42 | 3 |
+
+Regression checks use these retained native positions and cover pulse-driven
+volume envelopes, ignored internal callbacks, clock-source filtering, order
+boundaries and a compensated PCM trigger reaching the audio renderer once.
+These checks establish transport/cadence behavior; they do not measure physical
+MIDI-device latency or establish timestamp-accurate delivery of batched input.

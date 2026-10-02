@@ -69,21 +69,28 @@ func Apply(e *replay.Engine, message []byte) {
 	}
 	status := message[0]
 	if status >= 0xf8 {
+		// The native input ignores clock/transport in internal and Sync24
+		// modes. Notes, controllers and MMC remain independent of the clock.
+		if !e.ExternalClock || e.Project.Song.State[31]&2 != 0 {
+			return
+		}
 		switch status {
 		case 0xf8:
 			e.ClockPulse()
 		case 0xfa:
 			e.Reset()
 			e.Play(false)
+			e.CompensateClockLatency()
 		case 0xfb:
 			e.Playing = true
+			e.CompensateClockLatency()
 		case 0xfc:
 			e.Stop()
 		}
 		return
 	}
 	if status == 0xf2 {
-		if len(message) == 3 {
+		if len(message) == 3 && e.ExternalClock && e.Project.Song.State[31]&2 == 0 {
 			e.SetSongPointer(int(message[1]&127) | int(message[2]&127)<<7)
 		}
 		return

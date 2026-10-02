@@ -28,6 +28,8 @@ func TestNotesControllersAndTransportReachTracker(t *testing.T) {
 	if e.Voices[0].TrackVolume != 5 || e.Voices[1].TrackVolume != 5 || e.Voices[2].TrackVolume != 5 {
 		t.Fatal("global volume controller failed")
 	}
+	p.Song.State[31] |= 1
+	e.ExternalClock = true
 	Apply(e, []byte{0xfa})
 	if !e.Playing {
 		t.Fatal("MIDI start failed")
@@ -48,8 +50,8 @@ func TestExternalClockMovesRowsOnlyAfterSixPulses(t *testing.T) {
 	for i := 0; i < 100; i++ {
 		e.Tick()
 	}
-	if e.Row != 0 || e.Voices[0].Note != 60 {
-		t.Fatal("internal replay calls advanced externally clocked rows")
+	if e.Row != 0 || e.Voices[0].Note != 0 {
+		t.Fatal("internal replay calls started an externally clocked score")
 	}
 	for i := 0; i < 5; i++ {
 		Apply(e, []byte{0xf8})
@@ -60,8 +62,13 @@ func TestExternalClockMovesRowsOnlyAfterSixPulses(t *testing.T) {
 	}
 	Apply(e, []byte{0xf8})
 	e.Tick()
-	if e.Row != 1 || e.Voices[0].Note != 64 {
-		t.Fatal("sixth pulse did not reach the next musical row")
+	if e.Row != 1 || e.Voices[0].Note != 60 {
+		t.Fatal("sixth pulse did not finish the current musical row")
+	}
+	Apply(e, []byte{0xf8})
+	e.Tick()
+	if e.Voices[0].Note != 64 {
+		t.Fatal("first pulse of the next row did not parse its note")
 	}
 	Apply(e, []byte{0xfc})
 	Apply(e, []byte{0xf8})
@@ -80,10 +87,74 @@ func TestSongPointerAndRealtimeMessagesPreserveMIDIFraming(t *testing.T) {
 		t.Fatalf("system-common/running-status framing failed: %v", messages)
 	}
 	p := model.Demo()
+	p.Song.State[31] |= 1
 	e := replay.New(p)
 	Apply(e, messages[1])
 	if e.Position != 1 || e.Row != 3 || e.Patterns != p.Song.Orders[1] {
 		t.Fatal("Song Position Pointer did not select its sixteenth-note location")
+	}
+}
+
+func TestRealtimeClockAndTransportRespectTheNativeClockSource(t *testing.T) {
+	for _, mode := range []byte{0, 2, 3} {
+		t.Run(string(rune('0'+mode)), func(t *testing.T) {
+			p := model.New()
+			p.Song.State[31] = mode
+			e := replay.New(p)
+			Apply(e, []byte{0xfa})
+			Apply(e, []byte{0xfb})
+			if e.Playing {
+				t.Fatal("MIDI transport started a different native clock source")
+			}
+			e.Play(false)
+			Apply(e, []byte{0xf2, 17, 0})
+			Apply(e, []byte{0xf8})
+			Apply(e, []byte{0xfc})
+			if !e.Playing || e.Row != 0 || e.TickInRow != 0 {
+				t.Fatal("MIDI clock, pointer or stop changed another clock source")
+			}
+		})
+	}
+}
+
+func TestNativeMIDICompensationAppliesOnStartAndContinue(t *testing.T) {
+	p := model.New()
+	p.Song.State[31], p.Song.State[57] = 1, 7
+	p.Song.Patterns[0][0] = model.Cell{Note: 60, Instrument: 1}
+	p.Song.Patterns[0][1] = model.Cell{Note: 64, Instrument: 1}
+	p.Song.Patterns[0][2] = model.Cell{Note: 67, Instrument: 1}
+	e := replay.New(p)
+	Apply(e, []byte{0xfa})
+	e.Tick()
+	if e.Row != 1 || e.TickInRow != 1 || e.Voices[0].Note != 64 || e.Ticks != 7 {
+		t.Fatalf("seven native compensation calls did not initialize row 1: row=%d pulse=%d note=%d ticks=%d", e.Row, e.TickInRow, e.Voices[0].Note, e.Ticks)
+	}
+	Apply(e, []byte{0xfc})
+	Apply(e, []byte{0xf8})
+	Apply(e, []byte{0xfb})
+	e.Tick()
+	if e.Row != 2 || e.TickInRow != 2 || e.Voices[0].Note != 67 || e.Ticks != 14 {
+		t.Fatal("Continue failed to compensate from the retained pulse position")
+	}
+	Apply(e, []byte{0xfa})
+	e.Tick()
+	if e.Row != 1 || e.TickInRow != 1 || e.Voices[0].Note != 64 {
+		t.Fatal("Start failed to reset the arrangement before compensation")
+	}
+}
+
+func TestNativeSpeedControllerCanOverrideExternalPulseSpacing(t *testing.T) {
+	p := model.New()
+	p.Song.State[31] = 5
+	e := replay.New(p)
+	Apply(e, []byte{0xfa})
+	ApplyMapped(e, []byte{0xbf, 21, 16})
+	for range 4 {
+		Apply(e, []byte{0xf8})
+		e.Tick()
+	}
+	if e.Speed != 4 || e.Row != 1 || e.TickInRow != 0 {
+		t.Fatal("native controller 21 did not update external replay-call spacing")
 	}
 }
 

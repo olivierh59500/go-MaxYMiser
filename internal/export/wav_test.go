@@ -8,11 +8,27 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/olivierh59500/go-MaxYMiser/internal/model"
 )
 
 type fragmentedReader struct {
 	data []byte
 	size int
+}
+
+func TestExternalClockExportReportsMissingTimingWithoutCreatingSilentAudio(t *testing.T) {
+	for _, mode := range []byte{1, 3} {
+		p := model.Demo()
+		p.Song.State[31] = mode
+		path := filepath.Join(t.TempDir(), "external.wav")
+		if err := WAV(p, path, time.Second); err == nil {
+			t.Fatal("offline rendering accepted a song with no clock pulses")
+		}
+		if _, err := os.Stat(path); !os.IsNotExist(err) {
+			t.Fatal("missing external timing left a misleading WAV output")
+		}
+	}
 }
 
 func (r *fragmentedReader) Read(p []byte) (int, error) {

@@ -60,12 +60,12 @@ var helpText = [][]string{
 		"Controllers must be enabled in Settings; native CC values are scaled.",
 		"Settings A–E values are 00–0F, corresponding to MIDI channels 1–16.",
 		"MIDI sounds: 00 disabled, 01–20 YM, DD middle-C drums, 01–08 PCM.",
-		"Clock: six F8 pulses advance a tracker row; sounds retain internal cadence.",
+		"Clock: six F8 pulses make a row; instruments/effects advance once per pulse.",
 		"Start/continue/stop and Song Position Pointer are supported.",
 		"CC16–20: mutes · 21: speed · 22: position · 23: Jam · 24: mode · 25: row",
 		"CC44–47 queue patterns at the boundary; sound controllers change parameters.",
 		"Instrument CC edits are saved/undoable. MMC play/stop accepts complete frames.",
-		"Virtual-port output is verified; physical Sync24 and latency remain separate.",
+		"Latency advances 0–255 pulses on Start/Continue. Physical Sync24 is unavailable.",
 	},
 }
 

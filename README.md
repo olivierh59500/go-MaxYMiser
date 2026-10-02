@@ -212,8 +212,9 @@ The headless command requires no graphics window. WAV export produces stereo
 The graphical editor renders WAVs in the background; choose the duration in
 **Settings → WAV export seconds** (up to one hour).
 The adjacent **Song** button measures one arrangement traversal to its first
-repeat, respecting speed commands, pattern breaks and Jam sections. External
-clock timing requires an explicit duration. The measured traversal is not a
+repeat, respecting speed commands, pattern breaks and Jam sections. Select
+internal clock before exporting a tracker WAV: an offline renderer cannot
+receive the external timing. The measured traversal is not a
 claim that every oscillator or sample loops without a phase difference.
 The headless command exposes the same option as `-song-duration`, for WAV or
 SNDH exports. WAV rendering handles partial reader chunks and removes its own
@@ -276,8 +277,16 @@ they should not be described as bit-exact hardware emulation. MIDI input is
 available on macOS, including notes, program changes, controllers, transport,
 external clock and Song Position Pointer. Native A–E channel assignments are
 editable in Settings (hexadecimal 00–0F); matching channels can allocate YM
-polyphony. The D/E assignments control the two PCM voices. MIDI clocks advance
-one tracker row per six pulses while sound sequences retain their replay rate.
+polyphony. The D/E assignments control the two PCM voices. Each external MIDI
+clock pulse advances the complete replayer, including instrument sequences and
+effects. Selecting the clock resets row speed to six pulses, as in the original
+editor. The native speed controller can override this live value; pattern `S`
+commands and the ordinary speed editor remain disabled with external clock.
+**Settings → Latency** accepts 0–255 compensation pulses and applies them on
+both Start and Continue. The setting is retained in MYS and native CNF files.
+Start, Continue, Stop and Song Position Pointer only control playback when
+MIDI clock is selected. An imported Sync24 selection remains preserved; select
+MIDI clock to use a MIDI input in its place.
 Controllers 44–47 queue patterns at the next pattern boundary.
 **MIDI output** lists macOS destinations and connects only to the selected one.
 The renderer queues transport, clock and the two PCM-pattern voices in MIDI mode.
