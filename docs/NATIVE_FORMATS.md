@@ -67,6 +67,15 @@ versions 1–3. Version 0 uses four-bit DAC levels terminated by a negative byte
 the import uses the original editor's inverse DAC lookup. New exports use MYI3.
 Import remaps definitions into unused sequence and sample slots and fails
 without changing the bank when there is insufficient room.
+The project-level importer additionally reserves sequence IDs called by either
+effect column, PCM sample IDs from both lanes and reserved order rows, MIDI
+sample assignments and live voice overrides. A referenced empty definition is
+not free storage for an imported instrument.
+
+Independent byte fixtures cover MYI0–3's full sequence stride, final signed word,
+length/repeat bytes and version-specific sample boundary. MYI0's negative end
+marker is separate from the 32 KiB decoded sample limit; a complete 32 KiB
+payload followed by its marker is accepted, while a longer sample is rejected.
 
 The supplied Atari editor was used to load a Go-exported MYI3: instrument
 parameters, arpeggio/mixer/volume/PWM sequences and the sample's initial bytes

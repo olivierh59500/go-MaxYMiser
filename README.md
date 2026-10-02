@@ -34,6 +34,9 @@ trying the editor. External MaxYMiser files are not needed to launch it.
   definitions are shared by every instrument referring to the same ID.
   **Load MYI / Save MYI** exchange individual instruments with their sequences
   and optional sample. New exports use the original editor's MYI3 layout.
+  Import reserves sequence/sample IDs referenced by the partition, MIDI settings
+  or live voices, including deliberately empty definitions. Allocation failure
+  retains the preceding bank and score; successful import supports undo.
   **Copy** duplicates a sound while retaining its shared sequence/sample links.
   The Square/Buzzer/Timer matrix toggles effect masks directly. **Preview** and
   note keys in Instruments/Sequences audition sounds without writing the score.

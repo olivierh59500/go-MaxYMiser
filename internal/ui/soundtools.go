@@ -260,15 +260,25 @@ func (a *App) soundModal(modal, entry string) bool {
 			file, err = native.DecodeInstrument(raw)
 		}
 		e, _ := a.synth.Snapshot()
-		bank := e.Project.Bank
+		var reserved native.InstrumentReservations
+		for _, voice := range e.Voices {
+			for _, id := range voice.Parameters[32:40] {
+				reserved.Sequences[id] = true
+			}
+		}
+		for _, voice := range e.DMA {
+			if voice.Sample > 0 && voice.Sample <= model.MaxSamples {
+				reserved.Samples[voice.Sample-1] = true
+			}
+		}
 		if err == nil {
-			err = native.ImportInstrument(&bank, a.instrument, file)
+			err = project.ImportInstrument(e.Project, a.instrument, file, reserved)
 		}
 		if err != nil {
 			a.status = err.Error()
 		} else {
 			a.remember()
-			a.synth.Edit(func(e *replay.Engine) { e.Project.Bank = bank; e.Stop() })
+			a.synth.Edit(func(engine *replay.Engine) { engine.Project.Bank = e.Project.Bank; engine.Stop() })
 			a.dirty, a.status = true, "Native instrument loaded with independent sequence slots"
 		}
 	case "Save instrument (.myi)":

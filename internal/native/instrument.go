@@ -19,6 +19,13 @@ type InstrumentFile struct {
 	Trailing   []byte
 }
 
+// InstrumentReservations describes references outside the voice bank, such as
+// pattern sequence commands, PCM lanes and live audition settings.
+type InstrumentReservations struct {
+	Sequences [model.MaxSequences]bool
+	Samples   [model.MaxSamples]bool
+}
+
 // Legacy MYI0 samples contain four-bit DAC levels and a negative end marker.
 // This conversion matches the original editor's inverse DAC table.
 var legacyDACPCM = model.DACPCM
@@ -58,7 +65,7 @@ func DecodeInstrument(data []byte) (InstrumentFile, error) {
 		}
 	}
 	if file.Instrument[36] != 0 {
-		if len(data)-end > 32768 {
+		if file.Version != 0 && len(data)-end > 32768 {
 			return file, fmt.Errorf("native: MYI sample exceeds 32 KiB")
 		}
 		if file.Version == 0 {
@@ -68,6 +75,9 @@ func DecodeInstrument(data []byte) (InstrumentFile, error) {
 				}
 				if level > 15 {
 					return file, fmt.Errorf("native: invalid legacy MYI0 DAC level")
+				}
+				if len(file.Sample) == 32768 {
+					return file, fmt.Errorf("native: MYI sample exceeds 32 KiB")
 				}
 				file.Sample = append(file.Sample, legacyDACPCM[level])
 			}
@@ -134,6 +144,12 @@ func ExportInstrument(bank *model.VoiceBank, index int) (InstrumentFile, error) 
 // ImportInstrument allocates unused sequence/sample slots before updating the
 // destination instrument. It never overwrites definitions used by other sounds.
 func ImportInstrument(bank *model.VoiceBank, index int, file InstrumentFile) error {
+	return ImportInstrumentReserved(bank, index, file, InstrumentReservations{})
+}
+
+// ImportInstrumentReserved also protects references held by the composition
+// and live playback, without placing those unrelated bytes in a MYI file.
+func ImportInstrumentReserved(bank *model.VoiceBank, index int, file InstrumentFile, reserved InstrumentReservations) error {
 	if index < 0 || index >= model.MaxInstruments {
 		return fmt.Errorf("native: invalid instrument index")
 	}
@@ -141,7 +157,7 @@ func ImportInstrument(bank *model.VoiceBank, index int, file InstrumentFile) err
 	if file.Version > 3 || len(file.Sample) > 32768 {
 		return fmt.Errorf("native: invalid instrument file dimensions")
 	}
-	var used [256]bool
+	used := reserved.Sequences
 	used[0] = true
 	for _, instrument := range bank.Instruments {
 		for _, id := range instrument[48:56] {
@@ -188,7 +204,7 @@ func ImportInstrument(bank *model.VoiceBank, index int, file InstrumentFile) err
 	}
 	inst[36] = 0
 	if len(file.Sample) > 0 {
-		var sampleUsed [8]bool
+		sampleUsed := reserved.Samples
 		for _, existing := range bank.Instruments {
 			if id := existing[36]; id > 0 && id <= 8 {
 				sampleUsed[id-1] = true

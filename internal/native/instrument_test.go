@@ -2,6 +2,7 @@ package native
 
 import (
 	"bytes"
+	"encoding/binary"
 	"testing"
 
 	"github.com/olivierh59500/go-MaxYMiser/internal/model"
@@ -53,6 +54,45 @@ func TestMYIVersionsRetainTheirSequenceWordCounts(t *testing.T) {
 	}
 }
 
+func TestIndependentMYIVersionFixturesKeepSignedWordsAndSampleBoundaries(t *testing.T) {
+	for version := byte(0); version <= 3; version++ {
+		stride, count := 64, 7
+		if version >= 2 {
+			stride = 128
+		}
+		if version == 3 {
+			count = 8
+		}
+		raw := make([]byte, 56+count*stride)
+		copy(raw, "MYM0.MYI")
+		raw[3] = '0' + version
+		raw[8+36] = 1
+		for sequence := 0; sequence < count; sequence++ {
+			at := 56 + sequence*stride
+			binary.BigEndian.PutUint16(raw[at:], 0xffff)
+			binary.BigEndian.PutUint16(raw[at+stride-4:], uint16(0x8000+sequence))
+			raw[at+stride-2], raw[at+stride-1] = byte(stride/2-1), byte(stride/2-2)
+		}
+		wantSample := []byte{0, 127, 128, 255}
+		if version == 0 {
+			raw = append(raw, 0, 8, 13, 15, 255)
+			wantSample = []byte{128, 148, 7, 127}
+		} else {
+			raw = append(raw, wantSample...)
+		}
+		file, err := DecodeInstrument(raw)
+		if err != nil || !bytes.Equal(file.Sample, wantSample) {
+			t.Fatalf("MYI%d sample started at a later version's offset: %v", version, err)
+		}
+		for sequence := 0; sequence < count; sequence++ {
+			seq := file.Sequences[sequence]
+			if seq.Length != byte(stride/2-1) || seq.Repeat != byte(stride/2-2) || seq.Values[0] != 0xffff || seq.Values[stride/2-2] != uint16(0x8000+sequence) {
+				t.Fatalf("MYI%d sequence %d lost its final signed word or native loop", version, sequence)
+			}
+		}
+	}
+}
+
 func TestLegacyMYI0DigiSamplesUseTheOriginalInverseDACMapping(t *testing.T) {
 	file := InstrumentFile{Version: 0}
 	file.Instrument[36] = 1
@@ -64,6 +104,24 @@ func TestLegacyMYI0DigiSamplesUseTheOriginalInverseDACMapping(t *testing.T) {
 	got, err := DecodeInstrument(raw)
 	if err != nil || !bytes.Equal(got.Sample, []byte{128, 148, 7, 127}) {
 		t.Fatalf("legacy DAC conversion differs: %v %v", got.Sample, err)
+	}
+}
+
+func TestLegacyMYI0MaximumSampleKeepsItsSeparateEndMarker(t *testing.T) {
+	file := InstrumentFile{Version: 0}
+	file.Instrument[36] = 1
+	raw, err := EncodeInstrument(file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	payload := append(bytes.Repeat([]byte{8}, 32768), 255)
+	got, err := DecodeInstrument(append(append([]byte(nil), raw...), payload...))
+	if err != nil || len(got.Sample) != 32768 || got.Sample[32767] != legacyDACPCM[8] {
+		t.Fatalf("a legacy end marker reduced the maximum sample length: %v", err)
+	}
+	tooLong := append(bytes.Repeat([]byte{8}, 32769), 255)
+	if _, err := DecodeInstrument(append(append([]byte(nil), raw...), tooLong...)); err == nil {
+		t.Fatal("an oversized legacy sample became a valid signed payload")
 	}
 }
 

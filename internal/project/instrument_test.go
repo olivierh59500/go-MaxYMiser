@@ -4,11 +4,84 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 
 	"github.com/olivierh59500/go-MaxYMiser/internal/model"
 	"github.com/olivierh59500/go-MaxYMiser/internal/native"
 )
+
+func TestInstrumentImportProtectsBothStoredSequenceEffectColumns(t *testing.T) {
+	p := model.New()
+	p.Song.Patterns[0][0] = model.Cell{Effect1: 'L', Parameter1: 3, Effect2: 'A', Parameter2: 4}
+	file := native.InstrumentFile{Version: 3}
+	file.Instrument.SetName("Imported")
+	file.Sequences[0] = model.Sequence{Length: 2, Values: [63]uint16{15, 14}, Repeat: 1}
+	file.Sequences[1] = model.Sequence{Length: 3, Values: [63]uint16{0, 4, 7}, Repeat: 0}
+	before := p.Clone()
+	if err := ImportInstrument(p, 7, file, native.InstrumentReservations{}); err != nil {
+		t.Fatal(err)
+	}
+	if p.Bank.Sequences[3] != before.Bank.Sequences[3] || p.Bank.Sequences[4] != before.Bank.Sequences[4] || !reflect.DeepEqual(p.Song, before.Song) {
+		t.Fatal("import overwrote sequences called only by the partition")
+	}
+	if p.Bank.Instruments[7][48] == 3 || p.Bank.Instruments[7][49] == 4 || p.Bank.Sequences[p.Bank.Instruments[7][49]] != file.Sequences[1] {
+		t.Fatal("import did not allocate independent unreferenced sequence IDs")
+	}
+}
+
+func TestInstrumentImportProtectsReservedPCMSampleLanesAndMIDIMappings(t *testing.T) {
+	p := model.New()
+	p.Song.State[49] = 0
+	p.Song.Orders[200][3] = 2
+	p.Song.Patterns[2][0] = model.Cell{Note: 60, Instrument: 2, Effect1: 64, Parameter1: 3}
+	file := native.InstrumentFile{Version: 3, Sample: []byte{0, 127, 128, 255}}
+	file.Instrument[36] = 1
+	if err := ImportInstrument(p, 7, file, native.InstrumentReservations{}); err != nil {
+		t.Fatal(err)
+	}
+	if p.Bank.Instruments[7][36] != 4 || !bytes.Equal(p.Bank.Samples[3].PCM, file.Sample) {
+		t.Fatal("sample import reused a slot held by PCM rows or MIDI settings")
+	}
+	for slot := 0; slot < 3; slot++ {
+		if len(p.Bank.Samples[slot].PCM) != 0 {
+			t.Fatal("import changed a deliberately empty referenced sample")
+		}
+	}
+}
+
+func TestReferencedEmptySampleExhaustionKeepsTheInstrumentBankUnchanged(t *testing.T) {
+	p := model.New()
+	p.Song.Orders[200][3] = 2
+	for id := byte(1); id <= 8; id++ {
+		p.Song.Patterns[2][id].Instrument = id
+	}
+	before := p.Clone()
+	file := native.InstrumentFile{Version: 3, Sample: []byte{1, 2, 3}}
+	file.Instrument[36] = 1
+	file.Sequences[0] = model.Sequence{Length: 2, Values: [63]uint16{15, 9}, Repeat: 1}
+	if err := ImportInstrument(p, 7, file, native.InstrumentReservations{}); err == nil {
+		t.Fatal("referenced empty sample slots were treated as available storage")
+	}
+	if !reflect.DeepEqual(p.Bank, before.Bank) || !reflect.DeepEqual(p.Song, before.Song) {
+		t.Fatal("allocation exhaustion left a partially imported sound")
+	}
+}
+
+func TestInstrumentImportProtectsAdditionalLiveReferences(t *testing.T) {
+	p := model.New()
+	reserved := native.InstrumentReservations{}
+	reserved.Sequences[3], reserved.Samples[1] = true, true
+	file := native.InstrumentFile{Version: 3, Sample: []byte{1, 2}}
+	file.Instrument[36] = 1
+	file.Sequences[0] = model.Sequence{Length: 2, Values: [63]uint16{15, 8}, Repeat: 1}
+	if err := ImportInstrument(p, 7, file, reserved); err != nil {
+		t.Fatal(err)
+	}
+	if p.Bank.Instruments[7][48] == 3 || p.Bank.Instruments[7][36] != 3 {
+		t.Fatal("a live sequence/sample override was overwritten by instrument import")
+	}
+}
 
 func TestInstrumentCanBeResavedWithEditedSequencesAndSample(t *testing.T) {
 	for _, packed := range []bool{false, true} {

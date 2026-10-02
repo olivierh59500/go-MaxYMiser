@@ -52,6 +52,47 @@ func TestSoundExportsCanUpdateExistingFilesWithoutSavingTheProject(t *testing.T)
 	}
 }
 
+func TestMYIImportRetainsScoreOnlySequenceAndLiveSampleReferences(t *testing.T) {
+	p := model.New()
+	p.Song.Patterns[0][0] = model.Cell{Effect1: 'L', Parameter1: 3, Effect2: 'A', Parameter2: 4}
+	app, err := New(p, "current.mys", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer app.Close()
+	file := native.InstrumentFile{Version: 3, Sample: []byte{0, 127, 128, 255}}
+	file.Instrument.SetName("Imported")
+	file.Instrument[36] = 1
+	file.Sequences[0] = model.Sequence{Length: 2, Values: [63]uint16{15, 8}, Repeat: 1}
+	raw, err := native.EncodeInstrument(file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(t.TempDir(), "import.myi")
+	if err := os.WriteFile(path, raw, 0600); err != nil {
+		t.Fatal(err)
+	}
+	app.synth.Edit(func(e *replay.Engine) {
+		e.Voices[0].Parameters[32] = 5
+		e.DMA[0].Sample = 2
+	})
+	app.instrument = 7
+	app.modal, app.entry = "Load instrument (.myi)", path
+	app.applyModal()
+	e, _ := app.synth.Snapshot()
+	if e.Project.Bank.Instruments[7].Name() != "Imported" || e.Project.Bank.Instruments[7][48] != 6 || e.Project.Bank.Instruments[7][36] != 3 {
+		t.Fatalf("MYI allocation ignored score/live references: %s", app.status)
+	}
+	if e.Project.Bank.Sequences[3].Values[0] != 0 || e.Project.Bank.Sequences[4].Values[0] != 0 || e.Project.Bank.Sequences[5].Values[0] != 0 || len(e.Project.Bank.Samples[1].PCM) != 0 {
+		t.Fatal("MYI import overwrote a referenced empty definition")
+	}
+	app.restore(false)
+	e, _ = app.synth.Snapshot()
+	if e.Project.Bank.Instruments[7].Name() != "" || len(e.Project.Bank.Samples[2].PCM) != 0 || e.Project.Song.Patterns[0][0].Parameter1 != 3 {
+		t.Fatal("undo did not restore the pre-import bank and score references")
+	}
+}
+
 func TestGeneratorAndMorphUpdateSelectedSequencesAndUndo(t *testing.T) {
 	p := model.Demo()
 	p.Bank.Sequences[7] = model.Sequence{Length: 6, Repeat: 5, Values: [63]uint16{3, 3, 3, 3, 3, 3}}
