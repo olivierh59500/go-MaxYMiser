@@ -19,6 +19,7 @@ var helpText = [][]string{
 		"Ctrl+Left/Right: song position · Shift+Left/Right: live track pattern",
 		"Enter: edit/preview · Ctrl+O/S: open/save · Ctrl+Shift+S: Save as",
 		"Right-click Song: from beginning · right-click Pattern: from cursor row",
+		"Ctrl+N / Unused: blank unreferenced pattern or sequence in its workspace",
 		"Hexadecimal values: notes use names; instrument IDs 01–20; sequences 00–FF",
 		"Volume: 0 loudest, F quietest · track mutes keep live notes available",
 	},
@@ -76,7 +77,7 @@ func (a *App) drawDetailedHelp(dst *ebiten.Image) {
 		a.btn(dst, topic, 42+i*232, 207, 216, 32, fmt.Sprintf("help:%d", i), a.helpTopic == i)
 	}
 	for i, line := range helpText[a.helpTopic] {
-		a.text(dst, line, 42, float64(265+i*35), 12, fg)
+		a.text(dst, line, 42, float64(265+i*32), 12, fg)
 	}
 	a.text(dst, "MaxYMiser: gwEm / Dma-Sc / STSurvivor · Go: Olivier Houte / Malakh Software", 42, 650, 11, dim)
 }

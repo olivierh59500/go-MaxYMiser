@@ -285,6 +285,7 @@ func (a *App) drawPatterns(dst *ebiten.Image, e *replay.Engine) {
 	a.btn(dst, "Rec pattern", 516, 199, 128, 32, "record-pattern", a.editing && e.PatternMode)
 	a.btn(dst, "YM", 658, 199, 70, 32, "mode:ym", a.channel < 3)
 	a.btn(dst, "DMA", 738, 199, 80, 32, "mode:dma", a.channel == 3)
+	a.btn(dst, "Unused", 832, 199, 76, 32, "pattern-unused", false)
 	if a.channel == 3 {
 		a.drawDMAPattern(dst, e)
 		return
@@ -432,6 +433,7 @@ func (a *App) drawSequences(dst *ebiten.Image, e *replay.Engine) {
 	a.btn(dst, fmt.Sprintf("Repeat %02X", s.Repeat), 632, 203, 146, 32, "seq-repeat", false)
 	a.btn(dst, "Generate / morph", 820, 203, 198, 32, "seq-tools", a.sequenceTools)
 	a.btn(dst, "Clear", 1032, 203, 96, 32, "seq-clear", false)
+	a.btn(dst, "Unused", 1142, 203, 90, 32, "sequence-unused", false)
 	for i, item := range []struct{ label, action string }{{"Cut", "sequence-cut"}, {"Copy", "sequence-copy"}, {"Paste", "sequence-paste"}} {
 		a.btn(dst, item.label, 42+i*112, 636, 100, 28, item.action, false)
 	}
@@ -680,6 +682,16 @@ func (a *App) keyboard() {
 		return
 	}
 	if a.ctrl {
+		if inpututil.IsKeyJustPressed(ebiten.KeyN) {
+			if a.tab == "Sequences" {
+				a.action("sequence-unused")
+				return
+			}
+			if a.tab == "Patterns" || a.tab == "Edit" {
+				a.action("pattern-unused")
+				return
+			}
+		}
 		if a.tab == "Sequences" {
 			for key, action := range map[ebiten.Key]string{ebiten.KeyC: "sequence-copy", ebiten.KeyX: "sequence-cut", ebiten.KeyV: "sequence-paste"} {
 				if inpututil.IsKeyJustPressed(key) {
@@ -952,6 +964,9 @@ func (a *App) enterField(r rune) {
 	}
 }
 func (a *App) action(name string) {
+	if a.modal == "" && a.unusedAction(name) {
+		return
+	}
 	if a.modal == "" && a.transportStartAction(name) {
 		return
 	}

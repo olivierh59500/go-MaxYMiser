@@ -125,6 +125,7 @@ files use **Save as** rather than treating virtual paths as filesystem targets.
 | Open / save | Ctrl+O / Ctrl+S |
 | Save as | Ctrl+Shift+S |
 | Undo / redo | Ctrl+Z / Ctrl+Y |
+| Next unused pattern / sequence | Ctrl+N in its workspace |
 | Jam mode | F10 |
 | Disable Jam | Shift+F10 |
 | Previous / next song position | Ctrl+Left / Ctrl+Right |
@@ -138,6 +139,11 @@ files use **Save as** rather than treating virtual paths as filesystem targets.
 Instrument and sequence values use hexadecimal notation. Playback settings use
 decimal notation. Notes entered during playback and recording target the
 currently playing row.
+**Unused**, or Ctrl+N in Patterns/Edit or Sequences, selects a blank definition
+after the current ID and wraps through the native capacity. Stored content,
+reserved arrangement rows, instrument links, both effect columns and live
+overrides are protected. Pattern selection preserves playback; allocating new
+native storage participates in undo. Sequence 00 remains reserved.
 **Record** starts song playback with note entry enabled; **Stop** leaves recording
 mode. F9 maps note keys to instruments played at middle C. **Help** provides
 separate keyboard, effects, instruments, native format/YM and MIDI references.
