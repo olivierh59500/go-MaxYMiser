@@ -6,11 +6,25 @@ import (
 	"fmt"
 	"github.com/olivierh59500/go-MaxYMiser/internal/model"
 	"github.com/olivierh59500/go-MaxYMiser/internal/replay"
+	"io"
 	"os"
 	"time"
 )
 
 func WAV(p *model.Project, path string, duration time.Duration) error {
+	engine := replay.New(p)
+	engine.Play(false)
+	return writeAudio(replay.NewSynth(engine, 48000), path, duration)
+}
+func YM(data []byte, path string, duration time.Duration) error {
+	synth := replay.NewSynth(replay.New(model.New()), 48000)
+	if err := synth.LoadYM(data); err != nil {
+		return err
+	}
+	defer synth.CloseYM()
+	return writeAudio(synth, path, duration)
+}
+func writeAudio(reader io.Reader, path string, duration time.Duration) error {
 	if duration <= 0 || duration > time.Hour {
 		return fmt.Errorf("export: duration must be positive and at most one hour")
 	}
@@ -44,14 +58,11 @@ func WAV(p *model.Project, path string, duration time.Duration) error {
 	if _, err = f.Write(header); err != nil {
 		return err
 	}
-	engine := replay.New(p)
-	engine.Play(false)
-	synth := replay.NewSynth(engine, rate)
 	buffer := make([]byte, 4096*4)
 	for left := frames; left > 0; {
 		count := min(left, 4096)
 		chunk := buffer[:count*4]
-		if _, err = synth.Read(chunk); err != nil {
+		if _, err = reader.Read(chunk); err != nil {
 			return err
 		}
 		if _, err = f.Write(chunk); err != nil {

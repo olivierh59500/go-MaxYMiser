@@ -29,8 +29,8 @@ func main() {
 	}
 	p := model.Demo()
 	var err error
-	if *song != "" && strings.EqualFold(filepath.Ext(*song), ".ym") {
-	} else if *song != "" || *bank != "" {
+	isYM := *song != "" && strings.EqualFold(filepath.Ext(*song), ".ym")
+	if !isYM && (*song != "" || *bank != "") {
 		p, err = project.Load(*song, *bank)
 		if err != nil {
 			log.Fatal(err)
@@ -41,7 +41,16 @@ func main() {
 		return
 	}
 	if *wav != "" {
-		if err = export.WAV(p, *wav, *duration); err != nil {
+		if isYM {
+			raw, e := os.ReadFile(*song)
+			if e != nil {
+				log.Fatal(e)
+			}
+			err = export.YM(raw, *wav, *duration)
+		} else {
+			err = export.WAV(p, *wav, *duration)
+		}
+		if err != nil {
 			log.Fatal(err)
 		}
 		return

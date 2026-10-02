@@ -23,7 +23,9 @@ trying the editor. External MaxYMiser files are not needed to launch it.
   fourth native pattern stream; note, instrument, volume and two effect columns.
 - **Song**: the four independent pattern lists making up the arrangement.
 - **Instruments**: both banks of 16 instruments, detune masks, sequence links,
-  envelope, timer, sample and PWM parameters.
+  envelope, timer, sample and PWM parameters. Linked sequence values are shown
+  beside the direct settings; click the values to open that sequence. Sequence
+  definitions are shared by every instrument referring to the same ID.
 - **Sequences**: up to 256 native 16-bit sequences, with length and repeat.
 - **Samples**: eight banks of signed PCM, with raw PCM and 8/16-bit WAV import.
 - **YM**: original YM playback, live register inspection and proposed tracker
@@ -50,6 +52,7 @@ synthesizer output.
 | Upper note keyboard | Q 2 W 3 E R 5 T 6 Y 7 U |
 | Open / save | Ctrl+O / Ctrl+S |
 | Undo / redo | Ctrl+Z / Ctrl+Y |
+| Jam mode | F10 |
 | Copy / paste pattern | Ctrl+C / Ctrl+V |
 
 Instrument and sequence values use hexadecimal notation. Playback settings use
@@ -102,7 +105,8 @@ tracker instrument.
 
 Load the resulting JSON through **Composer profile** in the YM workspace before
 reconstruction. The profile records matches, occurrences and source examples.
-The recording itself remains the comparison reference.
+The recording itself remains the comparison reference. See
+[YM reconstruction](docs/YM_RECONSTRUCTION.md) for the corpus method and its limits.
 
 ## Implementation status
 

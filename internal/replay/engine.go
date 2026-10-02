@@ -65,6 +65,9 @@ func (e *Engine) Reset() {
 	e.Patterns = e.Project.Song.Orders[0]
 }
 func (e *Engine) Play(pattern bool) {
+	if !pattern {
+		e.loadPosition()
+	}
 	e.Playing = true
 	e.PatternMode = pattern
 	e.TickInRow = 0
@@ -125,7 +128,7 @@ func (e *Engine) Tick() {
 						e.Position = int(e.Project.Song.Repeat)
 						e.Loops++
 					}
-					e.Patterns = e.Project.Song.Orders[e.Position]
+					e.loadPosition()
 				}
 			}
 		}
@@ -499,4 +502,41 @@ func (e *Engine) configure() {
 		}
 		e.Registers[13] = shape
 	}
+}
+
+func (e *Engine) loadPosition() {
+	length := int(e.Project.Song.Length)
+	for checked := 0; checked < length; checked++ {
+		order := e.Project.Song.Orders[e.Position]
+		loop := false
+		for _, id := range order {
+			loop = loop || id == model.LoopPattern
+		}
+		if !loop {
+			e.Patterns = order
+			return
+		}
+		if e.Jam {
+			next := 0
+			for at := e.Position - 1; at >= 0; at-- {
+				for _, id := range e.Project.Song.Orders[at] {
+					if id == model.LoopPattern {
+						next = at + 1
+						break
+					}
+				}
+				if next != 0 {
+					break
+				}
+			}
+			e.Position = next
+		} else {
+			e.Position++
+			if e.Position >= length {
+				e.Position = int(e.Project.Song.Repeat)
+				e.Loops++
+			}
+		}
+	}
+	e.Patterns = [4]byte{255, 255, 255, 255}
 }
