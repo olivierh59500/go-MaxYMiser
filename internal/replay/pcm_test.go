@@ -24,7 +24,7 @@ func TestPCMUsesNativeNoteRatesAndModeAllocation(t *testing.T) {
 	e.Tick()
 	s := NewSynth(e, 48000)
 	s.configure()
-	if !s.pcm[0].active || !s.pcm[1].active || s.pcm[0].volume != 1 || math.Abs(s.pcm[0].step-16574.0/48000) > 1e-9 {
+	if !s.pcm[0].active || !s.pcm[1].active || s.pcm[0].volume != 1 || math.Abs(s.pcm[0].step-16574.0/25033) > 1e-9 || math.Abs(s.pcm[0].dacStep-48000.0/25033) > 1e-9 {
 		t.Fatal("two-voice mixing did not use native pitch and headroom")
 	}
 	p.Song.State[49] = 1
@@ -59,5 +59,25 @@ func TestPCMNoteOffAndVolumeOnlyRowsDoNotRestartSamples(t *testing.T) {
 	e.parseDMA(model.Cell{Instrument: 2})
 	if e.DMA[0].Volume != 0 {
 		t.Fatal("new PCM sample did not reset column attenuation")
+	}
+}
+
+func TestPCMUsesSTeDACHoldAndNativeModeSkipsInitialByte(t *testing.T) {
+	p := model.New()
+	p.Bank.Samples[0].PCM = []byte{10, 20, 30, 40, 50}
+	e := New(p)
+	e.TriggerSample(0, 48, 1)
+	e.Tick()
+	s := NewSynth(e, 48000)
+	s.configure()
+	if s.pcm[0].dacStep != 48000.0/25033 || s.pcm[0].step != 8287.0/25033 {
+		t.Fatal("resampled PCM bypassed native STe DAC cadence")
+	}
+	p.Song.State[49] = 3
+	e.TriggerSample(0, 48, 1)
+	e.Tick()
+	s.configure()
+	if s.pcm[0].position != 1 || s.pcm[0].dacStep != 48000.0/25033 || s.pcm[0].step != 1 {
+		t.Fatal("native PCM start/cadence does not match STe")
 	}
 }

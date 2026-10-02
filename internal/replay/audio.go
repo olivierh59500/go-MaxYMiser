@@ -26,6 +26,7 @@ type Synth struct {
 	waveform         [512]float32
 	waveAt           int
 	midi             midiOutputState
+	equalizer        equalizer
 }
 type timer struct {
 	kind             byte
@@ -40,10 +41,12 @@ type timer struct {
 	pwmRemaining     float64
 }
 type sampleVoice struct {
-	sample         int
-	position, step float64
-	volume         int
-	active         bool
+	sample            int
+	position, step    float64
+	volume            int
+	active            bool
+	dacPhase, dacStep float64
+	held              int
 }
 
 func NewSynth(e *Engine, rate int) *Synth {
@@ -88,6 +91,7 @@ func (s *Synth) Reset() {
 	s.timers = [3]timer{}
 	s.pcm = [2]sampleVoice{}
 	s.untilTick = 0
+	s.equalizer = equalizer{}
 }
 
 func (s *Synth) Read(p []byte) (int, error) {
@@ -117,17 +121,26 @@ func (s *Synth) Read(p []byte) (int, error) {
 				continue
 			}
 			pcm := s.Engine.Project.Bank.Samples[v.sample].PCM
-			at := int(v.position)
-			if at >= len(pcm) {
-				v.active = false
-				continue
+			if v.dacPhase <= 0 {
+				at := int(v.position)
+				if at >= len(pcm) {
+					v.active = false
+					continue
+				}
+				v.held = int(int8(pcm[at]))
+				v.position += v.step
+				v.dacPhase += v.dacStep
 			}
-			sample += (int(int8(pcm[at])) >> v.volume) * 128
-			v.position += v.step
+			v.dacPhase--
+			sample += (v.held >> v.volume) * 128
 		}
 		sample = sample * s.Engine.MasterVolume / 127
+		sample = s.equalizer.process(sample, s.Rate, s.Engine.Bass, s.Engine.Treble)
+		sample = int(float64(sample) * s.Engine.MicrowireGain)
 		sample = max(-32768, min(32767, sample))
 		left, right := sample, sample
+		left = int(float64(left) * s.Engine.MicrowireLeft)
+		right = int(float64(right) * s.Engine.MicrowireRight)
 		if s.Engine.Pan < 0 {
 			right = right * (16 + s.Engine.Pan) / 16
 		} else if s.Engine.Pan > 0 {
@@ -256,7 +269,15 @@ func (s *Synth) configure() {
 			if mode == 2 {
 				volume++
 			}
-			s.pcm[ch] = sampleVoice{sample: int(v.Sample) - 1, step: float64(rate) / float64(s.Rate), volume: volume, active: volume < 8}
+			dacRate := 25033
+			if mode == 3 {
+				dacRate = rate
+			}
+			position := 0.0
+			if mode == 3 {
+				position = 1
+			}
+			s.pcm[ch] = sampleVoice{sample: int(v.Sample) - 1, position: position, step: float64(rate) / float64(dacRate), dacStep: float64(s.Rate) / float64(dacRate), volume: volume, active: volume < 8}
 		}
 		if !v.Triggered && s.pcm[ch].active {
 			volume := int(v.Volume)

@@ -10,7 +10,7 @@ replay validation and hardware-specific integration.
 | Arrangement | Independent pattern lists, length/repeat, position selection, Jam markers, boundary-queued next-pattern controllers, duplicate pattern/sequence packing with reference remapping | More live resequencing scenarios |
 | Instruments | 32 definitions, scalar/mask editing, linked sequence values, individual MYI exchange and copying | More native MYI legacy/sample fixtures |
 | Sequences | 256 sequences, length/repeat, generation, signed values, range add/scale, copying and morphing | Additional shortcuts |
-| Samples | Eight banks, signed PCM/WAV import, gain, interpolated tuning, trim, sign conversion, native YMise DAC quantization, save and preview | Full STe mixer/filter comparison |
+| Samples | Eight banks, signed PCM/WAV import, gain, interpolated tuning, trim, sign conversion, native YMise DAC quantization, STe DAC cadence/rate fixtures, save and preview | Analog mixer/filter response is approximated digitally |
 | Native files | MYS/MYV lossless example round trips, MYI0–3 decode, MYI3 export, own SNDH import/export using a local replay template, ICE packing/unpacking verified against Atari routines | More cross-version fixtures |
 | YM | YM Player reference playback, register inspector, candidate score with selection ranges/explicit grids, onset-alignment proposals, composer corpus and cross-arrangement comparison | Improved modulation/envelope hypotheses |
 | Replay | Sequences, commands, native frequency/DAC tables, timer waveforms, PCM note rates/modes | Broader full-song and mixed-timer evidence; sample-grid timer scheduling remains distinct from cycle-exact hardware |

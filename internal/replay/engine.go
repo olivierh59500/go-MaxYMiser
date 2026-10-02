@@ -3,6 +3,7 @@ package replay
 
 import (
 	"github.com/olivierh59500/go-MaxYMiser/internal/model"
+	"math"
 	"strings"
 )
 
@@ -31,27 +32,28 @@ type PCMVoice struct {
 }
 
 type Engine struct {
-	Project                         *model.Project
-	Voices                          [3]Voice
-	DMA                             [2]PCMVoice
-	Registers                       [14]byte
-	EnvelopeWrite                   bool
-	Position, Row, TickInRow, Speed int
-	Playing, PatternMode, Jam       bool
-	Patterns                        [4]byte
-	Mutes, TimerMask, Zync          byte
-	Loops                           int
-	Break                           bool
-	Ticks                           uint64
-	MasterVolume, Pan, Bass, Treble int
-	pending                         [3]bool
-	pendingDMA                      [2]bool
-	ExternalClock                   bool
-	clockPulses                     int
-	clockRows                       int
-	rowParsed                       bool
-	NextPatterns                    [4]byte
-	nextPatternMask                 byte
+	Project                                      *model.Project
+	Voices                                       [3]Voice
+	DMA                                          [2]PCMVoice
+	Registers                                    [14]byte
+	EnvelopeWrite                                bool
+	Position, Row, TickInRow, Speed              int
+	Playing, PatternMode, Jam                    bool
+	Patterns                                     [4]byte
+	Mutes, TimerMask, Zync                       byte
+	Loops                                        int
+	Break                                        bool
+	Ticks                                        uint64
+	MasterVolume, Pan, Bass, Treble              int
+	MicrowireGain, MicrowireLeft, MicrowireRight float64
+	pending                                      [3]bool
+	pendingDMA                                   [2]bool
+	ExternalClock                                bool
+	clockPulses                                  int
+	clockRows                                    int
+	rowParsed                                    bool
+	NextPatterns                                 [4]byte
+	nextPatternMask                              byte
 }
 
 func New(p *model.Project) *Engine {
@@ -76,6 +78,7 @@ func (e *Engine) Reset() {
 	e.Mutes = e.Project.Song.State[37]
 	e.TimerMask = e.Project.Song.State[36] & 7
 	e.MasterVolume, e.Pan, e.Bass, e.Treble = 127, 0, 6, 6
+	e.MicrowireGain, e.MicrowireLeft, e.MicrowireRight = 1, 1, 1
 	e.Loops = 0
 	e.Ticks = 0
 	e.EnvelopeWrite = false
@@ -405,15 +408,24 @@ func (e *Engine) effect(v *Voice, code, value byte, muted bool) {
 	case 'T':
 		v.Transpose = int(int8(value))
 	case 'U':
+		if e.Project.Song.State[49] == 0 {
+			return
+		}
 		switch {
 		case value <= 12:
 			e.Bass = int(value)
 		case value >= 16 && value <= 28:
 			e.Treble = int(value - 16)
 		case value >= 128 && value <= 160:
-			e.MasterVolume = int(value-128) * 127 / 32
+			e.MicrowireGain = math.Pow(10, float64(int(value)-160)*2/20)
 		case value >= 192 && value <= 224:
-			e.Pan = int(value) - 208
+			pan := int(value) - 208
+			e.MicrowireLeft, e.MicrowireRight = 1, 1
+			if pan < 0 {
+				e.MicrowireRight = math.Pow(10, float64(pan)*2/20)
+			} else if pan > 0 {
+				e.MicrowireLeft = math.Pow(10, float64(-pan)*2/20)
+			}
 		}
 	case 'W':
 		v.Parameters[18] = value & 15

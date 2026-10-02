@@ -65,3 +65,21 @@ sequence levels, and main-call writes that overwrote timer-owned registers.
 The corrections are covered by regression tests. The audio renderer still
 schedules writes on its sample grid; matching these discrete values and rates
 does not claim cycle-exact 68000 interrupt timing.
+
+## PCM and Microwire
+
+Synthetic signed PCM fixtures were exported by Go and executed by the native
+SNDH replayer under Hatari in STe mode. Audio captures contain one sine sample,
+two mixed sine samples, and native-rate playback. Expected components near
+259 Hz / 176 Hz and 782 Hz are present in both renderers. Amplitude and analog
+filter response are not asserted to be identical between Hatari and YM Player.
+
+These captures and replay source exposed STe sample-and-hold at 25,033 Hz in
+resampling modes and the skipped initial sample byte in native mode. Regression
+tests cover DAC cadence, note rates, shifts, voice allocation and note-off.
+
+Microwire master/pan controls now use the native 2 dB attenuation increments
+independently of editor volume. Bass/treble control the Go digital shelving
+filters using 2 dB steps; default flat settings bypass processing. Frequency
+response tests verify low/high boosts and cuts. This preserves the intended
+controls but is not a transistor-level emulation of the LMC1992 analog circuit.
