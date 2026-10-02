@@ -6,9 +6,9 @@ replay validation and hardware-specific integration.
 
 | Area | Implemented | Remaining verification or work |
 | --- | --- | --- |
-| Tracker | Three YM voices, two PCM voices, both effect columns, live/step note entry, masked block cut/copy/paste, paste modes, row insert/delete, expand/shrink, transpose/remap, undo/redo | Song-wide remapping and additional editing shortcuts |
+| Tracker | Three YM voices, two PCM voices, both effect columns, live/step note entry, masked block cut/copy/paste, paste modes, row insert/delete, expand/shrink, block/song remap, transpose, undo/redo | Additional editing shortcuts |
 | Arrangement | Independent pattern lists, length/repeat, position selection, Jam markers, boundary-queued next-pattern controllers, duplicate pattern/sequence packing with reference remapping | More live resequencing scenarios |
-| Instruments | 32 definitions, scalar/mask editing, linked sequence values, individual MYI exchange | More native MYI legacy/sample fixtures, copy/remap convenience |
+| Instruments | 32 definitions, scalar/mask editing, linked sequence values, individual MYI exchange and copying | More native MYI legacy/sample fixtures |
 | Sequences | 256 sequences, length/repeat, generation, signed values, copying and morphing | Range modification and additional shortcuts |
 | Samples | Eight banks, signed PCM/WAV import, gain, interpolated tuning, trim, sign conversion, save and preview | Native YMise operation and full STe mixer/filter comparison |
 | Native files | MYS/MYV lossless example round trips, MYI0–3 decode, MYI3 export, own SNDH import/export using a local replay template, ICE unpacking | ICE packing |

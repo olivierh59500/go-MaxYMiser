@@ -30,6 +30,7 @@ trying the editor. External MaxYMiser files are not needed to launch it.
   definitions are shared by every instrument referring to the same ID.
   **Load MYI / Save MYI** exchange individual instruments with their sequences
   and optional sample. New exports use the original editor's MYI3 layout.
+  **Copy** duplicates a sound while retaining its shared sequence/sample links.
 - **Sequences**: up to 256 native 16-bit sequences, with length and repeat,
   ramp/triangle/sine/square generation, signed words, copying and morphing.
 - **Samples**: eight banks of signed PCM, with raw PCM and 8/16-bit WAV import,
@@ -37,6 +38,8 @@ trying the editor. External MaxYMiser files are not needed to launch it.
   independent preview.
 - **Edit**: row ranges, masked block copy/cut/paste with overwrite/overlay/underlay,
   row insertion/deletion, expand/shrink, transposition, attenuation and sound remap.
+  Sound remapping can cover the current block or every arrangement pattern
+  belonging to the selected YM/PCM track type.
   **Pack project** removes duplicate pattern/sequence definitions and remaps their
   references, including sequence-selection commands in both effect columns.
 - **YM**: original YM playback, live register inspection and proposed tracker

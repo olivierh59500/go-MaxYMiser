@@ -333,6 +333,7 @@ func (a *App) drawInstruments(dst *ebiten.Image, e *replay.Engine) {
 	a.btn(dst, "Save MYI", 1014, 202, 104, 34, "instrument-save", false)
 	a.btn(dst, "Rename", 1126, 202, 104, 34, "rename-instrument", false)
 	a.text(dst, "DIRECT SETTINGS", 320, 246, 10, dim)
+	a.btn(dst, "Copy", 670, 240, 98, 26, "instrument-copy", false)
 	a.text(dst, "SOUND SEQUENCES · click to edit", 820, 246, 10, dim)
 	labels := []string{"Portamento mask", "Arpeggio mask", "Vibrato mask", "Transpose mask", "Fixed frequency", "Fixed detune", "Sequence speed", "Pulse width", "Envelope shape", "Start sync", "Digi sample", "Digi rate", "Attenuation", "Detune coarse", "Detune fine", "Frequency resolution"}
 	offsets := []int{16, 17, 18, 19, 20, 21, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41}

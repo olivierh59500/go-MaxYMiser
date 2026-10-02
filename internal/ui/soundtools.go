@@ -109,6 +109,8 @@ func (a *App) soundAction(name string) bool {
 		a.beginFileBrowser("Load instrument (.myi)", "", false)
 	case "instrument-save":
 		a.beginFileBrowser("Save instrument (.myi)", fmt.Sprintf("instrument-%02X.myi", a.instrument+1), true)
+	case "instrument-copy":
+		a.modal, a.entry = "Copy instrument (destination 01–20)", fmt.Sprintf("%02X", min(32, a.instrument+2))
 	case "seq-tools":
 		a.sequenceTools = !a.sequenceTools
 	case "gen-signed":
@@ -202,6 +204,15 @@ func (a *App) soundModal(modal, entry string) bool {
 		return true
 	}
 	switch modal {
+	case "Copy instrument (destination 01–20)":
+		to, err := strconv.ParseUint(entry, 16, 8)
+		if err != nil || to < 1 || to > 32 {
+			a.status = "Enter an instrument ID from 01 to 20"
+			return true
+		}
+		a.remember()
+		a.synth.Edit(func(e *replay.Engine) { edit.CopyInstrument(&e.Project.Bank, a.instrument, int(to)-1) })
+		a.dirty, a.status = true, "Instrument copied with shared sequence links"
 	case "Load instrument (.myi)":
 		raw, err := os.ReadFile(entry)
 		var file native.InstrumentFile

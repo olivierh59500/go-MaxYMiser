@@ -40,7 +40,8 @@ func (a *App) drawPatternTools(dst *ebiten.Image, e *replay.Engine) {
 	a.btn(dst, "Transpose", 42, 528, 190, 36, "block-transpose", false)
 	a.btn(dst, "Attenuation", 248, 528, 190, 36, "block-volume", false)
 	a.btn(dst, "Remap sound", 454, 528, 190, 36, "block-remap", false)
-	a.btn(dst, "Pack project", 830, 528, 232, 36, "project-pack", false)
+	a.btn(dst, "Remap song", 660, 528, 190, 36, "song-remap", false)
+	a.btn(dst, "Pack project", 866, 528, 232, 36, "project-pack", false)
 	a.text(dst, "Transpose and remap use the selected row range; PCM edits apply to both sample voices.", 42, 595, 12, dim)
 	a.text(dst, "Expand/shrink retain displaced rows in the clipboard. Ctrl+Z undoes all edits.", 42, 626, 12, dim)
 }
@@ -126,6 +127,8 @@ func (a *App) patternAction(name string) bool {
 		a.modal, a.entry = "Adjust block attenuation (steps)", "1"
 	case "block-remap":
 		a.modal, a.entry = "Remap block (source,destination hex IDs)", "01,02"
+	case "song-remap":
+		a.modal, a.entry = "Remap song (source,destination hex IDs)", "01,02"
 	default:
 		return false
 	}
@@ -172,7 +175,7 @@ func (a *App) patternModal(modal, entry string) bool {
 				return edit.AdjustVolume(pattern, a.blockFirst, a.blockLast, amount, a.channel == 3)
 			})
 		}
-	case "Remap block (source,destination hex IDs)":
+	case "Remap block (source,destination hex IDs)", "Remap song (source,destination hex IDs)":
 		parts := strings.Split(entry, ",")
 		if len(parts) != 2 {
 			a.status = "Enter source,destination hexadecimal IDs"
@@ -182,6 +185,15 @@ func (a *App) patternModal(modal, entry string) bool {
 		to, err2 := strconv.ParseUint(strings.TrimSpace(parts[1]), 16, 8)
 		if err1 != nil || err2 != nil {
 			a.status = "Enter source,destination hexadecimal IDs"
+		} else if strings.HasPrefix(modal, "Remap song") {
+			e, _ := a.synth.Snapshot()
+			if err := edit.RemapSong(e.Project, byte(from), byte(to), a.channel == 3); err != nil {
+				a.status = err.Error()
+			} else {
+				a.remember()
+				a.synth.Edit(func(engine *replay.Engine) { engine.Stop(); engine.Project = e.Project; engine.Reset() })
+				a.dirty, a.status = true, "Song instrument references remapped"
+			}
 		} else {
 			a.applyPatternEdit(func(pattern *model.Pattern) error {
 				return edit.RemapInstrument(pattern, a.blockFirst, a.blockLast, byte(from), byte(to), a.channel == 3)
