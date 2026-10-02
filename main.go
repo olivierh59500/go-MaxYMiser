@@ -24,6 +24,8 @@ func main() {
 	duration := flag.Duration("duration", 30*time.Second, "WAV duration")
 	mute := flag.Bool("mute", false, "disable audio device")
 	info := flag.Bool("info", false, "print native project information")
+	config := flag.String("config", "", "native MYM.CNF configuration")
+	ymLibrary := flag.String("ym-library", "", "directory containing YM recordings for SNDH alternatives")
 	flag.Parse()
 	if *song == "" && flag.NArg() > 0 {
 		*song = flag.Arg(0)
@@ -76,6 +78,16 @@ func main() {
 		os.Exit(1)
 	}
 	defer app.Close()
+	if *ymLibrary != "" {
+		if err = app.SetYMLibrary(*ymLibrary); err != nil {
+			log.Fatal(err)
+		}
+	}
+	if *config != "" {
+		if err = app.LoadConfiguration(*config); err != nil {
+			log.Fatal(err)
+		}
+	}
 	if *song != "" && strings.EqualFold(filepath.Ext(*song), ".ym") {
 		if err = app.LoadYM(*song); err != nil {
 			log.Fatal(err)

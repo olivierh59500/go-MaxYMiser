@@ -118,3 +118,14 @@ func (s *Synth) SelectReference(active bool) {
 		s.Engine.Play(false)
 	}
 }
+
+func (s *Synth) PreviewInstrument(channel int, note, instrument byte) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.reference != nil {
+		s.reference.Pause()
+		s.referencePlaying = false
+		s.referenceActive = false
+	}
+	s.Engine.Trigger(channel, note, instrument)
+}

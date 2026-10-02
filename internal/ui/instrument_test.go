@@ -27,6 +27,25 @@ func TestExampleInstrumentViewsShowTheirLinkedSoundDefinitions(t *testing.T) {
 	}
 }
 
+func TestInstrumentComponentMasksKeepOtherEffectsAndSupportUndo(t *testing.T) {
+	app, err := New(model.Demo(), "", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer app.Close()
+	app.action("instrument:1")
+	app.action("mask:17:1")
+	e, _ := app.synth.Snapshot()
+	if e.Project.Bank.Instruments[1][17] != 5 || e.Project.Bank.Instruments[0][17] != 7 {
+		t.Fatal("mask toggle affected wrong components or instrument")
+	}
+	app.restore(false)
+	e, _ = app.synth.Snapshot()
+	if e.Project.Bank.Instruments[1][17] != 7 {
+		t.Fatal("component mask could not be undone")
+	}
+}
+
 func TestInstrumentSelectionOpensAndEditsTheCorrectSequence(t *testing.T) {
 	app, err := New(model.Demo(), "", true)
 	if err != nil {

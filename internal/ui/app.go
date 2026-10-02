@@ -48,11 +48,15 @@ type App struct {
 	exporting                                                          bool
 	icePacking                                                         bool
 	helpTopic                                                          int
+	nativeConfiguration                                                native.Configuration
 	drumKeyboard                                                       bool
 	corpus                                                             *ymimport.Corpus
 	ymPath                                                             string
 	ymReport                                                           *ymimport.Report
 	ymOptions                                                          ymimport.ReconstructionOptions
+	ymLibrary                                                          ymimport.YMLibrary
+	ymLibraryDirectory                                                 string
+	ymAlternatives                                                     []ymimport.YMAlternative
 	midiInput                                                          *midi.Input
 	midiOutput                                                         *midi.Output
 	midiDestinations                                                   []midi.Destination
@@ -101,6 +105,19 @@ func New(p *model.Project, projectPath string, mute bool) (*App, error) {
 	a.exportDuration = 30 * time.Second
 	a.ymOptions.FramesPerRow = 1
 	a.blockLast, a.pasteMode, a.columnMask = 63, edit.Overwrite, edit.AllColumns
+	for channel, id := range p.Song.Orders[0] {
+		if int(id) < len(p.Song.Patterns) {
+			a.channel, a.pattern = channel, int(id)
+			break
+		}
+	}
+	if len(p.ReplaySource) > 0 {
+		a.subtunes, _ = native.DecodeContainers(p.ReplaySource)
+	}
+	if projectPath != "" {
+		a.directory = filepath.Dir(projectPath)
+		a.status = "Loaded " + filepath.Base(projectPath)
+	}
 	if !mute {
 		context := audio.CurrentContext()
 		if context == nil {
@@ -353,12 +370,25 @@ func (a *App) drawInstruments(dst *ebiten.Image, e *replay.Engine) {
 	a.btn(dst, "Rename", 1126, 202, 104, 34, "rename-instrument", false)
 	a.text(dst, "DIRECT SETTINGS", 320, 246, 10, dim)
 	a.btn(dst, "Copy", 670, 240, 98, 26, "instrument-copy", false)
+	a.btn(dst, "Preview", 546, 240, 110, 26, "instrument-preview", false)
 	a.text(dst, "SOUND SEQUENCES · click to edit", 820, 246, 10, dim)
-	labels := []string{"Portamento mask", "Arpeggio mask", "Vibrato mask", "Transpose mask", "Fixed frequency", "Fixed detune", "Sequence speed", "Pulse width", "Envelope shape", "Start sync", "Digi sample", "Digi rate", "Attenuation", "Detune coarse", "Detune fine", "Frequency resolution"}
-	offsets := []int{16, 17, 18, 19, 20, 21, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41}
+	maskNames := []string{"Portamento", "Arpeggio", "Vibrato", "Transpose", "Fixed period", "Fixed detune"}
+	for bit, label := range []string{"Square", "Buzzer", "Timer"} {
+		a.text(dst, label, float64(487+bit*99), 274, 10, dim)
+	}
+	for index, label := range maskNames {
+		y := 299 + index*28
+		a.text(dst, label, 320, float64(y+6), 11, dim)
+		for component := 0; component < 3; component++ {
+			bit := 2 - component
+			a.btn(dst, map[bool]string{true: "On", false: "Off"}[inst[16+index]&(1<<bit) != 0], 482+component*99, y, 82, 24, fmt.Sprintf("mask:%d:%d", 16+index, bit), inst[16+index]&(1<<bit) != 0)
+		}
+	}
+	labels := []string{"Sequence speed", "Pulse width", "Envelope shape", "Start sync", "Digi sample", "Digi rate", "Attenuation", "Detune coarse", "Detune fine", "Frequency resolution"}
+	offsets := []int{32, 33, 34, 35, 36, 37, 38, 39, 40, 41}
 	for i, label := range labels {
 		x := 320 + (i%2)*240
-		y := 272 + (i/2)*44
+		y := 478 + (i/2)*32
 		a.text(dst, label, float64(x), float64(y+9), 10, dim)
 		a.btn(dst, fmt.Sprintf("%02X", inst[offsets[i]]), x+156, y, 66, 32, fmt.Sprintf("parameter:%d", offsets[i]), false)
 	}
@@ -438,6 +468,8 @@ func (a *App) drawSettings(dst *ebiten.Image, e *replay.Engine) {
 	a.btn(dst, "MIDI clock", 1030, 372, 168, 38, "midi-clock", e.ExternalClock)
 	a.btn(dst, "MIDI input", 670, 372, 180, 38, "midi", a.midiInput != nil)
 	a.btn(dst, "MIDI output", 670, 236, 180, 30, "midi-output", a.midiOutput != nil)
+	a.btn(dst, "Load CNF", 870, 236, 160, 30, "config-load", false)
+	a.btn(dst, "Save CNF", 1044, 236, 160, 30, "config-save", false)
 	modes := []string{"Disabled", "One voice", "Two voices", "Native STe rate", "MIDI output"}
 	mode := int(e.Project.Song.State[49])
 	if mode >= len(modes) {
@@ -470,7 +502,17 @@ func (a *App) drawModal(dst *ebiten.Image) {
 	a.text(dst, a.modal, 250, 248, 18, fg)
 	if a.modal == "Unable to open this music" {
 		for i, message := range a.errorDetails {
-			a.text(dst, message, 250, float64(295+i*37), 12, fg)
+			if i < 4 {
+				a.text(dst, message, 250, float64(295+i*30), 11, fg)
+			}
+		}
+		if len(a.ymAlternatives) > 0 {
+			for i, item := range a.ymAlternatives {
+				if i >= 3 {
+					break
+				}
+				a.btn(dst, "YM: "+item.Title, 250, 428+i*32, 600, 28, fmt.Sprintf("ym-alternative:%d", i), false)
+			}
 		}
 		a.btn(dst, "Close", 918, 437, 114, 40, "modal:cancel", true)
 		return
@@ -663,6 +705,23 @@ func (a *App) keyboard() {
 		a.action("play")
 	}
 	if a.tab != "Patterns" {
+		if a.tab == "Instruments" || a.tab == "Sequences" {
+			keys := []ebiten.Key{ebiten.KeyZ, ebiten.KeyS, ebiten.KeyX, ebiten.KeyD, ebiten.KeyC, ebiten.KeyV, ebiten.KeyG, ebiten.KeyB, ebiten.KeyH, ebiten.KeyN, ebiten.KeyJ, ebiten.KeyM}
+			upper := []ebiten.Key{ebiten.KeyQ, ebiten.KeyDigit2, ebiten.KeyW, ebiten.KeyDigit3, ebiten.KeyE, ebiten.KeyR, ebiten.KeyDigit5, ebiten.KeyT, ebiten.KeyDigit6, ebiten.KeyY, ebiten.KeyDigit7, ebiten.KeyU}
+			for index, key := range keys {
+				if inpututil.IsKeyJustPressed(key) {
+					a.AuditionInstrument(byte(12 + a.octave*12 + index))
+				}
+			}
+			for index, key := range upper {
+				if inpututil.IsKeyJustPressed(key) {
+					a.AuditionInstrument(byte(24 + a.octave*12 + index))
+				}
+			}
+			if inpututil.IsKeyJustPressed(ebiten.KeyCapsLock) {
+				a.AuditionInstrument(1)
+			}
+		}
 		return
 	}
 	for octave, key := range []ebiten.Key{ebiten.KeyF1, ebiten.KeyF2, ebiten.KeyF3, ebiten.KeyF4, ebiten.KeyF5, ebiten.KeyF6, ebiten.KeyF7, ebiten.KeyF8} {
@@ -842,6 +901,12 @@ func (a *App) enterField(r rune) {
 	}
 }
 func (a *App) action(name string) {
+	if a.alternativeAction(name) {
+		return
+	}
+	if a.modal == "" && a.configurationAction(name) {
+		return
+	}
 	if a.modal == "" && a.helpAction(name) {
 		return
 	}
@@ -930,6 +995,14 @@ func (a *App) action(name string) {
 		a.entry = fmt.Sprintf("%02X", e.Project.Bank.Instruments[a.instrument][x])
 		return
 	}
+	if _, err := fmt.Sscanf(name, "mask:%d:%d", &x, &y); err == nil {
+		if x >= 16 && x <= 21 && y >= 0 && y <= 2 {
+			a.remember()
+			a.synth.Edit(func(e *replay.Engine) { e.Project.Bank.Instruments[a.instrument][x] ^= 1 << y })
+			a.dirty = true
+		}
+		return
+	}
 	if _, err := fmt.Sscanf(name, "mute:%d", &x); err == nil {
 		a.synth.Edit(func(e *replay.Engine) { e.Mutes ^= 1 << x; e.Project.Song.State[37] = e.Mutes })
 		return
@@ -986,6 +1059,8 @@ func (a *App) action(name string) {
 		a.status = fmt.Sprintf("Reconstructed candidate: %d instruments, %d patterns. Compare with the original YM.", report.Instruments, report.Patterns)
 	case "ym:profile":
 		a.beginFileBrowser("Load composer profile (.json)", "", false)
+	case "ym-library":
+		a.modal, a.entry = "YM library directory", a.ymLibraryDirectory
 	case "ym:range":
 		a.modal, a.entry = "YM range (first,last,row frames)", fmt.Sprintf("%d,%d,%d", a.ymOptions.StartFrame, a.ymOptions.EndFrame, a.ymOptions.FramesPerRow)
 	case "ym:reference":
@@ -1053,6 +1128,8 @@ func (a *App) action(name string) {
 		a.projectPath = ""
 		a.dirty = false
 		a.status = "New project"
+	case "instrument-preview":
+		a.AuditionInstrument(48)
 	case "open":
 		a.beginFileBrowser("Open music (.mys / .myv / .snd / .ym)", "", false)
 	case "subtune-next":
@@ -1225,6 +1302,12 @@ func (a *App) applyModal() {
 	}
 	modal, entry := a.modal, strings.TrimSpace(a.entry)
 	a.modal = ""
+	if a.libraryModal(modal, entry) {
+		return
+	}
+	if a.configurationModal(modal, entry) {
+		return
+	}
 	if a.midiOutputModal(modal, entry) {
 		return
 	}
@@ -1545,6 +1628,7 @@ func (a *App) drawYM(dst *ebiten.Image) {
 	a.text(dst, r.Name, 42, 211, 22, fg)
 	a.text(dst, r.Author+" · "+r.Format, 42, 248, 13, dim)
 	a.btn(dst, "Composer profile", 520, 246, 180, 34, "ym:profile", a.corpus != nil)
+	a.btn(dst, "YM library", 350, 246, 154, 34, "ym-library", len(a.ymLibrary.Files) > 0)
 	a.btn(dst, "Reconstruct", 710, 246, 156, 34, "ym:infer", false)
 	a.btn(dst, "Listen YM", 876, 246, 152, 34, "ym:reference", r.Active)
 	a.btn(dst, "Listen score", 1038, 246, 194, 34, "ym:score", !r.Active)

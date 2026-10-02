@@ -2,6 +2,15 @@
 
 All native multi-byte values are big-endian.
 
+## Configuration
+
+`MYM.CNF` contains 29 bytes with no header. Fields were mapped from the original
+1.67 save/load routines: pattern scrolling, appearance settings, hardware flags,
+composition year, five MIDI channel/instrument assignments and MIDI clock/latency
+settings. The Go edition applies mapped tracker settings and retains other bytes
+for native round trips. Unsupported display/hardware fields remain available
+when exporting the file back to Atari.
+
 ## ICE wrappers
 
 MYS, MYV, MYI and own SNDH imports accept Pack-Ice wrappers before validating the

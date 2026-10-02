@@ -31,6 +31,8 @@ trying the editor. External MaxYMiser files are not needed to launch it.
   **Load MYI / Save MYI** exchange individual instruments with their sequences
   and optional sample. New exports use the original editor's MYI3 layout.
   **Copy** duplicates a sound while retaining its shared sequence/sample links.
+  The Square/Buzzer/Timer matrix toggles effect masks directly. **Preview** and
+  note keys in Instruments/Sequences audition sounds without writing the score.
 - **Sequences**: up to 256 native 16-bit sequences, with length and repeat,
   ramp/triangle/sine/square generation, signed words, copying and morphing.
   **Modify range** adds or scales selected words without changing loop metadata.
@@ -47,10 +49,17 @@ trying the editor. External MaxYMiser files are not needed to launch it.
 - **YM**: original YM playback, live register inspection and proposed tracker
   reconstruction, with optional composer-corpus evidence.
 - **Settings**: playback rate, speed, edit step, octave, volume, timer mask,
-  saved Jam mode, one/two-voice/native-rate PCM modes and macOS MIDI input.
+  saved Jam mode, one/two-voice/native-rate PCM modes, native CNF exchange and
+  macOS MIDI input.
 
 The window can be resized. The waveform at the bottom displays the actual
 synthesizer output.
+**Settings → Load CNF / Save CNF** exchanges the original 29-byte `MYM.CNF`
+configuration, preserving hardware/display fields. `-config /path/to/MYM.CNF`
+loads it explicitly at startup.
+`-ym-library /path/to/ym-recordings` indexes candidate YM alternatives for SNDH
+files whose native score is not available. A title match is a version hint;
+the user chooses the recording before playback or reconstruction.
 Open, new-path saves, individual instrument exchange, sample import/export and
 composer profile loading use the built-in file browser. Navigate folders, scroll
 the list, select a file and confirm; a full path can also be typed.

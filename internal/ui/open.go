@@ -62,6 +62,7 @@ func (a *App) OpenMusic(path string) error {
 }
 
 func (a *App) showOpenError(path string, err error) {
+	a.ymAlternatives = nil
 	a.errorDetails = []string{"File: " + filepath.Base(path)}
 	if raw, e := os.ReadFile(path); e == nil && (strings.EqualFold(filepath.Ext(path), ".sndh") || strings.EqualFold(filepath.Ext(path), ".snd")) {
 		if plain, e := native.UnpackICE(raw); e == nil && !bytes.Contains(plain, []byte("MYM0INST")) && !bytes.Contains(plain, []byte("MYM1INST")) {
@@ -73,6 +74,9 @@ func (a *App) showOpenError(path string, err error) {
 		a.errorDetails = append(a.errorDetails, err.Error())
 	}
 	a.errorDetails = append(a.errorDetails, "The current composition and playback were retained.")
+	if raw, err := os.ReadFile(path); err == nil {
+		a.suggestYM(path, raw)
+	}
 	a.modal, a.entry = "Unable to open this music", ""
 	a.status = "Open failed: " + filepath.Base(path)
 }

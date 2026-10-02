@@ -55,6 +55,8 @@ func allowedFile(modal, name string) bool {
 		return ext == ".myi"
 	case strings.Contains(modal, "profile"):
 		return ext == ".json"
+	case strings.Contains(modal, "configuration"):
+		return ext == ".cnf"
 	case strings.HasPrefix(modal, "Import raw"):
 		return ext == ".pcm" || ext == ".raw" || ext == ".wav" || ext == ".spl" || ext == ".snd"
 	default:
