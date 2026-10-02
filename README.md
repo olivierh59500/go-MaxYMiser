@@ -37,9 +37,14 @@ trying the editor. External MaxYMiser files are not needed to launch it.
   **Copy** duplicates a sound while retaining its shared sequence/sample links.
   The Square/Buzzer/Timer matrix toggles effect masks directly. **Preview** and
   note keys in Instruments/Sequences audition sounds without writing the score.
+  Edited parameters update voices using that instrument without restarting the
+  arrangement. Assigning a sequence also extends the serialized bank when needed.
 - **Sequences**: up to 256 native 16-bit sequences, with length and repeat,
   ramp/triangle/sine/square generation, signed words, copying and morphing.
   **Modify range** adds or scales selected words without changing loop metadata.
+  **Cut / Copy / Paste** retains words, length and repeat, using Ctrl+X/C/V or
+  the native F3/F4/F5 shortcuts in this workspace. Shared sequence edits refresh
+  sounding voices at their current phase, including held final values.
 - **Samples**: eight banks of signed PCM, with raw PCM and 8/16-bit WAV import,
   gain, tuning with interpolation, trimming, sign conversion, PCM save and
   independent preview.

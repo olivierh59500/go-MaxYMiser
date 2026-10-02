@@ -55,7 +55,7 @@ func (a *App) drawSequenceTools(dst *ebiten.Image, e *replay.Engine) {
 	a.btn(dst, "Morph between", 530, 557, 198, 34, "gen-morph", false)
 	a.btn(dst, "Copy to destination", 742, 557, 246, 34, "gen-copy", false)
 	a.text(dst, "Morph fills the intervening sequence IDs. Endpoints keep their data; lengths and repeat must match.", 42, 621, 12, dim)
-	a.text(dst, "Ctrl+Z undoes generation, morphing, copying or clearing.", 42, 647, 12, dim)
+	a.text(dst, "Ctrl+Z undoes sequence edits.", 410, 647, 12, dim)
 }
 
 func parseSequenceWord(text string, signed bool) (int, error) {
@@ -134,6 +134,7 @@ func (a *App) soundAction(name string) bool {
 		a.synth.Edit(func(e *replay.Engine) {
 			e.Project.Bank.Sequences[a.sequence] = sequence
 			e.Project.Bank.SequenceCount = max(e.Project.Bank.SequenceCount, a.sequence+1)
+			e.RefreshSequence(a.sequence)
 		})
 		a.dirty, a.status = true, "Sequence generated"
 	case "gen-morph", "gen-copy":
@@ -155,11 +156,20 @@ func (a *App) soundAction(name string) bool {
 			return true
 		}
 		a.remember()
-		a.synth.Edit(func(e *replay.Engine) { e.Project.Bank = bank })
+		a.synth.Edit(func(e *replay.Engine) {
+			e.Project.Bank = bank
+			for id := min(a.sequence, int(destination)); id <= max(a.sequence, int(destination)); id++ {
+				e.RefreshSequence(id)
+			}
+		})
 		a.dirty, a.status = true, "Sequence bank updated"
 	case "seq-clear":
 		a.remember()
-		a.synth.Edit(func(e *replay.Engine) { e.Project.Bank.Sequences[a.sequence] = model.Sequence{Length: 1} })
+		a.synth.Edit(func(e *replay.Engine) {
+			e.Project.Bank.Sequences[a.sequence] = model.Sequence{Length: 1}
+			e.RefreshSequence(a.sequence)
+			e.Project.Bank.SequenceCount = max(e.Project.Bank.SequenceCount, a.sequence+1)
+		})
 		a.dirty = true
 	case "sample-tune":
 		a.modal, a.entry = "Tune sample (semitones)", "0.125"
@@ -230,7 +240,7 @@ func (a *App) soundModal(modal, entry string) bool {
 			a.status = err.Error()
 		} else {
 			a.remember()
-			a.synth.Edit(func(e *replay.Engine) { e.Project.Bank.Sequences[a.sequence] = sequence })
+			a.synth.Edit(func(e *replay.Engine) { e.Project.Bank.Sequences[a.sequence] = sequence; e.RefreshSequence(a.sequence) })
 			a.dirty, a.status = true, "Sequence range modified"
 		}
 	case "Copy instrument (destination 01–20)":

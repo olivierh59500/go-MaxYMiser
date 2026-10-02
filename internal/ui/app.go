@@ -75,6 +75,8 @@ type App struct {
 	hasCopy                                                            bool
 	blockClipboard                                                     []model.Cell
 	orderClipboard                                                     [][4]byte
+	sequenceClipboard                                                  model.Sequence
+	hasSequenceClipboard                                               bool
 	blockFirst, blockLast                                              int
 	pasteMode                                                          edit.PasteMode
 	columnMask                                                         edit.ColumnMask
@@ -426,6 +428,9 @@ func (a *App) drawSequences(dst *ebiten.Image, e *replay.Engine) {
 	a.btn(dst, fmt.Sprintf("Repeat %02X", s.Repeat), 632, 203, 146, 32, "seq-repeat", false)
 	a.btn(dst, "Generate / morph", 820, 203, 198, 32, "seq-tools", a.sequenceTools)
 	a.btn(dst, "Clear", 1032, 203, 96, 32, "seq-clear", false)
+	for i, item := range []struct{ label, action string }{{"Cut", "sequence-cut"}, {"Copy", "sequence-copy"}, {"Paste", "sequence-paste"}} {
+		a.btn(dst, item.label, 42+i*112, 636, 100, 28, item.action, false)
+	}
 	if a.sequenceTools {
 		a.drawSequenceTools(dst, e)
 		return
@@ -646,6 +651,14 @@ func (a *App) keyboard() {
 		return
 	}
 	if a.ctrl {
+		if a.tab == "Sequences" {
+			for key, action := range map[ebiten.Key]string{ebiten.KeyC: "sequence-copy", ebiten.KeyX: "sequence-cut", ebiten.KeyV: "sequence-paste"} {
+				if inpututil.IsKeyJustPressed(key) {
+					a.sequenceClipboardAction(action)
+					return
+				}
+			}
+		}
 		if inpututil.IsKeyJustPressed(ebiten.KeyArrowLeft) {
 			a.moveSongPosition(-1)
 			return
@@ -696,6 +709,14 @@ func (a *App) keyboard() {
 	}
 	if inpututil.IsKeyJustPressed(ebiten.KeySpace) {
 		a.action("play")
+	}
+	if a.tab == "Sequences" {
+		for key, action := range map[ebiten.Key]string{ebiten.KeyF3: "sequence-cut", ebiten.KeyF4: "sequence-copy", ebiten.KeyF5: "sequence-paste"} {
+			if inpututil.IsKeyJustPressed(key) {
+				a.sequenceClipboardAction(action)
+				return
+			}
+		}
 	}
 	if a.tab != "Patterns" {
 		if a.tab == "Instruments" || a.tab == "Sequences" {
@@ -902,6 +923,9 @@ func (a *App) enterField(r rune) {
 	}
 }
 func (a *App) action(name string) {
+	if a.modal == "" && a.sequenceClipboardAction(name) {
+		return
+	}
 	if a.modal == "" && a.arrangementAction(name) {
 		return
 	}
@@ -1011,7 +1035,10 @@ func (a *App) action(name string) {
 	if _, err := fmt.Sscanf(name, "mask:%d:%d", &x, &y); err == nil {
 		if x >= 16 && x <= 21 && y >= 0 && y <= 2 {
 			a.remember()
-			a.synth.Edit(func(e *replay.Engine) { e.Project.Bank.Instruments[a.instrument][x] ^= 1 << y })
+			a.synth.Edit(func(e *replay.Engine) {
+				e.Project.Bank.Instruments[a.instrument][x] ^= 1 << y
+				e.RefreshInstrumentParameter(a.instrument, x)
+			})
 			a.dirty = true
 		}
 		return
@@ -1517,14 +1544,18 @@ func (a *App) applyModal() {
 			case modal == "Sequence length":
 				e.Project.Bank.Sequences[a.sequence].Length = byte(max(1, min(63, n)))
 				e.Project.Bank.Sequences[a.sequence].Repeat = min(e.Project.Bank.Sequences[a.sequence].Repeat, e.Project.Bank.Sequences[a.sequence].Length-1)
+				e.RefreshSequence(a.sequence)
 			case modal == "Sequence repeat":
 				e.Project.Bank.Sequences[a.sequence].Repeat = byte(min(int(n), max(0, int(e.Project.Bank.Sequences[a.sequence].Length)-1)))
+				e.RefreshSequence(a.sequence)
 			case strings.HasPrefix(modal, "Sequence word "):
 				fmt.Sscanf(modal, "Sequence word %d", &x)
 				e.Project.Bank.Sequences[a.sequence].Values[x] = uint16(n)
+				e.RefreshSequence(a.sequence)
 			case strings.HasPrefix(modal, "Instrument parameter "):
 				fmt.Sscanf(modal, "Instrument parameter %d", &x)
 				e.Project.Bank.Instruments[a.instrument][x] = byte(n)
+				e.RefreshInstrumentParameter(a.instrument, x)
 			case strings.HasPrefix(modal, "Order "):
 				fmt.Sscanf(modal, "Order %d channel %d", &x, &y)
 				if n >= 240 && n != 253 && n != 254 && n != 255 {
