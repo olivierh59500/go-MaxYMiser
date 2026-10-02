@@ -137,6 +137,9 @@ phrases and timbre differences, with source times for checking each example.
 
 ## Implementation status
 
+The detailed [feature inventory](docs/FEATURES.md) records current support and
+remaining format, editing and playback work.
+
 This is a developer edition. The pattern engine includes sequence playback,
 both effect columns, shared YM noise/envelope behaviour, detune masks,
 portamento, arpeggios, slides, timer synthesis and two PCM sample voices.

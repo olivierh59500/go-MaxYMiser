@@ -1,0 +1,27 @@
+# MaxYMiser Go feature status
+
+This inventory relates the Go edition to the useful editing and playback
+functions of MaxYMiser FM 1.67. It distinguishes editable format support from
+replay validation and hardware-specific integration.
+
+| Area | Implemented | Remaining verification or work |
+| --- | --- | --- |
+| Tracker | Three YM voices, two PCM voices, both effect columns, live/step note entry, copy/paste, undo/redo | Block operations, row insertion/removal, pattern transposition and instrument remapping |
+| Arrangement | Independent pattern lists, length/repeat, position selection, Jam markers | More live resequencing scenarios and MIDI next-pattern controllers |
+| Instruments | 32 definitions, scalar/mask editing, linked sequence values, individual MYI exchange | More native MYI legacy/sample fixtures, copy/remap convenience |
+| Sequences | 256 sequences, length/repeat, generation, signed values, copying and morphing | Range modification and additional shortcuts |
+| Samples | Eight banks, signed PCM/WAV import, gain, interpolated tuning, trim, sign conversion, save and preview | Native YMise operation and full STe mixer/filter comparison |
+| Native files | MYS/MYV lossless example round trips, MYI0–3 decode, MYI3 export, own unpacked SNDH import | ICE wrappers and native SNDH export |
+| YM | YM Player reference playback, register inspector, candidate score, composer corpus and cross-arrangement comparison | Musical-grid reconstruction, improved modulation/envelope hypotheses and reconstruction selection ranges |
+| Replay | Sequences, commands, native frequency/DAC tables, timer waveforms, PCM note rates/modes | Broader full-song and mixed-timer evidence; sample-grid timer scheduling remains distinct from cycle-exact hardware |
+| MIDI | macOS notes, program changes, controllers and transport | External clock/SPP, DMA MIDI voices, output ports and Sync24 hardware |
+| Workflow | Resizable modern interface, drag/drop, native save, asynchronous WAV export | File browser, richer contextual help and user-selectable export duration |
+
+Native register evidence currently includes 8,778 complete replay calls across
+the three supplied examples and isolated timer fixtures. The register checks
+cover only captured writes, with timer-owned registers inspected separately.
+See [replay verification](REPLAY_VERIFICATION.md).
+
+The individual MYI3 export has been opened in the original editor. Its instrument
+parameters, sequence remapping and embedded sample bytes were checked in memory.
+See [native formats](NATIVE_FORMATS.md) for layout and legacy loader details.
