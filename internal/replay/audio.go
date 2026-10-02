@@ -289,9 +289,6 @@ func (s *Synth) configure() {
 				s.pcm[ch].active = false
 			}
 		}
-		if e.Mutes&(1<<(ch+3)) != 0 {
-			s.pcm[ch].active = false
-		}
 	}
 }
 

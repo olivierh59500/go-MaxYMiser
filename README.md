@@ -78,6 +78,9 @@ Their own music data can still support reconstruction after the player format
 has been decoded. The first paired source decoder covers the Mad Max Last Ninja
 player; see [YM reconstruction](docs/YM_RECONSTRUCTION.md) for commands,
 verification results and the current scope.
+Dropping a MYS and its matching MYV uses the same validated opening workflow.
+Both files are decoded before changing the composition or its playback; dropped
+files use **Save as** rather than treating virtual paths as filesystem targets.
 
 ## Keyboard
 
@@ -96,6 +99,9 @@ verification results and the current scope.
 | Open / save | Ctrl+O / Ctrl+S |
 | Undo / redo | Ctrl+Z / Ctrl+Y |
 | Jam mode | F10 |
+| Disable Jam | Shift+F10 |
+| Previous / next song position | Ctrl+Left / Ctrl+Right |
+| Previous / next live pattern | Shift+Left / Shift+Right |
 | Octave selection | F1–F8 |
 | Percussion note keyboard | F9 |
 | Copy / paste selected row range | Ctrl+C / Ctrl+V |
@@ -113,6 +119,12 @@ pattern columns and participate in undo, including same-note retriggers.
 While playback is running, **Pattern**, **Song** and **Record** switch modes
 without restarting the row, envelope state or audio. In song mode, pressing
 **Song** again stops playback.
+In Jam song mode, position changes wait for the current pattern boundary; the
+Song workspace shows the queued target. Jam pattern mode queues the selected
+track's next pattern. Repeated navigation adjusts the pending target, including
+pattern 00. **Stop** discards pending jumps. Track mutes disable score sequencing
+while allowing live keyboard/MIDI notes and sample previews, as in the native
+performance workflow.
 
 In **Sequences**, choose **Generate / morph** to create envelopes or oscillations.
 The selected sequence's length defines the generated length. Ramps hold their

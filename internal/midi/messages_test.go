@@ -103,6 +103,27 @@ func TestNextPatternControllersWaitForThePatternBoundary(t *testing.T) {
 	}
 }
 
+func TestPositionControllerUsesNativeJamBoundaryNavigation(t *testing.T) {
+	p := model.Demo()
+	p.Song.SetSpeed(1)
+	e := replay.New(p)
+	e.Jam = true
+	e.Play(false)
+	for range 17 {
+		e.Tick()
+	}
+	Apply(e, []byte{0xb0, 22, 2})
+	if e.Position != 0 || e.NextPosition != 2 || !e.PositionQueued || e.Row != 17 {
+		t.Fatal("position controller interrupted a Jam pattern")
+	}
+	for e.Row != 0 {
+		e.Tick()
+	}
+	if e.Position != 2 || e.Patterns != p.Song.Orders[2] {
+		t.Fatal("MIDI song selection did not apply at the pattern boundary")
+	}
+}
+
 func TestNativeChannelAssignmentsAllocateYMPolyphonyAndTwoPCMVoices(t *testing.T) {
 	p := model.New()
 	p.Song.State[40], p.Song.State[41] = 7, 7

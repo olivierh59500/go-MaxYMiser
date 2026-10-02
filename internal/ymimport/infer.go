@@ -18,6 +18,7 @@ type Report struct {
 	SourceLabelRate                          int
 	RecipeApplications                       []RecipeApplication
 	SourcePatterns                           []PatternEvidence
+	KnownSourcePair                          bool
 }
 type timbre struct {
 	Tone, Noise, Envelope bool

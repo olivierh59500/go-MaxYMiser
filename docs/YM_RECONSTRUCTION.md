@@ -209,6 +209,15 @@ passage to hear that position in the original YM. This browsing preserves the
 editable composition. Source-pattern IDs describe the original player's data;
 they are not the same as the generated MaxYMiser pattern numbers.
 
+If the imported register recording is exactly the one associated with the
+paired profile, the view instead uses that source's known pattern IDs and
+order boundaries. Equality requires the chip clock, frame rate, length and
+every decoded register frame to match; a filename or title never selects this
+path. The profile's SNDH/YM association still identifies the source variant,
+and displayed time ranges use its verified alignment. Recordings with sample
+or timer payloads are excluded from register-only identity checks. A changed
+recording falls back to candidate matching, and older profiles remain readable.
+
 ## Comparing arrangements from different composers
 
 Two arrangements of a common composition are complementary evidence. A phrase

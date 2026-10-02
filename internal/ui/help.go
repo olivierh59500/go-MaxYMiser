@@ -12,13 +12,14 @@ var helpText = [][]string{
 	{
 		"Space: song play/stop · Right Ctrl: pattern play · Enter: edit/preview",
 		"Tab / Shift+Tab: track · arrows: cursor · Page Up/Down: 16 rows",
-		"F1–F8: keyboard octave · F9: percussion note keyboard · F10: Jam",
+		"F1–F8: octave · F9: percussion keyboard · F10: Jam · Shift+F10: disable Jam",
 		"Z S X D C V G B H N J M: lower octave · Q 2 W 3 E R 5 T 6 Y 7 U: upper",
 		"Caps Lock: note-off · Backspace: clear cell · Insert/Delete: insert/delete row",
 		"Ctrl+C/X/V: copy/cut/paste selected range · Ctrl+Z/Y: undo/redo",
+		"Ctrl+Left/Right: song position · Shift+Left/Right: live track pattern",
 		"Ctrl+O/S: open/save · Edit workspace: ranges, masks, transpose and remap",
 		"Hexadecimal values: notes use names; instrument IDs 01–20; sequences 00–FF",
-		"Volume columns are attenuation: 0 loudest, F quietest, dash unchanged",
+		"Volume: 0 loudest, F quietest · track mutes keep live notes available",
 	},
 	{
 		"1–6: portamento, arpeggio, vibrato, transpose, fixed-period and detune masks",

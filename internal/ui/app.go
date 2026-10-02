@@ -342,6 +342,9 @@ func (a *App) drawSong(dst *ebiten.Image, e *replay.Engine) {
 	a.btn(dst, "Title / artist", 612, 204, 190, 34, "song-info", false)
 	a.btn(dst, "Add position", 820, 204, 172, 34, "order:add", false)
 	a.btn(dst, "Remove last", 1008, 204, 174, 34, "order:remove", false)
+	if e.PositionQueued {
+		a.text(dst, fmt.Sprintf("Jam: next position %02X", e.NextPosition), 42, 640, 12, accent)
+	}
 	start := min(a.scroll, max(0, int(p.Song.Length)-18))
 	for pos := start; pos < int(p.Song.Length) && pos < start+18; pos++ {
 		y := 252 + (pos-start)*22
@@ -613,59 +616,12 @@ midiDone:
 		}
 	}
 	if files := ebiten.DroppedFiles(); files != nil {
-		fs.WalkDir(files, ".", func(path string, entry fs.DirEntry, err error) error {
-			if err != nil || entry == nil || entry.IsDir() {
-				return nil
-			}
-			data, err := fs.ReadFile(files, path)
-			if err != nil {
-				a.status = err.Error()
-				return nil
-			}
-			switch strings.ToLower(filepath.Ext(path)) {
-			case ".ym":
-				if err := a.loadYMBytes(data); err != nil {
-					a.status = err.Error()
-					break
-				}
-				a.ymPath = path
-			case ".snd", ".sndh":
-				value, err := native.DecodeContainer(data)
-				if err != nil {
-					a.status = err.Error()
-					break
-				}
-				a.remember()
-				a.synth.CloseYM()
-				a.synth.Edit(func(e *replay.Engine) {
-					e.Project = &model.Project{Title: value.Title, Author: value.Author, Song: value.Song, Bank: value.Bank, ReplaySource: append([]byte(nil), data...)}
-					e.Reset()
-				})
-				a.tab = "Patterns"
-				a.projectPath = ""
-			case ".mys":
-				song, err := native.DecodeSong(data)
-				if err != nil {
-					a.status = err.Error()
-					break
-				}
-				a.remember()
-				a.synth.CloseYM()
-				a.synth.Edit(func(e *replay.Engine) { e.Project.Song = song; e.Project.Title = filepath.Base(path); e.Reset() })
-				a.projectPath = ""
-				a.pattern, a.row = 0, 0
-				a.tab = "Patterns"
-			case ".myv":
-				bank, err := native.DecodeVoiceBank(data)
-				if err != nil {
-					a.status = err.Error()
-					break
-				}
-				a.remember()
-				a.synth.Edit(func(e *replay.Engine) { e.Project.Bank = bank; e.Reset() })
-			}
-			return nil
-		})
+		if err := a.OpenDroppedMusic(files); err != nil {
+			a.ymAlternatives = nil
+			a.errorDetails = []string{err.Error(), "The current composition and playback were retained."}
+			a.modal, a.entry = "Unable to open this music", ""
+			a.status = "Unable to open dropped music"
+		}
 	}
 	return nil
 }
@@ -675,6 +631,14 @@ func (a *App) keyboard() {
 		return
 	}
 	if a.ctrl {
+		if inpututil.IsKeyJustPressed(ebiten.KeyArrowLeft) {
+			a.moveSongPosition(-1)
+			return
+		}
+		if inpututil.IsKeyJustPressed(ebiten.KeyArrowRight) {
+			a.moveSongPosition(1)
+			return
+		}
 		if inpututil.IsKeyJustPressed(ebiten.KeyZ) {
 			a.restore(false)
 			return
@@ -704,7 +668,12 @@ func (a *App) keyboard() {
 		return
 	}
 	if inpututil.IsKeyJustPressed(ebiten.KeyF10) {
-		a.action("jam")
+		if ebiten.IsKeyPressed(ebiten.KeyShift) {
+			a.synth.Edit(func(e *replay.Engine) { e.Jam = false; e.Project.Song.State[39] = 0 })
+			a.dirty = true
+		} else {
+			a.action("jam")
+		}
 	}
 	if inpututil.IsKeyJustPressed(ebiten.KeySpace) {
 		a.action("play")
@@ -748,6 +717,14 @@ func (a *App) keyboard() {
 		a.editing = !a.editing
 	}
 	shift := ebiten.IsKeyPressed(ebiten.KeyShift)
+	if shift && inpututil.IsKeyJustPressed(ebiten.KeyArrowLeft) {
+		a.moveLivePattern(-1)
+		return
+	}
+	if shift && inpututil.IsKeyJustPressed(ebiten.KeyArrowRight) {
+		a.moveLivePattern(1)
+		return
+	}
 	if inpututil.IsKeyJustPressed(ebiten.KeyTab) {
 		delta := 1
 		if shift {
@@ -1029,12 +1006,16 @@ func (a *App) action(name string) {
 		return
 	}
 	if _, err := fmt.Sscanf(name, "position:%d", &x); err == nil {
+		queued := false
 		a.synth.Edit(func(e *replay.Engine) {
-			e.Position = x
-			e.Patterns = e.Project.Song.Orders[x]
-			e.Row, e.TickInRow = 0, 0
+			e.SelectPosition(x)
+			queued = e.PositionQueued
 		})
-		a.selectChannel(a.channel)
+		if queued {
+			a.status = fmt.Sprintf("Jam: position %02X queued for the next pattern boundary", x)
+		} else {
+			a.selectChannel(a.channel)
+		}
 		return
 	}
 	switch name {

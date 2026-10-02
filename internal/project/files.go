@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/olivierh59500/go-MaxYMiser/internal/model"
 	"github.com/olivierh59500/go-MaxYMiser/internal/native"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -12,9 +13,20 @@ import (
 )
 
 func Load(songPath, bankPath string) (*model.Project, error) {
+	return loadWithReader(songPath, bankPath, os.ReadFile)
+}
+
+// LoadFS uses the same native decoding and paired-bank lookup for dropped
+// files or embedded filesystems. Both payloads are validated before returning.
+func LoadFS(files fs.FS, songPath, bankPath string) (*model.Project, error) {
+	return loadWithReader(songPath, bankPath, func(path string) ([]byte, error) { return fs.ReadFile(files, path) })
+}
+
+func loadWithReader(songPath, bankPath string, read func(string) ([]byte, error)) (*model.Project, error) {
 	p := model.New()
+	var bankData []byte
 	if songPath != "" {
-		b, err := os.ReadFile(songPath)
+		b, err := read(songPath)
 		if err != nil {
 			return nil, err
 		}
@@ -37,19 +49,23 @@ func Load(songPath, bankPath string) (*model.Project, error) {
 		if bankPath == "" {
 			for _, ext := range []string{".MYV", ".myv"} {
 				candidate := strings.TrimSuffix(songPath, filepath.Ext(songPath)) + ext
-				if _, err := os.Stat(candidate); err == nil {
+				if data, err := read(candidate); err == nil {
 					bankPath = candidate
+					bankData = data
 					break
 				}
 			}
 		}
 	}
 	if bankPath != "" {
-		b, err := os.ReadFile(bankPath)
-		if err != nil {
-			return nil, err
+		if bankData == nil {
+			var err error
+			bankData, err = read(bankPath)
+			if err != nil {
+				return nil, err
+			}
 		}
-		bank, err := native.DecodeVoiceBank(b)
+		bank, err := native.DecodeVoiceBank(bankData)
 		if err != nil {
 			return nil, err
 		}

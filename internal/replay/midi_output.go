@@ -81,14 +81,14 @@ func (s *Synth) midiTick() {
 	}
 	for voice, v := range e.DMA {
 		channel := e.Project.Song.State[[]int{43, 51}[voice]] & 15
-		if !v.Triggered && e.Mutes&(1<<(voice+3)) == 0 {
+		if !v.Triggered {
 			continue
 		}
 		if m.notes[voice] > 1 {
 			m.push(0x80|m.channels[voice], m.notes[voice], 0)
 			m.notes[voice] = 0
 		}
-		if v.Note > 1 && v.Sample > 0 && e.Mutes&(1<<(voice+3)) == 0 {
+		if v.Note > 1 && v.Sample > 0 {
 			m.push(0xc0|channel, (v.Sample-1)&127)
 			velocity := byte(max(1, 127-int(v.Volume)*8))
 			m.push(0x90|channel, v.Note&127, velocity)

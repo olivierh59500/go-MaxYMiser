@@ -34,10 +34,16 @@ func ApplyPairedRecipes(project *model.Project, report *Report, trace Trace, pro
 		labels[i].End += report.StartFrame
 	}
 	report.SourcePlayer, report.SourceLabelRate, report.SourceLabels = profile.Source.Player, trace.Rate, labels
-	report.SourcePatterns = profile.PatternEvidence(selection)
-	for i := range report.SourcePatterns {
-		report.SourcePatterns[i].Start += report.StartFrame
-		report.SourcePatterns[i].End += report.StartFrame
+	known, matched := profile.KnownPatternEvidence(trace, report.StartFrame, report.EndFrame)
+	if matched {
+		report.SourcePatterns = known
+		report.KnownSourcePair = true
+	} else {
+		report.SourcePatterns = profile.PatternEvidence(selection)
+		for i := range report.SourcePatterns {
+			report.SourcePatterns[i].Start += report.StartFrame
+			report.SourcePatterns[i].End += report.StartFrame
+		}
 	}
 	if report.FramesPerRow != 1 {
 		report.Warnings = appendUnique(report.Warnings, "Source instrument recipes require the one-frame reconstruction grid; labels remain available on coarser grids.")

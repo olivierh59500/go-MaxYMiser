@@ -56,6 +56,8 @@ type Engine struct {
 	rowParsed                                    bool
 	NextPatterns                                 [4]byte
 	nextPatternMask                              byte
+	NextPosition                                 int
+	PositionQueued                               bool
 }
 
 func New(p *model.Project) *Engine {
@@ -77,6 +79,7 @@ func (e *Engine) Reset() {
 	e.ExternalClock = e.Project.Song.State[31]&1 != 0
 	e.clockPulses, e.clockRows, e.rowParsed = 0, 0, false
 	e.NextPatterns, e.nextPatternMask = [4]byte{}, 0
+	e.NextPosition, e.PositionQueued = 0, false
 	e.Mutes = e.Project.Song.State[37]
 	e.TimerMask = e.Project.Song.State[36] & 7
 	e.MasterVolume, e.Pan, e.Bass, e.Treble = 127, 0, 6, 6
@@ -100,6 +103,8 @@ func (e *Engine) Play(pattern bool) {
 func (e *Engine) Stop() {
 	e.Playing = false
 	e.pending = [3]bool{}
+	e.PositionQueued = false
+	e.nextPatternMask = 0
 	// The audio renderer consumes a stop trigger at the next sequencer tick.
 	e.pendingDMA = [2]bool{true, true}
 	e.Voices = [3]Voice{}
@@ -180,10 +185,15 @@ func (e *Engine) advanceRow() {
 	}
 	e.Break, e.Row = false, 0
 	if !e.PatternMode {
-		e.Position++
-		if e.Position >= int(e.Project.Song.Length) {
-			e.Position = int(e.Project.Song.Repeat)
-			e.Loops++
+		if e.PositionQueued {
+			e.Position = e.NextPosition
+			e.PositionQueued = false
+		} else {
+			e.Position++
+			if e.Position >= int(e.Project.Song.Length) {
+				e.Position = int(e.Project.Song.Repeat)
+				e.Loops++
+			}
 		}
 		e.loadPosition()
 	}
@@ -193,6 +203,23 @@ func (e *Engine) advanceRow() {
 		}
 	}
 	e.nextPatternMask = 0
+}
+
+// SelectPosition queues song jumps at a pattern boundary while Jam is playing.
+// Ordinary selection is immediate and resets only the tracker row timing.
+func (e *Engine) SelectPosition(position int) bool {
+	if position < 0 || position >= int(e.Project.Song.Length) {
+		return false
+	}
+	if e.Playing && e.Jam && !e.PatternMode {
+		e.NextPosition, e.PositionQueued = position, true
+		return true
+	}
+	e.Position, e.PositionQueued = position, false
+	e.loadPosition()
+	e.Row, e.TickInRow, e.rowParsed = 0, 0, false
+	e.clockRows, e.clockPulses = 0, 0
+	return true
 }
 
 // ClockPulse receives MIDI's 24 pulses per quarter note. Six pulses advance
@@ -224,6 +251,13 @@ func (e *Engine) QueuePattern(channel int, pattern byte) {
 	}
 	e.NextPatterns[channel] = pattern
 	e.nextPatternMask |= 1 << channel
+}
+
+func (e *Engine) QueuedPattern(channel int) (byte, bool) {
+	if channel < 0 || channel >= 4 {
+		return 0, false
+	}
+	return e.NextPatterns[channel], e.nextPatternMask&(1<<channel) != 0
 }
 func (e *Engine) cell(id byte, row int) model.Cell {
 	if id == model.NoteOffPattern && row == 0 {
@@ -604,7 +638,7 @@ func (e *Engine) configure() {
 		v := &e.Voices[ch]
 		mixer := v.Values[3]
 		volume := int(v.Values[0]&255) - v.ColumnVolume - int(v.Parameters[22]) - v.TrackVolume
-		if e.Mutes&(1<<ch) != 0 || v.Note == 0 || mixer == 0 || volume <= 0 {
+		if v.Note == 0 || mixer == 0 || volume <= 0 {
 			volume = 0
 			mixer &= 0xff0f
 			v.Values[3] = mixer

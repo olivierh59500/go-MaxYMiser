@@ -40,7 +40,11 @@ func (a *App) ymPatternAction(action string) bool {
 }
 
 func (a *App) drawYMPatterns(dst *ebiten.Image) {
-	a.text(dst, "SOURCE PATTERN CANDIDATES", 42, 303, 15, fg)
+	title := "SOURCE PATTERN CANDIDATES"
+	if a.ymReport != nil && a.ymReport.KnownSourcePair {
+		title = "PATTERNS FROM THE PAIRED SOURCE"
+	}
+	a.text(dst, title, 42, 303, 15, fg)
 	if a.ymReport == nil || len(a.ymReport.SourcePatterns) == 0 {
 		a.text(dst, "Load a paired profile, then Reconstruct to search for known source phrases.", 42, 351, 12, dim)
 		return
@@ -58,10 +62,21 @@ func (a *App) drawYMPatterns(dst *ebiten.Image) {
 			ids = append(ids, fmt.Sprintf("%02X", p))
 		}
 		label := fmt.Sprintf("%s  %5d:%5d  source %s  distance %.2f", []string{"A", "B", "C"}[hit.Channel], hit.Start, hit.End, strings.Join(ids, " / "), hit.Distance)
+		if hit.Known {
+			label = fmt.Sprintf("%s  %5d:%5d  source %s  paired recording", []string{"A", "B", "C"}[hit.Channel], hit.Start, hit.End, strings.Join(ids, " / "))
+		}
 		a.btn(dst, label, 42, 343+n*37, 1152, 33, fmt.Sprintf("ym:pattern-hit:%d", id), false)
 	}
-	a.text(dst, "Click a passage to hear the original YM. Multiple IDs mean the source pattern is ambiguous.", 42, 590, 12, dim)
+	instruction := "Click a passage to hear the original YM. Multiple IDs mean the source pattern is ambiguous."
+	if a.ymReport.KnownSourcePair {
+		instruction = "Click a passage to hear the paired recording. Source IDs are known; time ranges use the profile alignment."
+	}
+	a.text(dst, instruction, 42, 590, 12, dim)
 	a.btn(dst, "Previous", 42, 625, 142, 30, "ym:patterns-prev", false)
 	a.btn(dst, "Next", 198, 625, 142, 30, "ym:patterns-next", false)
-	a.text(dst, fmt.Sprintf("Page %d / %d · %d candidate passages", a.ymPatternPage+1, (len(hits)+5)/6, len(hits)), 368, 635, 12, accent)
+	kind := "candidate passages"
+	if a.ymReport.KnownSourcePair {
+		kind = "source passages"
+	}
+	a.text(dst, fmt.Sprintf("Page %d / %d · %d %s", a.ymPatternPage+1, (len(hits)+5)/6, len(hits), kind), 368, 635, 12, accent)
 }

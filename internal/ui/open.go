@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/olivierh59500/go-MaxYMiser/internal/model"
 	"github.com/olivierh59500/go-MaxYMiser/internal/native"
 	"github.com/olivierh59500/go-MaxYMiser/internal/project"
 	"github.com/olivierh59500/go-MaxYMiser/internal/replay"
@@ -27,18 +28,27 @@ func (a *App) OpenMusic(path string) error {
 		if err != nil {
 			return err
 		}
-		a.remember()
-		a.synth.CloseYM()
-		a.synth.Edit(func(e *replay.Engine) { e.Stop(); e.Project.Bank = bank })
-		a.instrument, a.sequence = 0, 0
-		a.tab, a.directory, a.dirty = "Instruments", filepath.Dir(path), true
-		a.status = "Loaded voice bank: " + filepath.Base(path)
+		a.acceptVoiceBank(bank, path)
 		return nil
 	}
 	p, err := project.Load(path, "")
 	if err != nil {
 		return err
 	}
+	a.acceptProject(p, path, path)
+	return nil
+}
+
+func (a *App) acceptVoiceBank(bank model.VoiceBank, path string) {
+	a.remember()
+	a.synth.CloseYM()
+	a.synth.Edit(func(e *replay.Engine) { e.Stop(); e.Project.Bank = bank })
+	a.instrument, a.sequence = 0, 0
+	a.tab, a.directory, a.dirty = "Instruments", filepath.Dir(path), true
+	a.status = "Loaded voice bank: " + filepath.Base(path)
+}
+
+func (a *App) acceptProject(p *model.Project, path, savePath string) {
 	reloaded := a.reloadConfiguration(&p.Song)
 	var subtunes []native.EmbeddedProject
 	if strings.EqualFold(filepath.Ext(path), ".snd") || strings.EqualFold(filepath.Ext(path), ".sndh") {
@@ -48,7 +58,7 @@ func (a *App) OpenMusic(path string) error {
 	a.synth.CloseYM()
 	a.synth.Edit(func(e *replay.Engine) { e.Stop(); e.Project = p; e.Reset() })
 	a.subtunes, a.subtuneIndex = subtunes, 0
-	a.projectPath, a.directory = path, filepath.Dir(path)
+	a.projectPath, a.directory = savePath, filepath.Dir(path)
 	a.instrument, a.sequence, a.sample = 0, 0, 0
 	a.pattern, a.row, a.channel = 0, 0, 0
 	for channel, id := range p.Song.Orders[0] {
@@ -62,7 +72,6 @@ func (a *App) OpenMusic(path string) error {
 	if reloaded {
 		a.status += " · personal configuration reapplied"
 	}
-	return nil
 }
 
 func (a *App) showOpenError(path string, err error) {

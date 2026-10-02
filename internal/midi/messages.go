@@ -250,12 +250,7 @@ func controller(e *replay.Engine, ch int, code, value byte) {
 	case code == 21:
 		e.Speed = max(2, int(value))
 	case code == 22:
-		if value < e.Project.Song.Length {
-			e.Position = int(value)
-			e.Patterns = e.Project.Song.Orders[value]
-			e.Row = 0
-			e.TickInRow = 0
-		}
+		e.SelectPosition(int(value))
 	case code == 23:
 		e.Jam = value != 0
 	case code == 24:

@@ -20,6 +20,7 @@ type PatternEvidence struct {
 	End      int     `json:"ym_end_frame"`
 	Patterns []int   `json:"possible_source_patterns"`
 	Distance float64 `json:"feature_distance"`
+	Known    bool    `json:"known_source_pair,omitempty"`
 }
 
 type PatternValidation struct {
@@ -204,7 +205,7 @@ func (profile PairedProfile) PatternEvidence(trace Trace) []PatternEvidence {
 						unique = append(unique, id)
 					}
 				}
-				out = append(out, PatternEvidence{ch, start, end, append([]int(nil), unique...), best})
+				out = append(out, PatternEvidence{Channel: ch, Start: start, End: end, Patterns: append([]int(nil), unique...), Distance: best})
 			}
 		}
 	}

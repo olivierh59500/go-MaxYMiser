@@ -34,6 +34,8 @@ type PairedProfile struct {
 	Recipes           []InstrumentRecipe `json:"instrument_recipes,omitempty"`
 	Patterns          []PatternPrototype `json:"pattern_prototypes,omitempty"`
 	PatternValidation PatternValidation  `json:"pattern_validation"`
+	ReferenceIdentity string             `json:"reference_register_identity,omitempty"`
+	ReferencePatterns []PatternEvidence  `json:"reference_source_patterns,omitempty"`
 }
 
 type PairValidation struct {
@@ -245,6 +247,12 @@ func LearnPair(score SourceScore, trace Trace, ymFile string) (PairedProfile, er
 	p.Recipes = learnRecipes(score, trace, alignment, p.TrainingEnd)
 	p.Patterns = learnPatternPrototypes(score, trace, alignment, p.TrainingEnd)
 	p.PatternValidation = validatePatternEvidence(score, trace, p)
+	if !trace.Effects {
+		p.ReferenceIdentity = registerIdentity(trace)
+		for _, passage := range sourcePassages(score, trace, alignment) {
+			p.ReferencePatterns = append(p.ReferencePatterns, PatternEvidence{Channel: passage.channel, Start: passage.start, End: passage.end, Patterns: []int{passage.pattern}, Known: true})
+		}
+	}
 	for _, f := range labelled {
 		if f.event.Frame < p.TrainingEnd {
 			continue
@@ -372,6 +380,14 @@ func LoadPairedProfile(path string) (PairedProfile, error) {
 	for _, pattern := range p.Patterns {
 		if pattern.Pattern < 0 || pattern.Pattern > 255 || pattern.Frames < 12 || pattern.Frames > 2048 || len(pattern.Features) != 320 {
 			return p, fmt.Errorf("pair: invalid source pattern prototype")
+		}
+	}
+	if len(p.ReferencePatterns) > 100000 {
+		return p, fmt.Errorf("pair: too many reference pattern passages")
+	}
+	for _, pattern := range p.ReferencePatterns {
+		if pattern.Channel < 0 || pattern.Channel >= 3 || pattern.Start < 0 || pattern.End <= pattern.Start || len(pattern.Patterns) != 1 || pattern.Patterns[0] < 0 || pattern.Patterns[0] > 255 {
+			return p, fmt.Errorf("pair: invalid reference pattern passage")
 		}
 	}
 	for _, recipe := range p.Recipes {
