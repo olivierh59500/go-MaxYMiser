@@ -123,3 +123,9 @@ Single-song binary replay wrappers now export through verified relative voice,
 song-copy and rate operands, supporting eight additional corpus files. Both
 direct and adjusted PC-relative offset tables are covered. Export retains the
 outer call rate, executable prefix and entry points, with strict source bounds.
+
+Complete arrangement comparisons for Colony and 0ompa main now cover 37,585
+captured native calls, repeated for their regenerated SNDH exports after native
+pair save/reload. They exposed and corrected signed byte noise-transpose wrapping
+and the mixer behavior of a zero tone period. These checks establish main-call
+register results, with timer waveform and hardware timing still separate.

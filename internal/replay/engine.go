@@ -744,13 +744,13 @@ func (e *Engine) configure() {
 			if mixer&0x0100 != 0 {
 				period := e.Period(v, 2)
 				e.Registers[ch*2], e.Registers[ch*2+1] = byte(period), byte(period>>8)&15
-				if period != 0 {
-					e.Registers[7] &^= 1 << ch
-				}
+				e.Registers[7] &^= 1 << ch
 			}
 			if mixer&0x1000 != 0 {
 				e.Registers[7] &^= 1 << (ch + 3)
-				noise := int(v.Values[4]) + v.NoiseTranspose + v.TrackNoiseTranspose
+				// Native ADD.B wraps each transpose into the low byte before
+				// testing its sign and clamping the YM's five-bit period.
+				noise := int(int8(byte(v.Values[4]) + byte(v.NoiseTranspose) + byte(v.TrackNoiseTranspose)))
 				e.Registers[6] = byte(max(0, min(31, noise)))
 			}
 		}

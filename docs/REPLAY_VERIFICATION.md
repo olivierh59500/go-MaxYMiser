@@ -48,6 +48,22 @@ native captures, include effect-specific fixtures and inspect timer writes
 within the calls. PCM mixing/filter differences between synthesizers are a
 separate question from the sequencer's register output.
 
+## Additional complete arrangement comparisons
+
+The single-song binary wrappers of Colony and ltc03 0ompa main also run under
+the native harness. Their arrangements repeat after 4,224 and 8,448 logical
+replay calls respectively. Captures extend beyond these complete traversals:
+8,836 calls for Colony and 28,749 for 0ompa main, in both the source and regenerated
+SNDH. All captured main-register writes and envelope flags match after MYS/MYV
+save/reload. The harness accelerates wrapper calls; these comparisons establish
+sequencer results rather than audio timing or timer-phase parity.
+
+The complete comparison exposed two arithmetic/mixer differences. Native noise
+transposes wrap in the low byte before its signed result is clamped to 0–31.
+A zero tone period also retains the configured mixer bit until the voice becomes
+silent; it is not an implicit note-off. Both behaviors have independent boundary
+regressions, including signed overflow, upper-byte values and explicit note-off.
+
 ## Isolated timer fixtures
 
 Small original test projects were also passed through the supplied native binary.
