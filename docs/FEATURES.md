@@ -53,6 +53,15 @@ native song save/reload and editor undo. The three supplied native examples also
 retain all 8,778 captured register calls after compaction and MYS/MYV save/reload;
 their sequence counts change from 136 to 6, 136 to 12 and 13 to 13 respectively.
 
+Packing also substitutes exact empty/note-off pattern presets, as described in
+the native editor's Zap/Pack workflow. Track roles determine whether a stop can
+use the YM or two-lane PCM preset; partial, shared and unassigned stop material
+is retained. The original replay's PCM preset clears both lanes on the first
+row, including muted and single-channel modes. Go replay now follows that rule,
+and preset selections remain visible in the editor after packing. Native-pair
+reload and 1,300-tick YM/PCM comparisons verify the substitutions without
+changing stored musical playback.
+
 The individual MYI3 export has been opened in the original editor. Its instrument
 parameters, sequence remapping and embedded sample bytes were checked in memory.
 See [native formats](NATIVE_FORMATS.md) for layout and legacy loader details.

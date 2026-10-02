@@ -10,8 +10,8 @@ type PackResult struct {
 	PatternsBefore, PatternsAfter, SequencesBefore, SequencesAfter int
 }
 
-// PackProject removes duplicate patterns and sequences while retaining every
-// stored definition. It rewrites song positions, editor pattern state,
+// PackProject replaces exact native presets and removes duplicate patterns and
+// sequences. It rewrites song positions, editor pattern state,
 // instrument links and both sequence-select effect columns. Sample and
 // instrument data are not removed. This is a transaction on a cloned project.
 func PackProject(project *model.Project) (PackResult, error) {
@@ -68,6 +68,10 @@ func PackProjectWithSelections(project *model.Project, selections ...[4]byte) (P
 	uniquePatterns := map[patternKey]byte{}
 	patterns := make([]model.Pattern, 0, len(p.Song.Patterns))
 	for id, pattern := range p.Song.Patterns {
+		if preset, ok := packedPreset(pattern, sourceRoles[id]); ok {
+			patternMap[id] = preset
+			continue
+		}
 		key := patternKey{pattern, sourceRoles[id]}
 		mapped, ok := uniquePatterns[key]
 		if !ok {
@@ -133,7 +137,9 @@ func PackProjectWithSelections(project *model.Project, selections ...[4]byte) (P
 	// rather than changing a PCM sample ID that resembles a sequence command.
 	var roles [240]byte
 	for id := range project.Song.Patterns {
-		roles[patternMap[id]] |= sourceRoles[id]
+		if patternMap[id] < model.MaxPatterns {
+			roles[patternMap[id]] |= sourceRoles[id]
+		}
 	}
 	for id := range p.Song.Patterns {
 		if roles[id]&2 != 0 {
@@ -160,4 +166,21 @@ func PackProjectWithSelections(project *model.Project, selections ...[4]byte) (P
 	result.PatternsAfter, result.SequencesAfter = len(patterns), count
 	*project = *p
 	return result, nil
+}
+
+// packedPreset requires complete byte equality. PCM note-off needs both lanes;
+// a shared YM/PCM definition is retained when its interpretations differ.
+func packedPreset(pattern model.Pattern, role byte) (byte, bool) {
+	if pattern == (model.Pattern{}) {
+		return model.EmptyPattern, true
+	}
+	var off model.Pattern
+	off[0].Note = model.NoteOff
+	if role == 2 {
+		off[0].Effect1 = model.NoteOff
+	}
+	if (role == 1 || role == 2) && pattern == off {
+		return model.NoteOffPattern, true
+	}
+	return 0, false
 }

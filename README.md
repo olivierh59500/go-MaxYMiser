@@ -79,6 +79,9 @@ go run ./cmd/maxymiser -defaults /path/to/native-workspace \
   **All columns** enables or disables the complete copy/paste mask.
   **Pack project** removes duplicate pattern/sequence definitions and remaps their
   references, including sequence-selection commands in both effect columns.
+  Exact empty and note-off definitions become native presets. PCM note-off
+  stops both sample lanes; a first-lane-only stop, shared YM/PCM definition or
+  unassigned note-off remains stored when its future interpretation could differ.
   PCM roles remain protected in all stored positions, saved editor selections,
   disabled tracks and independently edited/live/queued combinations. A shared
   YM/PCM definition that would require conflicting byte changes is left intact

@@ -147,6 +147,84 @@ func TestPackKeepsRegisterPlaybackAndSequenceCommands(t *testing.T) {
 	}
 }
 
+func TestPackSubstitutesNativePresetsWithoutChangingYMOrPCMPlayback(t *testing.T) {
+	p := model.New()
+	p.Song.Patterns = make([]model.Pattern, 5)
+	p.Song.Patterns[0][0] = model.Cell{Note: 60, Instrument: 1}
+	p.Song.Patterns[1][0] = model.Cell{Note: model.NoteOff}
+	p.Song.Patterns[3][0] = model.Cell{Note: 60, Instrument: 1, Effect1: 64, Parameter1: 2}
+	p.Song.Patterns[4][0] = model.Cell{Note: model.NoteOff, Effect1: model.NoteOff}
+	p.Song.Length = 3
+	p.Song.Orders[0] = [4]byte{0, 2, 2, 3}
+	p.Song.Orders[1] = [4]byte{1, 2, 2, 4}
+	p.Song.Orders[2] = [4]byte{2, 2, 2, 2}
+	for _, base := range []int{4, 52} {
+		copy(p.Song.State[base:base+4], p.Song.Orders[0][:])
+	}
+	p.Song.Orders[200] = [4]byte{1, 2, 1, 4}
+	before := p.Clone()
+	result, err := PackProject(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.PatternsAfter != 2 || p.Song.Orders[1][0] != model.NoteOffPattern || p.Song.Orders[1][3] != model.NoteOffPattern || p.Song.Orders[2][0] != model.EmptyPattern || p.Song.Orders[200][3] != model.NoteOffPattern {
+		t.Fatalf("exact presets were not substituted throughout the stored song: %+v", result)
+	}
+	left, right := replay.New(before), replay.New(p)
+	left.Play(false)
+	right.Play(false)
+	for tick := 0; tick < 1300; tick++ {
+		left.Tick()
+		right.Tick()
+		if left.Registers != right.Registers || left.EnvelopeWrite != right.EnvelopeWrite || left.DMA != right.DMA {
+			t.Fatalf("preset packing changed YM/PCM playback at tick %d", tick)
+		}
+	}
+	raw, err := native.EncodeSong(p.Song)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := native.DecodeSong(raw); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestPackKeepsPartialOrSharedNoteOffDefinitions(t *testing.T) {
+	for _, shared := range []bool{false, true} {
+		p := model.New()
+		p.Song.Patterns[0][0] = model.Cell{Note: model.NoteOff}
+		p.Song.Orders[0][3] = 0
+		if !shared {
+			p.Song.Orders[0][0] = model.EmptyPattern
+		}
+		if _, err := PackProject(p); err != nil {
+			t.Fatal(err)
+		}
+		id := p.Song.Orders[0][3]
+		if id >= model.MaxPatterns || p.Song.Patterns[id][0].Note != model.NoteOff || p.Song.Patterns[id][0].Effect1 != 0 {
+			t.Fatal("partial PCM or shared note-off acquired a second-lane stop")
+		}
+	}
+}
+
+func TestPackKeepsUnassignedNoteOffMaterialForFutureTrackSelection(t *testing.T) {
+	p := model.New()
+	p.Song.Patterns = append(p.Song.Patterns, model.Pattern{})
+	p.Song.Patterns[3][0].Note = model.NoteOff
+	if _, err := PackProject(p); err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, pattern := range p.Song.Patterns {
+		if pattern[0].Note == model.NoteOff && pattern[0].Effect1 == 0 {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("unassigned first-lane stop was converted into a future two-lane PCM stop")
+	}
+}
+
 func TestPackDoesNotRewritePCMSamplesAsYMSequences(t *testing.T) {
 	p := model.New()
 	p.Song.Patterns[2][0] = model.Cell{Note: 60, Instrument: 1, Effect1: 'M', Parameter1: 2}

@@ -249,7 +249,16 @@ func (e *Engine) parseRow() {
 		e.parse(channel, e.cell(e.Patterns[channel], e.Row), e.Mutes&(1<<channel) != 0)
 	}
 	if e.Project.Song.State[49] != 0 {
-		e.parseDMA(e.cell(e.Patterns[3], e.Row))
+		if e.Patterns[3] == model.NoteOffPattern && e.Row == 0 {
+			// The native preset clears both DMA lanes before testing mutes or
+			// the one/two-channel mode. Ordinary PCM cells retain those tests.
+			for i := range e.DMA {
+				e.DMA[i].Note, e.DMA[i].Sample = 0, 0
+				e.DMA[i].Triggered = true
+			}
+		} else {
+			e.parseDMA(e.cell(e.Patterns[3], e.Row))
+		}
 	}
 	e.rowParsed = true
 }

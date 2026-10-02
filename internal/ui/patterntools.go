@@ -92,6 +92,7 @@ func (a *App) patternAction(name string) bool {
 		a.remember()
 		a.synth.Edit(func(engine *replay.Engine) { engine.Stop(); engine.Project = e.Project; engine.Reset() })
 		a.pattern, a.row = 0, 0
+		a.selectChannel(a.channel)
 		a.dirty = true
 		a.status = fmt.Sprintf("Packed %d→%d patterns and %d→%d sequences", result.PatternsBefore, result.PatternsAfter, result.SequencesBefore, result.SequencesAfter)
 	case "song-clear", "bank-clear":

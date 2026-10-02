@@ -298,9 +298,6 @@ func (a *App) drawPatterns(dst *ebiten.Image, e *replay.Engine) {
 		a.btn(dst, "Mute", x+196, 238, 60, 30, fmt.Sprintf("mute:%d", ch), e.Mutes&(1<<ch) != 0)
 	}
 	selected := a.pattern
-	if selected >= len(p.Song.Patterns) {
-		selected = 0
-	}
 	start := a.patternViewStart(e)
 	for visible := 0; visible < 20; visible++ {
 		row := start + visible
@@ -322,6 +319,8 @@ func (a *App) drawPatterns(dst *ebiten.Image, e *replay.Engine) {
 			var cell model.Cell
 			if pattern < len(p.Song.Patterns) {
 				cell = p.Song.Patterns[pattern][row]
+			} else if pattern == int(model.NoteOffPattern) && row == 0 {
+				cell.Note = model.NoteOff
 			}
 			x := 88 + ch*272
 			if row == a.row && ch == a.channel {
@@ -1687,9 +1686,7 @@ func (a *App) selectChannel(channel int) {
 	a.channel = channel
 	e, _ := a.synth.Snapshot()
 	pattern := int(e.Project.Song.Orders[e.Position][channel])
-	if pattern < len(e.Project.Song.Patterns) {
-		a.pattern = pattern
-	}
+	a.pattern = pattern
 }
 func (a *App) remember() {
 	a.synth.Edit(func(e *replay.Engine) { a.undo = append(a.undo, e.Project.Clone()) })
@@ -1740,6 +1737,8 @@ func (a *App) drawDMAPattern(dst *ebiten.Image, e *replay.Engine) {
 		var c model.Cell
 		if pattern < len(p.Song.Patterns) {
 			c = p.Song.Patterns[pattern][row]
+		} else if pattern == int(model.NoteOffPattern) && row == 0 {
+			c.Note, c.Effect1 = model.NoteOff, model.NoteOff
 		}
 		a.text(dst, fmt.Sprintf("%s    %s     %s", noteName(c.Note), hexOrDash(c.Instrument), hexOrDash(c.Volume)), 94, float64(y+1), 14, fg)
 		a.text(dst, fmt.Sprintf("%s    %s     %s", noteName(c.Effect1), hexOrDash(c.Parameter1), hexOrDash(c.Effect2)), 516, float64(y+1), 14, fg)
