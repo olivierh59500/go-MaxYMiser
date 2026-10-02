@@ -211,6 +211,13 @@ The headless command requires no graphics window. WAV export produces stereo
 16-bit PCM at 48 kHz and refuses to overwrite an existing output file.
 The graphical editor renders WAVs in the background; choose the duration in
 **Settings → WAV export seconds** (up to one hour).
+The adjacent **Song** button measures one arrangement traversal to its first
+repeat, respecting speed commands, pattern breaks and Jam sections. External
+clock timing requires an explicit duration. The measured traversal is not a
+claim that every oscillator or sample loops without a phase difference.
+The headless command exposes the same option as `-song-duration`, for WAV or
+SNDH exports. WAV rendering handles partial reader chunks and removes its own
+incomplete output on error.
 
 ## YM reconstruction and composer profiles
 

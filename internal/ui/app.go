@@ -507,6 +507,7 @@ func (a *App) drawSettings(dst *ebiten.Image, e *replay.Engine) {
 	a.btn(dst, "ICE", 1144, 480, 72, 38, "ice-packing", a.icePacking)
 	a.text(dst, "WAV export seconds", 670, 546, 13, dim)
 	a.btn(dst, strconv.FormatFloat(a.exportDuration.Seconds(), 'f', -1, 64), 950, 534, 180, 38, "setting:export-duration", false)
+	a.btn(dst, "Song", 1144, 534, 72, 38, "export-song-duration", false)
 	a.btn(dst, "Load SNDH replay", 670, 588, 250, 36, "sndh-template", len(e.Project.ReplaySource) > 0)
 	a.btn(dst, "Export SNDH", 936, 588, 232, 36, "sndh-export", false)
 	for track, offset := range []int{40, 41, 42, 43, 51} {
@@ -930,6 +931,9 @@ func (a *App) enterField(r rune) {
 	}
 }
 func (a *App) action(name string) {
+	if a.modal == "" && a.songDurationAction(name) {
+		return
+	}
 	if a.modal == "" && a.yearAction(name) {
 		return
 	}

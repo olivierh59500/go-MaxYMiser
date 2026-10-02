@@ -62,7 +62,7 @@ func writeAudio(reader io.Reader, path string, duration time.Duration) error {
 	for left := frames; left > 0; {
 		count := min(left, 4096)
 		chunk := buffer[:count*4]
-		if _, err = reader.Read(chunk); err != nil {
+		if _, err = io.ReadFull(reader, chunk); err != nil {
 			return err
 		}
 		if _, err = f.Write(chunk); err != nil {
@@ -71,6 +71,9 @@ func writeAudio(reader io.Reader, path string, duration time.Duration) error {
 		left -= count
 	}
 	if err = f.Sync(); err != nil {
+		return err
+	}
+	if err = f.Close(); err != nil {
 		return err
 	}
 	success = true

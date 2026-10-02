@@ -24,6 +24,7 @@ func main() {
 	ice := flag.Bool("ice", false, "ICE-compress native SNDH output")
 	duration := flag.Duration("duration", 30*time.Second, "render duration")
 	subtune := flag.Int("subtune", 1, "one-based native SNDH subtune")
+	songDuration := flag.Bool("song-duration", false, "derive export duration from one arranged traversal")
 	flag.Parse()
 	if *song == "" && flag.NArg() > 0 {
 		*song = flag.Arg(0)
@@ -62,6 +63,17 @@ func main() {
 		fmt.Printf("%s: %s, %s, %.2f seconds; original register recording\n", filepath.Base(*song), r.Name, r.Format, float64(r.Duration)/1000)
 	} else {
 		fmt.Printf("%s: %d positions, %d patterns, %d sequences, %d Hz, speed %d\n", p.Title, p.Song.Length, len(p.Song.Patterns), p.Bank.SequenceCount, p.Song.TickRate(), p.Song.Speed())
+	}
+	if *songDuration {
+		if isYM {
+			log.Fatal("song-duration requires an editable native arrangement")
+		}
+		measured, err := replay.MeasureSongDuration(p)
+		if err != nil {
+			log.Fatal(err)
+		}
+		*duration = measured.Duration
+		fmt.Printf("Measured arrangement traversal: %.3f seconds\n", duration.Seconds())
 	}
 	if *wav != "" {
 		if isYM {
