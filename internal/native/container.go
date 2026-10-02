@@ -158,7 +158,7 @@ func DecodeContainers(data []byte) ([]EmbeddedProject, error) {
 			if !valid {
 				continue
 			}
-			voice, err := DecodeVoiceBank(bank)
+			voice, err := decodeContainerBank(bank)
 			if err != nil {
 				if firstError == nil {
 					firstError = err
