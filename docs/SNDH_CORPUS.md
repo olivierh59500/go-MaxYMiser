@@ -5,7 +5,7 @@ SNDH files. Of these, 704 contain MaxYMiser native instrument signatures.
 The other files contain different replay routines and are not editable MaxYMiser
 projects merely because they share the SNDH container format.
 
-The current audit imports 690 files containing 879 editable native subtunes.
+The current audit imports 690 files containing 880 editable native subtunes.
 658 files use supported single-song replay templates. All 658 export/reload checks
 preserve serialized song data, voice banks and title/author metadata exactly.
 This verifies editable data handling, not audio fidelity across those songs.
@@ -22,8 +22,8 @@ The collection exposed independent INST/DIGI versions, alternate bank/song/sampl
 ordering, multiple native subtunes and metadata words that resemble SNDH tags.
 Regression fixtures cover these cases without copying the source compositions.
 
-The current report contains 50 issues: 14 import failures, 32 unsupported
-single-song export templates, and four declared-count discrepancies. These
+The current report contains 49 issues: 14 import failures, 32 unsupported
+single-song export templates, and three declared-count discrepancies. These
 categories can refer to the same container. Issues include:
 
 - MaxYMiser signatures embedded in nonstandard or repacked replay layouts.
@@ -71,8 +71,9 @@ song patterns within the selector's copied span.
 The importer follows this verified selector, validates the complete pattern
 stream before the trailing block, and rebuilds pointers to the existing empty
 guards. It preserves the actual INST/DIGI versions and trailing bytes. Recovery
-requires zero sample lengths, aligned complete sequence records and the exact
-bounded trailer; missing nonempty waveforms and invalid lengths remain errors.
+requires zero sample lengths, complete sequence records and a sample tag at a
+complete pattern boundary within the selector's copied span. Missing nonempty
+waveforms and invalid lengths remain errors.
 Standalone MYV decoding remains strict.
 
 All ten banks and songs save/reload as native MYS/MYV without data changes.
@@ -103,7 +104,7 @@ Yoomp exposes five songs through this layout.
 
 The audit compares decoded payload count with the bounded `##nn` header tag.
 Terraboink declares 20 songs with one decoded payload; Nano Cave declares seven
-with six; Randomazer declares nine with eight; PHF Rally 2 declares two with one.
+with six; Randomazer declares nine with eight.
 Selector aliases, cue positions or unsupported payloads require further native
 analysis. These collections are imported partially and recorded as such.
 
@@ -112,8 +113,15 @@ These table slots use a different order from the physical bank layout. The
 importer now follows the validated relative table and exposes those six songs
 with their original numbering. Song 7 branches to a separate replay routine
 whose music is not a MaxYMiser payload, so it remains outside editable import.
-PHF Rally 2's first bank has displaced empty-sample pointers and nonzero data
-between its sequence records and song header; that layout remains unresolved.
+PHF Rally 2 now exposes both native songs in their selector order. Its first bank
+has a two-byte alignment word after complete sequence records; both song spans
+include a displaced empty DIGI block and a longer opaque suffix. The sample tag
+is located only after complete 64-row patterns, never by truncating at an
+arbitrary byte match. The suffix remains in the saved sample trailer; normal MYV
+output omits the source alignment word. Both songs retain 994 original and 994
+regenerated native replay calls in total, alongside unchanged MYS/MYV save/reload.
+These checks cover captured main-register writes and envelope flags rather than
+complete timer or analog parity.
 
 A multi-song executable prefix cannot safely export one replacement song while
 its selector retains references to discarded songs. Single-song template

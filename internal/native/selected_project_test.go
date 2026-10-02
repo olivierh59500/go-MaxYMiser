@@ -13,6 +13,10 @@ import (
 // These constructed layouts relocate the empty sample trailer after the song.
 // Pointer cells and tag placement are independent of the decoder under test.
 func displacedEmptySelector(t *testing.T, projects []*model.Project) []byte {
+	return displacedEmptySelectorExtras(t, projects, nil, []byte{0x45, 0x79})
+}
+
+func displacedEmptySelectorExtras(t *testing.T, projects []*model.Project, padding, suffix []byte) []byte {
 	t.Helper()
 	out := append([]byte(nil), syntheticMultiSelector(t, projects)[:512]...)
 	for slot, p := range projects {
@@ -27,20 +31,66 @@ func displacedEmptySelector(t *testing.T, projects []*model.Project) []byte {
 		}
 		bankAt := len(out)
 		out = append(out, voice...)
+		if slot == 0 {
+			out = append(out, padding...)
+		}
 		songAt := len(out)
 		out = append(out, music...)
 		tag := []byte("MYM1DIGI")
 		tag[3] = '0' + p.Bank.SampleVersion
 		out = append(out, tag...)
 		out = append(out, make([]byte, 8)...)
-		out = append(out, 0x45, 0x79)
+		out = append(out, suffix...)
 		code := 192 + slot*40
 		binary.BigEndian.PutUint32(out[code+2:], uint32(bankAt-500))
 		binary.BigEndian.PutUint32(out[code+8:], uint32(songAt-504))
-		binary.BigEndian.PutUint32(out[code+14:], uint32(len(music)+18))
+		binary.BigEndian.PutUint32(out[code+14:], uint32(len(out)-songAt))
 		binary.BigEndian.PutUint32(out[code+28:], uint32(songAt+22-code))
 	}
 	return out
+}
+
+func TestDisplacedEmptyCollectionKeepsLongSuffixAndIgnoresAlignmentWord(t *testing.T) {
+	p, q := model.New(), model.New()
+	p.Song.Patterns[0][2] = model.Cell{Note: 60, Instrument: 1}
+	q.Song.Patterns[0][5] = model.Cell{Note: 67, Instrument: 1}
+	suffix := []byte("Optimizer footer")
+	raw := displacedEmptySelectorExtras(t, []*model.Project{p, q}, []byte{0x4d, 0}, suffix)
+	got, err := DecodeContainers(raw)
+	if err != nil || len(got) != 2 {
+		t.Fatalf("aligned displaced collection was incomplete: %v", err)
+	}
+	for i, want := range []*model.Project{p, q} {
+		if !reflect.DeepEqual(got[i].Song, want.Song) || got[i].Bank.SequenceCount != want.Bank.SequenceCount || got[i].Bank.Instruments != want.Bank.Instruments {
+			t.Fatal("alignment changed editable song or bank data")
+		}
+		if !bytes.Equal(got[i].Bank.Samples[7].Trailer, append([]byte{0}, suffix...)) {
+			t.Fatalf("slot %d long optimizer suffix was lost: %x",i+1,got[i].Bank.Samples[7].Trailer)
+		}
+	}
+	if _, err := ParseMultiSNDHTemplate(raw); err != nil {
+		t.Fatal(err)
+	}
+	bad := displacedEmptySelectorExtras(t, []*model.Project{p, q}, []byte{1, 2, 3, 4}, suffix)
+	if _, err := ParseMultiSNDHTemplate(bad); err == nil {
+		t.Fatal("partial sequence data was treated as arbitrary alignment")
+	}
+}
+
+func TestSampleTagInsidePatternRecordCannotTruncateTheSong(t *testing.T) {
+	p := model.New()
+	music, err := EncodeSong(p.Song)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// One row precedes the marker, so it is not a pattern boundary. Its
+	// bytes deliberately resemble a sample tag without forming valid RLE.
+	music = append(music[:songHeader], make([]byte, 8)...)
+	music = append(music, []byte("MYM1DIGI")...)
+	music = append(music, make([]byte, 8)...)
+	if selectedSampleTag(music) >= 0 {
+		t.Fatal("a row-shaped tag truncated the music")
+	}
 }
 
 func TestSelectorRecoversDisplacedEmptySampleTagAndAllNativeSongs(t *testing.T) {

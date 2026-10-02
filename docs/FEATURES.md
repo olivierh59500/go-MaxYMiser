@@ -78,7 +78,7 @@ complete suite has passed again with the macOS display available, including
 reservation of saved PCM references during MYI import and undoable sample-length
 editing. The current final backend check also passes `go vet`,
 re-verifies all 8,778 example replay calls and retains the SNDH corpus totals:
-690 editable imports, 879 subtunes and 658 unchanged single-song export/reload
+690 editable imports, 880 subtunes and 658 unchanged single-song export/reload
 checks. The previously reported corpus issues and hardware limits remain open
 compatibility boundaries rather than evidence of complete Atari emulation.
 
@@ -89,3 +89,8 @@ regenerated native-call comparisons, alongside MYS/MYV save/reload checks.
 SNDH duration export supports both TIME and FRMS arrays, retaining the outer
 wrapper's call rate for collections and rejecting truncated or overflowing
 metadata. Existing feature/hardware tags and executable boundaries are retained.
+
+Native pattern-boundary parsing also recovers both PHF Rally 2 songs, including
+their sequence alignment word and longer empty-sample suffix. The two source
+projects save/reload without changes to their musical data; original and
+regenerated collections each add 994 captured native-call comparisons.

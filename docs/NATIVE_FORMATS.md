@@ -105,7 +105,10 @@ remain distinct, especially for collections mixing several replay formats.
 Verified relative selectors also delimit optimized banks whose empty DIGI tag
 and guards follow the song, with stale sample pointers into its pattern data.
 Only complete sequence records and eight explicitly zero sample lengths qualify
-for this layout. The actual DIGI version and opaque trailer are retained when
+for this layout. A source bank can carry a two-byte alignment word after its
+records; normal MYV output omits that source alignment. The sample tag must occur
+at a complete native pattern boundary within the exact selector span.
+The actual DIGI version and opaque trailer are retained when
 rebuilding the bank; no missing nonempty waveform is synthesized.
 
 ### Native SNDH export
