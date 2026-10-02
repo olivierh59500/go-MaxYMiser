@@ -46,6 +46,7 @@ type App struct {
 	exportResults                                                      chan error
 	exportDuration                                                     time.Duration
 	exporting                                                          bool
+	icePacking                                                         bool
 	corpus                                                             *ymimport.Corpus
 	ymPath                                                             string
 	ymReport                                                           *ymimport.Report
@@ -426,6 +427,7 @@ func (a *App) drawSettings(dst *ebiten.Image, e *replay.Engine) {
 	a.btn(dst, modes[mode], 850, 426, 280, 38, "pcm-mode", false)
 	a.text(dst, "PCM attenuation limit", 670, 492, 13, dim)
 	a.btn(dst, fmt.Sprint(e.Project.Song.State[56]), 950, 480, 180, 38, "setting:pcm-limit", false)
+	a.btn(dst, "ICE", 1144, 480, 72, 38, "ice-packing", a.icePacking)
 	a.text(dst, "WAV export seconds", 670, 546, 13, dim)
 	a.btn(dst, strconv.FormatFloat(a.exportDuration.Seconds(), 'f', -1, 64), 950, 534, 180, 38, "setting:export-duration", false)
 	a.btn(dst, "Load SNDH replay", 670, 588, 250, 36, "sndh-template", len(e.Project.ReplaySource) > 0)
@@ -1106,6 +1108,8 @@ func (a *App) action(name string) {
 		a.beginFileBrowser("Load SNDH replay template", "", false)
 	case "sndh-export":
 		a.beginFileBrowser("Export native SNDH", "maxymiser.snd", true)
+	case "ice-packing":
+		a.icePacking = !a.icePacking
 	default:
 		if strings.HasPrefix(name, "setting:") {
 			a.modal = "Setting " + strings.TrimPrefix(name, "setting:")
@@ -1115,7 +1119,9 @@ func (a *App) action(name string) {
 }
 func (a *App) save(path string) {
 	var err error
-	a.synth.Edit(func(e *replay.Engine) { err = project.Save(e.Project, path) })
+	var snapshot *model.Project
+	a.synth.Edit(func(e *replay.Engine) { snapshot = e.Project.Clone() })
+	err = project.SavePacked(snapshot, path, a.icePacking)
 	if err != nil {
 		a.status = err.Error()
 		return
@@ -1160,7 +1166,7 @@ func (a *App) applyModal() {
 	case modal == "Export native SNDH":
 		var snapshot *model.Project
 		a.synth.Edit(func(e *replay.Engine) { snapshot = e.Project.Clone() })
-		if err := project.SaveSNDH(snapshot, entry, a.exportDuration); err != nil {
+		if err := project.SaveSNDHPacked(snapshot, entry, a.exportDuration, a.icePacking); err != nil {
 			a.status = err.Error()
 		} else {
 			a.status = "Native SNDH exported with track duration"

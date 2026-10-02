@@ -21,6 +21,7 @@ func main() {
 	wav := flag.String("wav", "", "new WAV output path")
 	sndh := flag.String("sndh", "", "native SNDH output path")
 	template := flag.String("template", "", "existing MaxYMiser SNDH replay template")
+	ice := flag.Bool("ice", false, "ICE-compress native SNDH output")
 	duration := flag.Duration("duration", 30*time.Second, "render duration")
 	flag.Parse()
 	if *song == "" && flag.NArg() > 0 {
@@ -71,7 +72,7 @@ func main() {
 		if isYM {
 			log.Fatal("reconstruct the YM into an editable native project before SNDH export")
 		}
-		if err = project.SaveSNDH(p, *sndh, *duration); err != nil {
+		if err = project.SaveSNDHPacked(p, *sndh, *duration, *ice); err != nil {
 			log.Fatal(err)
 		}
 		fmt.Println("Native SNDH exported:", *sndh)

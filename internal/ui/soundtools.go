@@ -238,6 +238,9 @@ func (a *App) soundModal(modal, entry string) bool {
 		if err == nil {
 			raw, err = native.EncodeInstrument(file)
 		}
+		if err == nil && a.icePacking {
+			raw, err = native.PackICE(raw)
+		}
 		if err == nil {
 			var output *os.File
 			output, err = os.OpenFile(entry, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0644)

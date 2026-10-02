@@ -68,3 +68,21 @@ func TestSNDHExportRequiresAValidatedLocallySuppliedReplay(t *testing.T) {
 		t.Fatal("invalid replay template accepted")
 	}
 }
+
+func TestICEOptionSavesACompressedEditablePair(t *testing.T) {
+	app, err := New(model.Demo(), "", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer app.Close()
+	app.action("ice-packing")
+	path := filepath.Join(t.TempDir(), "packed.mys")
+	app.save(path)
+	raw, err := os.ReadFile(path)
+	if err != nil || string(raw[:4]) != "ICE!" {
+		t.Fatalf("UI native save ignored ICE: %v", err)
+	}
+	if _, err = native.DecodeSong(raw); err != nil {
+		t.Fatal(err)
+	}
+}

@@ -103,7 +103,9 @@ Unpacked `.SND`/`.SNDH` files created by MaxYMiser can be opened as editable
 projects by extracting their native song and voice-bank payloads. This import
 is specific to MaxYMiser exports; it is not a general 68000 SNDH player.
 Native formats also accept ICE-compressed wrappers. The Go decoder is checked
-against streams produced by the original editor's compressor. Saves are unpacked.
+against streams produced by the original editor's compressor. **Settings → ICE**
+enables compression for native project, MYI and SNDH saves. Go-packed files have
+also been decoded by the original Atari routine with byte-identical results.
 Native SNDH export preserves a locally supplied MaxYMiser replay prefix and
 rebuilds song/sample offsets, metadata, replay rate and duration. Opening a
 supported SNDH keeps its replay available for saving; a new composition can
@@ -183,7 +185,7 @@ editable in Settings (hexadecimal 00–0F); matching channels can allocate YM
 polyphony. The D/E assignments control the two PCM voices. MIDI clocks advance
 one tracker row per six pulses while sound sequences retain their replay rate.
 Controllers 44–47 queue patterns at the next pattern boundary.
-MIDI clock output, Sync24 hardware and ICE packing are not
+MIDI clock output and Sync24 hardware are not
 included in this edition.
 
 ## Verification

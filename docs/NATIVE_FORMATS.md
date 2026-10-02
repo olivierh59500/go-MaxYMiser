@@ -13,7 +13,10 @@ Native compression of a 3,800-byte bank, a 1,086-byte MYI3 instrument and a
 41,938-byte SNDH was also decoded byte for byte and accepted by their respective
 Go native importers. The parser rejects malformed lengths and offsets;
 bounded fuzzing covers unexpected streams without panics.
-Saving currently writes unpacked files.
+The writer uses bounded LZ candidate searches and emits the same backwards
+grammar. Go-packed MYS and SNDH files were decoded by the original routine with
+byte-identical results. Saving supports either packed or unpacked files;
+compression does not apply the optional graphics bitplane transform.
 
 ## Song
 
