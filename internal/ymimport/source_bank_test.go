@@ -1,6 +1,7 @@
 package ymimport
 
 import (
+	"encoding/binary"
 	"reflect"
 	"testing"
 
@@ -39,6 +40,61 @@ func TestSourceBankTranslatesEnvelopeCadenceAndSignedArpeggios(t *testing.T) {
 	loaded, err := native.DecodeVoiceBank(raw)
 	if err != nil || loaded.Instruments[3] != bank.Instruments[3] || loaded.Sequences != bank.Sequences {
 		t.Fatalf("translated definitions cannot be edited as native MYV: %v", err)
+	}
+}
+
+func TestSourceNoiseAttackUsesNativeMixerOrderAndRetainsTheArpeggio(t *testing.T) {
+	s := SourceScore{Instruments: []SourceInstrument{{ID: 3, Settings: []byte{4, 72, 1, 0, 1, 1}, VolumeSequence: []byte{14, 14, 13}, Arpeggio: SourceSequence{StepFrames: 1, Values: []int{0, 3, 7, 12}, Repeat: 0}, NoiseProgram: []SourceNoiseStep{{1, 47}, {1, 47}, {3, 47}}}}}
+	bank, report, err := SourceVoiceBank(s)
+	if err != nil || len(report.Converted) != 1 || len(report.Unsupported) != 0 {
+		t.Fatalf("noise attack did not convert: %+v %v", report, err)
+	}
+	p := model.New()
+	p.Bank = bank
+	e := replay.New(p)
+	e.Trigger(0, 60, 4)
+	for frame := 0; frame < 8; frame++ {
+		e.Tick()
+		wantMixer := byte(62)
+		if frame == 0 {
+			wantMixer = 55
+		}
+		if e.Registers[7]&63 != wantMixer {
+			t.Fatalf("native attack call %d: mixer=%02x, want %02x", frame, e.Registers[7], wantMixer)
+		}
+		if frame == 0 && e.Registers[6] != 15 {
+			t.Fatalf("native noise 47 did not become its five-bit period: %d", e.Registers[6])
+		}
+		if frame > 0 {
+			want := []uint16{478, 402, 319, 239}[frame%4]
+			got := uint16(e.Registers[0]) | uint16(e.Registers[1])<<8
+			if got != want {
+				t.Fatalf("noise attack lost chord step %d: %d, want %d", frame, got, want)
+			}
+		}
+	}
+}
+
+func TestSourceNoiseProgramDecodingUsesValidatedPointersAndRejectsInvalidModes(t *testing.T) {
+	b := sourceFixture()
+	b[0x2030] = 4
+	binary.BigEndian.PutUint32(b[0x16d4:], 0x10000+0x2620)
+	copy(b[0x2620:], []byte{1, 47, 1, 47, 3, 47, 255})
+	s, err := DecodeSource(b, 0, 24)
+	if err != nil || len(s.Instruments[3].NoiseProgram) != 3 {
+		t.Fatalf("noise program was not retained: %v", err)
+	}
+	if s.Instruments[3].NoiseProgram[1] != (SourceNoiseStep{1, 47}) {
+		t.Fatal("native noise operands changed")
+	}
+	b[0x2622] = 9
+	if _, err := DecodeSource(b, 0, 24); err == nil {
+		t.Fatal("unknown native noise operation was silently translated")
+	}
+	b[0x2622] = 1
+	binary.BigEndian.PutUint32(b[0x16d4:], 0xffffffff)
+	if _, err := DecodeSource(b, 0, 24); err == nil {
+		t.Fatal("invalid native noise pointer was accepted")
 	}
 }
 

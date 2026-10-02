@@ -29,3 +29,26 @@ func decodeSourceArpeggio(r sourceReader, table, id int) (SourceSequence, error)
 	}
 	return s, fmt.Errorf("unterminated arpeggio %d", id)
 }
+
+// The native noise-program pointer advances over the first pair before the
+// first output call. The final 0xff marker leaves the previous mixer unchanged.
+func decodeSourceNoiseProgram(data []byte, at int) ([]SourceNoiseStep, error) {
+	var steps []SourceNoiseStep
+	for count := 0; count < 64; count++ {
+		if at < 0 || at >= len(data) {
+			return nil, fmt.Errorf("truncated native noise program")
+		}
+		if data[at] == 255 {
+			if len(steps) < 2 {
+				return nil, fmt.Errorf("native noise program has no replay step")
+			}
+			return steps, nil
+		}
+		if at+1 >= len(data) || data[at] < 1 || data[at] > 3 {
+			return nil, fmt.Errorf("unsupported native noise-program operation")
+		}
+		steps = append(steps, SourceNoiseStep{Mode: data[at], Period: data[at+1]})
+		at += 2
+	}
+	return nil, fmt.Errorf("unterminated native noise program")
+}

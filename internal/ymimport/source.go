@@ -36,11 +36,17 @@ type SourceControl struct {
 }
 
 type SourceInstrument struct {
-	ID             int            `json:"id"`
-	Offset         int            `json:"offset"`
-	Settings       []byte         `json:"settings"`
-	VolumeSequence []byte         `json:"volume_sequence"`
-	Arpeggio       SourceSequence `json:"arpeggio"`
+	ID             int               `json:"id"`
+	Offset         int               `json:"offset"`
+	Settings       []byte            `json:"settings"`
+	VolumeSequence []byte            `json:"volume_sequence"`
+	Arpeggio       SourceSequence    `json:"arpeggio"`
+	NoiseProgram   []SourceNoiseStep `json:"noise_program,omitempty"`
+}
+
+type SourceNoiseStep struct {
+	Mode   byte `json:"mode"`
+	Period byte `json:"period"`
 }
 
 // SourceSequence retains byte-level timing separately from the tracker row
@@ -185,6 +191,23 @@ func decodeMadMaxLastNinja(data []byte, subtune, frames int) (SourceScore, error
 			instrument.Arpeggio, err = decodeSourceArpeggio(r, 0x824+shift, int(instrument.Settings[1]))
 			if err != nil {
 				return score, fmt.Errorf("source: instrument %d arpeggio: %w", id, err)
+			}
+		}
+		if flags := instrument.Settings[0] & 0x1c; flags != 0 {
+			field := 0x16d4 + shift
+			if flags&8 != 0 {
+				field = 0x16f0 + shift
+			}
+			if flags&16 != 0 {
+				field = 0x170c + shift
+			}
+			at, e := r.pointer(field)
+			if e != nil {
+				return score, fmt.Errorf("source: invalid noise-program pointer for instrument %d", id)
+			}
+			instrument.NoiseProgram, err = decodeSourceNoiseProgram(data, at)
+			if err != nil {
+				return score, fmt.Errorf("source: instrument %d noise program: %w", id, err)
 			}
 		}
 		score.Instruments = append(score.Instruments, instrument)

@@ -100,6 +100,9 @@ slide are translated for ordinary tones with a constant zero arpeggio; other
 source programs and period-table rounding still require work. **Save as** writes a separate native
 MYS/MYV pair, preserving the original executable. This is partial editable import,
 not complete playback of arbitrary Mad Max SNDH files.
+The decoded noise-attack programs also become editable mixer/noise sequences.
+The standard Last Ninja bank currently translates 30 of its 32 definitions;
+the two remaining automatic pitch programs are retained as unsupported.
 Dropping a MYS and its matching MYV uses the same validated opening workflow.
 Both files are decoded before changing the composition or its playback; dropped
 files use **Save as** rather than treating virtual paths as filesystem targets.

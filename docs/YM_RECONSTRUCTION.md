@@ -139,10 +139,10 @@ Opening an unrelated native project, a YM or a new project clears the old source
 inspection. Dropped source SNDH files use the same inspection workflow.
 
 For the first 6,000 standard Last Ninja frames, conversion produces 86 generated
-patterns, 94 order positions and 27 sequences. Saving and reloading the native
+patterns, 94 order positions and 36 sequences. Saving and reloading the native
 pair retains all 1,561 note/rest events, including their source instrument IDs
 and timestamps, with an exact 120-second excerpt traversal. Of these events,
-192 notes use the eight unsupported source sounds. Pattern commands 82 and 84
+61 notes use the two unsupported source sounds. Pattern commands 82 and 84
 are translated for ordinary tone programs with a constant zero arpeggio. These
 data checks do not establish complete sound fidelity:
 unsupported definitions stay silent and marked `?`, while the translated sounds
@@ -210,12 +210,26 @@ instrument, channel, frame range, feature distance and competing-label margin.
 envelopes and arpeggios. Source ID zero maps to tracker instrument 01, and so
 on. Unsupported hardware programs retain their source data in the JSON and
 are listed in the separate MYV analysis report; they do not become invented
-generic instruments. Last Ninja currently yields 24 translated definitions
-and eight unsupported ones. The original first-step envelope cadence is
+generic instruments. Last Ninja currently yields 30 translated definitions
+and two unsupported ones. The original first-step envelope cadence is
 preserved, including speed-zero envelopes advancing before the first output.
 Native execution checks covered 52 triggered notes and 1,186 volume-register
 values with no mismatches. Pattern-controlled vibrato and slides remain
 outside this base bank conversion.
+
+Six additional Last Ninja sounds combine an arpeggio with a short native noise
+attack. The decoder retains the program's validated pointer, operation and
+period bytes. The player skips the first pair before its first output, executes
+one remaining pair per call, and holds the mixer state at the final FF marker.
+These operations become independent editable mixer and noise sequences.
+
+An original 68000 probe confirms noise-only mixer 37 on the first call and tone
+mixer 3E from the second call, with no extra startup frame. The first noise write
+is 2F; only its low five bits select the chip period, so the translated sequence
+uses 0F. The arpeggio and volume sequence continue independently. Synthetic
+round-trip and replay checks retain this timing without copying the original
+music into the repository. The remaining two definitions also combine native
+automatic pitch changes, which are not covered by this noise conversion.
 
 Paired training also produces editable instrument recipes for registered
 volume, relative pitch, vibrato correction, mixer and noise sequences. Different

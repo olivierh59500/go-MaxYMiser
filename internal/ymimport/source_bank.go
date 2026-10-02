@@ -12,12 +12,12 @@ type SourceBankReport struct {
 	Warnings    []string       `json:"warnings"`
 }
 
-// SourceVoiceBank translates known square-wave envelope and arpeggio behavior
+// SourceVoiceBank translates known envelope, arpeggio and noise-attack behavior
 // to native editable sequences. Unsupported synthesis is explicit, not replaced
 // by a generic sound. The source ID maps to MaxYMiser's one-based ID+1.
 func SourceVoiceBank(score SourceScore) (model.VoiceBank, SourceBankReport, error) {
 	bank := model.VoiceBank{Version: 1, SampleVersion: 1, SequenceCount: 1}
-	report := SourceBankReport{Unsupported: map[int]string{}, Warnings: []string{"Converted definitions retain square-wave volume and arpeggio behavior. Pattern-controlled vibrato, slides, hardware programs and pitch-table rounding are not part of this bank conversion."}}
+	report := SourceBankReport{Unsupported: map[int]string{}, Warnings: []string{"Converted definitions retain volume, arpeggio and validated noise-attack timing. Pattern-controlled vibrato, slides, other hardware programs and pitch-table rounding are not part of this bank conversion."}}
 	sequenceIDs := map[model.Sequence]byte{}
 	add := func(sequence model.Sequence) (byte, error) {
 		if id, ok := sequenceIDs[sequence]; ok {
@@ -38,8 +38,10 @@ func SourceVoiceBank(score SourceScore) (model.VoiceBank, SourceBankReport, erro
 		}
 		var reason string
 		switch {
-		case source.Settings[0] != 0:
+		case source.Settings[0]&^0x1c != 0:
 			reason = "native hardware-effect flags are not yet translated"
+		case (source.Settings[0]&0x1c != 0 || len(source.NoiseProgram) > 0) && len(source.NoiseProgram) < 2:
+			reason = "native noise-program data is missing"
 		case source.Settings[1] >= 128:
 			reason = "extended native pitch/noise program is not yet translated"
 		case len(source.VolumeSequence) == 0:
@@ -95,11 +97,34 @@ func SourceVoiceBank(score SourceScore) (model.VoiceBank, SourceBankReport, erro
 			report.Unsupported[source.ID] = reason
 			continue
 		}
+		mixer, noise := model.Sequence{Values: [63]uint16{0x100}, Length: 1}, model.Sequence{Length: 1}
+		if len(source.NoiseProgram) > 0 {
+			steps := source.NoiseProgram[1:]
+			if len(steps) > len(mixer.Values) {
+				report.Unsupported[source.ID] = "noise program exceeds native sequence capacity"
+				continue
+			}
+			mixer.Length, noise.Length = byte(len(steps)), byte(len(steps))
+			mixer.Repeat, noise.Repeat = byte(len(steps)-1), byte(len(steps)-1)
+			for n, step := range steps {
+				switch step.Mode {
+				case 1:
+					mixer.Values[n] = 0x1000
+				case 2:
+					mixer.Values[n] = 0x1100
+				case 3:
+					mixer.Values[n] = 0x0100
+				default:
+					return bank, report, fmt.Errorf("source: invalid noise mixer operation")
+				}
+				noise.Values[n] = uint16(step.Period & 31)
+			}
+		}
+		sequences := []model.Sequence{volume, arpeggio, mixer, noise}
 		inst := &bank.Instruments[source.ID]
 		inst.SetName(fmt.Sprintf("Source %02X", source.ID))
 		inst[17], inst[19], inst[32] = 4, 4, 1
-		sequences := []model.Sequence{volume, arpeggio, {Values: [63]uint16{0x100}, Length: 1}}
-		for n, offset := range []int{48, 49, 51} {
+		for n, offset := range []int{48, 49, 51, 52} {
 			sequence := sequences[n]
 			id, err := add(sequence)
 			if err != nil {
