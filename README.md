@@ -37,6 +37,8 @@ trying the editor. External MaxYMiser files are not needed to launch it.
   independent preview.
 - **Edit**: row ranges, masked block copy/cut/paste with overwrite/overlay/underlay,
   row insertion/deletion, expand/shrink, transposition, attenuation and sound remap.
+  **Pack project** removes duplicate pattern/sequence definitions and remaps their
+  references, including sequence-selection commands in both effect columns.
 - **YM**: original YM playback, live register inspection and proposed tracker
   reconstruction, with optional composer-corpus evidence.
 - **Settings**: playback rate, speed, edit step, octave, volume, timer mask,

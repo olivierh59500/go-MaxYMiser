@@ -40,6 +40,7 @@ func (a *App) drawPatternTools(dst *ebiten.Image, e *replay.Engine) {
 	a.btn(dst, "Transpose", 42, 528, 190, 36, "block-transpose", false)
 	a.btn(dst, "Attenuation", 248, 528, 190, 36, "block-volume", false)
 	a.btn(dst, "Remap sound", 454, 528, 190, 36, "block-remap", false)
+	a.btn(dst, "Pack project", 830, 528, 232, 36, "project-pack", false)
 	a.text(dst, "Transpose and remap use the selected row range; PCM edits apply to both sample voices.", 42, 595, 12, dim)
 	a.text(dst, "Expand/shrink retain displaced rows in the clipboard. Ctrl+Z undoes all edits.", 42, 626, 12, dim)
 }
@@ -60,6 +61,18 @@ func (a *App) patternAction(name string) bool {
 		return true
 	}
 	switch name {
+	case "project-pack":
+		e, _ := a.synth.Snapshot()
+		result, err := edit.PackProject(e.Project)
+		if err != nil {
+			a.status = err.Error()
+			return true
+		}
+		a.remember()
+		a.synth.Edit(func(engine *replay.Engine) { engine.Stop(); engine.Project = e.Project; engine.Reset() })
+		a.pattern, a.row = 0, 0
+		a.dirty = true
+		a.status = fmt.Sprintf("Packed %d→%d patterns and %d→%d sequences", result.PatternsBefore, result.PatternsAfter, result.SequencesBefore, result.SequencesAfter)
 	case "block-first", "block-last":
 		a.modal, a.entry = "Block first row", fmt.Sprintf("%02X", a.blockFirst)
 		if name == "block-last" {
