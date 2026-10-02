@@ -27,6 +27,8 @@ and native capacity limits remain explicit. See
 Long ordinary-tone envelopes use native pattern volume without consuming an
 effect column. Their bank definitions retain the other converted sound settings;
 the report identifies definitions that need the generated score for playback.
+Verified classic fixed-pitch mixer/noise programs use editable M/N commands,
+preserving alternating phase and the noise shadow shared between source voices.
 
 Native register evidence currently includes 8,778 complete replay calls across
 the three supplied examples and isolated timer fixtures. The register checks

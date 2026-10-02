@@ -19,6 +19,8 @@ type SourceProjectReport struct {
 	ModulationSegments     int              `json:"pitch_modulation_segments"`
 	ScoreVolumeInstruments []int            `json:"pattern_volume_instruments,omitempty"`
 	ScoreVolumeChanges     int              `json:"pattern_volume_changes,omitempty"`
+	ScoreMixerInstruments  []int            `json:"pattern_mixer_instruments,omitempty"`
+	ScoreMixerChanges      int              `json:"pattern_mixer_changes,omitempty"`
 	UntranslatedCommands   map[byte]int     `json:"untranslated_pattern_commands"`
 	Warnings               []string         `json:"warnings"`
 }
@@ -41,7 +43,8 @@ func SourceProject(score SourceScore, start, end int) (*model.Project, SourcePro
 	if positions > 255 {
 		return nil, report, fmt.Errorf("source: selected excerpt exceeds 255 arrangement positions")
 	}
-	bank, bankReport, volumeInstruments, err := prepareSourceProjectBank(score)
+	bankScore, mixerCandidates := prepareClassicMixerScore(score)
+	bank, bankReport, volumeInstruments, err := prepareSourceProjectBank(bankScore)
 	if err != nil {
 		return nil, report, err
 	}
@@ -131,6 +134,14 @@ func SourceProject(score SourceScore, start, end int) (*model.Project, SourcePro
 		return nil, report, err
 	}
 	report.ModulationSegments = segments
+	mixerIDs, mixerChanges, err := applyClassicMixer(score, rows, &bank, start, mixerCandidates)
+	if err != nil {
+		return nil, report, err
+	}
+	report.ScoreMixerInstruments, report.ScoreMixerChanges = mixerIDs, mixerChanges
+	if len(mixerIDs) > 0 {
+		report.Warnings = append(report.Warnings, "Verified classic fixed-pitch sounds use generated M/N commands for their alternating mixer and shared noise period. Their bank definitions need this score for original timbre.")
+	}
 	if segments > 0 {
 		delete(report.UntranslatedCommands, 0x81)
 		delete(report.UntranslatedCommands, 0x82)
@@ -140,7 +151,23 @@ func SourceProject(score SourceScore, start, end int) (*model.Project, SourcePro
 	// A partial final native pattern ends at the exact selected frame instead
 	// of extending the excerpt with unrequested empty rows.
 	if len(rows)%model.Rows != 0 {
-		rows[len(rows)-1][0].Effect1 = 'B'
+		inserted := false
+		for channel := range 3 {
+			cell := &rows[len(rows)-1][channel]
+			if cell.Effect1 == 0 {
+				cell.Effect1 = 'B'
+				inserted = true
+				break
+			}
+			if cell.Effect2 == 0 {
+				cell.Effect2 = 'B'
+				inserted = true
+				break
+			}
+		}
+		if !inserted {
+			return nil, report, fmt.Errorf("source: excerpt boundary needs a free effect column; choose another end frame")
+		}
 	}
 	p := model.New()
 	p.Title = "Source score excerpt"

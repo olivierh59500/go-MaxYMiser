@@ -110,6 +110,10 @@ Long ordinary-tone volume envelopes use the generated score's native volume
 column, retaining their independent timing, legato and retrigger behavior.
 The source view identifies these sounds; their standalone bank preview holds
 a constant volume, so their envelope playback requires the generated MYS/MYV pair.
+Basic classic fixed-pitch sounds also retain their alternating noise/tone mixer
+through generated `M`/`N` commands, using the noise period shared by all voices.
+Their original timbre likewise depends on the generated score, as identified
+in the source view and conversion report.
 The standard Last Ninja bank currently translates all 32 definitions, including
 the two finite automatic drum-pitch programs. Other source layouts and period
 rounding remain outside a claim of complete original playback.

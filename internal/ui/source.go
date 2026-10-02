@@ -152,6 +152,12 @@ func (a *App) drawSource(dst *ebiten.Image) {
 				break
 			}
 		}
+		for _, id := range report.ScoreMixerInstruments {
+			if sound.ID == id {
+				state = "alternating mixer / shared noise in generated score"
+				break
+			}
+		}
 		a.text(dst, fmt.Sprintf("%02X  settings % X  ·  %s", sound.ID, sound.Settings, state), 42, float64(391+n*26), 11, fg)
 	}
 	a.btn(dst, "Previous sounds", 42, 616, 176, 30, "source:previous", false)

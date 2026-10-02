@@ -150,8 +150,8 @@ replacement constant-volume voice. A separate synthetic native score checks
 The Ace 2 SNDH/YM pair aligns at two YM frames with 518/518 eligible tonal events
 agreeing. In the held-out chronological section, 228 of 302 known instrument
 events are labelled correctly, 73 remain unresolved and one accepted label is
-incorrect. This remains a same-song evaluation. Fixed-pitch
-hardware programs and additional mixer/noise effects can remain unconverted;
+incorrect. This remains a same-song evaluation. Combined hardware programs
+and additional mixer/noise effects can remain unconverted;
 recognized source notes do not imply complete editable sound reproduction.
 
 ```sh
@@ -264,6 +264,35 @@ The first 6,000 Ace 2 frames now produce 92 patterns and 314 score-volume
 commands, with no note events using an unsupported definition in that excerpt.
 This verifies the translated volume/pitch behavior described above, not every
 original mixer/noise command or complete analog sound fidelity.
+
+### Classic fixed-pitch mixer and shared noise
+
+Basic classic definitions with flag `02` now retain their original alternating
+noise/tone behavior through generated `M` and `N` commands. The period comes
+from the shared native noise shadow, including changes made by other voices.
+New note steps reset the alternation phase; cropped selections preserve the
+phase at the chosen frame. Original fixed-note/source flags remain unchanged
+in the source inspection and JSON.
+
+The editable bank retains each sound's translated volume and arpeggio. Its
+generated score supplies mixer/noise timing, so standalone MYV preview does not
+claim the original timbre. `pattern_mixer_instruments` and
+`pattern_mixer_changes` identify these dependencies in the conversion report;
+the source view labels the affected definitions too. The unverified additional
+noise-sweep command `8F` keeps these definitions unsupported for now.
+
+After native pair save/reload, Commando's 312 captured fixed-pitch calls match
+the original active mixer bits, audible shared noise period and volume values.
+A synthetic native score verifies another 120 calls with a different voice
+changing the shared shadow. The mixer model was also checked against 1,200
+complete calls from both Commando and Ace 2, plus 220 synthetic calls. These
+checks concern the stated registers and timing, not complete analog waveform
+parity or every original sound definition.
+
+The first 6,000 Commando frames generate 100 patterns and 1,517 mixer/noise
+commands; 57 events still use other unsupported definitions. End-of-excerpt
+commands occupy an available effect column and never overwrite the last mixer
+or pitch command. Full effect rows and native capacities remain explicit errors.
 
 With `-ym`, it first aligns source notes with the register recording. The
 search supports a recording lead-in and a constant pitch transposition, and
