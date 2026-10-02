@@ -69,6 +69,25 @@ song block and adjusts the relative sample pointers by its length. The import
 checks the native tags and decodes both resulting payloads before accepting the
 project.
 
+### Native SNDH export
+
+The exporter reuses an existing MaxYMiser replay prefix selected at runtime.
+The imported prefix remains outside the source repository. Opening a supported
+MaxYMiser SNDH retains it automatically; an independent MYS/MYV project can load
+a replay through **Settings → Load SNDH replay**.
+
+The first three branch entry points, executable data positions and voice-data
+pointer are preserved. The song pointer is rebuilt, and sample-relative offsets
+are adjusted for the newly inserted tracker block. Title, author, timer-C rate
+and optional duration tags are updated within the header's original capacity.
+An unsupported layout, incompatible bank version or oversized metadata is
+rejected rather than silently producing a corrupt executable.
+
+An original Go composition exported this way was reopened in the supplied Atari
+editor: title/author, arrangement length and instrument names were verified in
+memory. A separate native replay harness executed its entry points; all captured
+register writes and envelope-write flags matched Go for 600 complete calls.
+
 ## YM recordings
 
 The inspection decoder accepts YM2, YM3, YM3b, YM5 and YM6 register recordings,

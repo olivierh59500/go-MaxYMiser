@@ -426,6 +426,8 @@ func (a *App) drawSettings(dst *ebiten.Image, e *replay.Engine) {
 	a.btn(dst, fmt.Sprint(e.Project.Song.State[56]), 950, 480, 180, 38, "setting:pcm-limit", false)
 	a.text(dst, "WAV export seconds", 670, 546, 13, dim)
 	a.btn(dst, strconv.FormatFloat(a.exportDuration.Seconds(), 'f', -1, 64), 950, 534, 180, 38, "setting:export-duration", false)
+	a.btn(dst, "Load SNDH replay", 670, 588, 250, 36, "sndh-template", len(e.Project.ReplaySource) > 0)
+	a.btn(dst, "Export SNDH", 936, 588, 232, 36, "sndh-export", false)
 }
 func (a *App) drawHelp(dst *ebiten.Image) {
 	rect(dst, 24, 192, 1232, 482, panel)
@@ -539,7 +541,7 @@ midiDone:
 				a.remember()
 				a.synth.CloseYM()
 				a.synth.Edit(func(e *replay.Engine) {
-					e.Project = &model.Project{Title: value.Title, Author: value.Author, Song: value.Song, Bank: value.Bank}
+					e.Project = &model.Project{Title: value.Title, Author: value.Author, Song: value.Song, Bank: value.Bank, ReplaySource: append([]byte(nil), data...)}
 					e.Reset()
 				})
 				a.tab = "Patterns"
@@ -1076,6 +1078,10 @@ func (a *App) action(name string) {
 		a.modal, a.entry = "Song title / artist", e.Project.Title+" / "+e.Project.Author
 	case "export":
 		a.beginFileBrowser("Export WAV", "maxymiser.wav", true)
+	case "sndh-template":
+		a.beginFileBrowser("Load SNDH replay template", "", false)
+	case "sndh-export":
+		a.beginFileBrowser("Export native SNDH", "maxymiser.snd", true)
 	default:
 		if strings.HasPrefix(name, "setting:") {
 			a.modal = "Setting " + strings.TrimPrefix(name, "setting:")
@@ -1095,6 +1101,9 @@ func (a *App) save(path string) {
 	a.dirty = false
 	a.lastSave = time.Now()
 	a.status = "Saved native song and voice bank"
+	if strings.EqualFold(filepath.Ext(path), ".snd") || strings.EqualFold(filepath.Ext(path), ".sndh") {
+		a.status = "Saved native SNDH song"
+	}
 }
 func (a *App) applyModal() {
 	if a.browser != nil {
@@ -1112,6 +1121,26 @@ func (a *App) applyModal() {
 	}
 	var x, y int
 	switch {
+	case modal == "Load SNDH replay template":
+		raw, err := os.ReadFile(entry)
+		if err == nil {
+			_, err = native.ParseSNDHTemplate(raw)
+		}
+		if err != nil {
+			a.status = err.Error()
+		} else {
+			a.remember()
+			a.synth.Edit(func(e *replay.Engine) { e.Project.ReplaySource = append([]byte(nil), raw...) })
+			a.status = "Native SNDH replay loaded; current composition retained"
+		}
+	case modal == "Export native SNDH":
+		var snapshot *model.Project
+		a.synth.Edit(func(e *replay.Engine) { snapshot = e.Project.Clone() })
+		if err := project.SaveSNDH(snapshot, entry, a.exportDuration); err != nil {
+			a.status = err.Error()
+		} else {
+			a.status = "Native SNDH exported with track duration"
+		}
 	case strings.HasPrefix(modal, "Open music"):
 		if strings.EqualFold(filepath.Ext(entry), ".myv") {
 			data, err := os.ReadFile(entry)

@@ -101,6 +101,11 @@ projects by extracting their native song and voice-bank payloads. This import
 is specific to MaxYMiser exports; it is not a general 68000 SNDH player.
 Native formats also accept ICE-compressed wrappers. The Go decoder is checked
 against streams produced by the original editor's compressor. Saves are unpacked.
+Native SNDH export preserves a locally supplied MaxYMiser replay prefix and
+rebuilds song/sample offsets, metadata, replay rate and duration. Opening a
+supported SNDH keeps its replay available for saving; a new composition can
+choose **Settings → Load SNDH replay**, then **Export SNDH**. Original executable
+data is loaded at runtime and is not bundled with the Go application.
 
 YM files are played by YM Player, including its compressed-file support and
 chip effects. Their register data is retained separately from the native
@@ -110,6 +115,8 @@ recording with the reconstructed candidate.
 ```sh
  go run ./cmd/maxymiser -song /path/to/song.mys -bank /path/to/voices.myv
  go run ./cmd/maxymiser -song /path/to/song.snd -wav music.wav -duration 30s
+ go run ./cmd/maxymiser -song /path/to/song.mys \
+   -template /path/to/maxymiser.snd -sndh finished.snd -duration 3m
 ```
 
 The headless command requires no graphics window. WAV export produces stereo
@@ -168,7 +175,7 @@ Subsample timing, oscillator synchronisation, mixed timer combinations and STe
 mixing have not yet been validated against a complete Atari recording matrix;
 they should not be described as bit-exact hardware emulation. MIDI input is
 available on macOS, including notes, program changes, controllers and transport.
-MIDI clock output, Sync24 hardware, native SNDH export and ICE packing are not
+MIDI clock output, Sync24 hardware and ICE packing are not
 included in this edition.
 
 ## Verification

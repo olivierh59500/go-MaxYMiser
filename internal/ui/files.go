@@ -49,6 +49,8 @@ func allowedFile(modal, name string) bool {
 	switch {
 	case strings.HasPrefix(modal, "Open music"):
 		return ext == ".mys" || ext == ".myv" || ext == ".snd" || ext == ".sndh" || ext == ".ym"
+	case modal == "Load SNDH replay template":
+		return ext == ".snd" || ext == ".sndh"
 	case strings.Contains(modal, "instrument"):
 		return ext == ".myi"
 	case strings.Contains(modal, "profile"):

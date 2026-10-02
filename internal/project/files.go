@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 func Load(songPath, bankPath string) (*model.Project, error) {
@@ -24,6 +25,7 @@ func Load(songPath, bankPath string) (*model.Project, error) {
 			}
 			p.Song, p.Bank = embedded.Song, embedded.Bank
 			p.Title, p.Author = embedded.Title, embedded.Author
+			p.ReplaySource = append([]byte(nil), b...)
 			return p, nil
 		}
 		song, err := native.DecodeSong(b)
@@ -56,6 +58,9 @@ func Load(songPath, bankPath string) (*model.Project, error) {
 	return p, nil
 }
 func Save(p *model.Project, path string) error {
+	if strings.EqualFold(filepath.Ext(path), ".snd") || strings.EqualFold(filepath.Ext(path), ".sndh") {
+		return SaveSNDH(p, path, 0)
+	}
 	stem := strings.TrimSuffix(path, filepath.Ext(path))
 	song, err := native.EncodeSong(p.Song)
 	if err != nil {
@@ -69,6 +74,21 @@ func Save(p *model.Project, path string) error {
 		return err
 	}
 	return atomicWrite(stem+".myv", bank)
+}
+
+func SaveSNDH(p *model.Project, path string, duration time.Duration) error {
+	if len(p.ReplaySource) == 0 {
+		return fmt.Errorf("project: load a native MaxYMiser SNDH replay template before exporting")
+	}
+	template, err := native.ParseSNDHTemplate(p.ReplaySource)
+	if err != nil {
+		return err
+	}
+	data, err := native.EncodeSNDH(template, p, duration)
+	if err != nil {
+		return err
+	}
+	return atomicWrite(path, data)
 }
 func atomicWrite(path string, data []byte) error {
 	dir := filepath.Dir(path)

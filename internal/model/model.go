@@ -70,6 +70,9 @@ type Project struct {
 	Title, Author string
 	Song          Song
 	Bank          VoiceBank
+	// ReplaySource is a locally supplied MaxYMiser SNDH used for native export.
+	// It is external runtime data, not part of the MYS/MYV editable payload.
+	ReplaySource []byte
 }
 
 func New() *Project {

@@ -4,6 +4,7 @@ package model
 func (p *Project) Clone() *Project {
 	clone := *p
 	clone.Song.Patterns = append([]Pattern(nil), p.Song.Patterns...)
+	// ReplaySource is immutable runtime data; edits replace the whole slice.
 	for i, s := range p.Bank.Samples {
 		clone.Bank.Samples[i].PCM = append([]byte(nil), s.PCM...)
 		clone.Bank.Samples[i].Trailer = append([]byte(nil), s.Trailer...)

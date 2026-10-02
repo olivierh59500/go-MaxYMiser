@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/olivierh59500/go-MaxYMiser/internal/model"
+	"github.com/olivierh59500/go-MaxYMiser/internal/native"
 )
 
 func TestWAVExportUsesChosenDurationAndLeavesEditorUsable(t *testing.T) {
@@ -40,5 +41,30 @@ func TestWAVExportUsesChosenDurationAndLeavesEditorUsable(t *testing.T) {
 	raw, err := os.ReadFile(path)
 	if err != nil || len(raw) != 44+4800*4 || binary.LittleEndian.Uint32(raw[40:44]) != 4800*4 {
 		t.Fatalf("WAV did not use selected duration: bytes=%d err=%v", len(raw), err)
+	}
+}
+
+func TestSNDHExportRequiresAValidatedLocallySuppliedReplay(t *testing.T) {
+	app, err := New(model.Demo(), "", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer app.Close()
+	path := filepath.Join(t.TempDir(), "song.snd")
+	app.modal, app.entry = "Export native SNDH", path
+	app.applyModal()
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Fatal("export created a non-playable SNDH without a replay prefix")
+	}
+	bad := filepath.Join(t.TempDir(), "bad.snd")
+	os.WriteFile(bad, []byte("SNDH"), 0600)
+	app.modal, app.entry = "Load SNDH replay template", bad
+	app.applyModal()
+	e, _ := app.synth.Snapshot()
+	if len(e.Project.ReplaySource) != 0 || e.Project.Title != "First signal" {
+		t.Fatal("invalid replay template changed the current composition")
+	}
+	if _, err := native.ParseSNDHTemplate([]byte("not a template")); err == nil {
+		t.Fatal("invalid replay template accepted")
 	}
 }
