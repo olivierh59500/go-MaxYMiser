@@ -42,7 +42,7 @@ func DecodeSong(data []byte) (model.Song, error) {
 			if row+skip >= model.Rows {
 				return song, fmt.Errorf("native: RLE run exceeds pattern length")
 			}
-			pattern[row] = model.Cell{record[0], record[1], record[2], record[3], record[4], record[5], record[6]}
+			pattern[row] = model.Cell{Note: record[0], Instrument: record[1], Volume: record[2], Effect1: record[3], Parameter1: record[4], Effect2: record[5], Parameter2: record[6]}
 			row += skip + 1
 		}
 		song.Patterns = append(song.Patterns, pattern)

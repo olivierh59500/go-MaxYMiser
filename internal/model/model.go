@@ -77,7 +77,7 @@ func New() *Project {
 	p.Song.State[8] = 1
 	p.Song.State[12] = 3
 	p.Song.State[36] = 7
-	p.Song.State[37] = 7
+	p.Song.State[37] = 0
 	p.Song.SetSpeed(6)
 	p.Song.SetTickRate(50)
 	for i := range p.Song.Orders {
