@@ -13,6 +13,9 @@ type Report struct {
 	Warnings                                 []string
 	StartFrame, EndFrame, FramesPerRow       int
 	GridCandidates                           []GridCandidate
+	SourceLabels                             []SourceEvidence
+	SourcePlayer                             string
+	SourceLabelRate                          int
 }
 type timbre struct {
 	Tone, Noise, Envelope bool

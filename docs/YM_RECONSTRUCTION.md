@@ -79,6 +79,72 @@ hypotheses. Those effects remain audible in the separately retained YM
 reference. The corpus provides supporting examples and stronger comparisons;
 it does not turn ambiguous traces into unique source data.
 
+## Learning from paired SNDH and YM files
+
+A SNDH contains executable playback code and that player's music data. It can
+therefore provide source instrument IDs, note commands and pattern boundaries
+that a YM register recording does not retain. These labels make supervised
+learning possible once the particular player has a verified decoder. A SNDH
+does not need to use MaxYMiser to be useful for this purpose.
+
+SNDH is a container, not one common tracker format. Author and title metadata
+do not identify a safe data layout. The first source decoder recognizes the
+Mad Max player carried by the standard and SID versions of **Last Ninja**. It
+uses instruction signatures and file-relative pointer validation, retains the
+original 27 referenced patterns and 32 instrument definitions, and simulates
+the source note/control timing. The alternate instrument-bank command and
+additional subtunes are rejected until their layouts are verified.
+Instrument extraction currently retains the six base settings and volume
+sequence. The separate pitch, noise and hardware-effect sequences are not yet
+translated into MaxYMiser definitions.
+
+Native execution under Hatari provided 298 note events with their source
+offsets, instrument IDs, timing and legato flags. Every event agreed with the
+Go source decoder. Original binaries, captured memory and learned music data
+remain external local inputs; they are not included in the repository.
+
+```sh
+ go run ./cmd/ympair -sndh /path/to/Last_Ninja.sndh \
+   -ym "/path/to/Last Ninja.ym" -frames 6000 -output last-ninja-paired.json
+
+ go run ./cmd/ymimport -input /path/to/music.ym \
+   -paired-profile last-ninja-paired.json -output candidate.mys
+```
+
+Without `-ym`, `ympair` exports only the native source tables and timeline.
+With `-ym`, it first aligns source notes with the register recording. The
+search supports a recording lead-in and a constant pitch transposition, and
+requires at least 20 tonal events with 90% pitch agreement. It does not assume
+that similarly named files are the same arrangement. Different frame rates,
+tempo changes and channel permutations need a different alignment method.
+Pitch agreement verifies a musical timeline, not an identical timbre or replay
+variant: the SID variant can share notes with the standard recording. Labels
+describe the bank selected by `-sndh`; register-level verification is needed
+before treating two versions as identical sound definitions.
+
+The labelled model stores normalized feature prototypes associated with native
+instrument IDs. The last chronological quarter is excluded from training.
+Ambiguous matches and unfamiliar sounds produce no label. Source IDs belong
+to that original bank; the same number in another song does not identify the
+same instrument. Neither distance nor matching margin is a probability.
+
+For the supplied standard Last Ninja pair, the first 6,000 source frames align
+at an offset of six YM frames: 846/849 eligible tonal events agree. The held-out
+section contains 358 examples of instruments encountered during training:
+205 labels are correct, 144 are left unresolved, and nine are incorrect. This
+is about 96% precision among accepted labels, but only 57% coverage as correct
+labels. Validation still uses repeated material from one song; these numbers
+do not establish performance on another composition or on all Mad Max music.
+
+In the application, **YM → Paired source profile** loads the generated JSON;
+**Reconstruct** includes source-labelled candidates alongside the existing
+composer evidence. `-paired-profile /path/to/profile.json` selects the same
+profile at startup. The analysis report records each accepted event's source
+instrument, channel, frame range, feature distance and competing-label margin.
+The generated MaxYMiser synthesis settings remain approximate. Translating
+source modulation commands and improving event segmentation are subsequent
+steps; a source-labelled match alone does not restore the original sound.
+
 ## Comparing arrangements from different composers
 
 Two arrangements of a common composition are complementary evidence. A phrase

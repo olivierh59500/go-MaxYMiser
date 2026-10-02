@@ -51,6 +51,7 @@ type App struct {
 	nativeConfiguration                                                native.Configuration
 	drumKeyboard                                                       bool
 	corpus                                                             *ymimport.Corpus
+	pairedProfile                                                      *ymimport.PairedProfile
 	ymPath                                                             string
 	ymReport                                                           *ymimport.Report
 	ymOptions                                                          ymimport.ReconstructionOptions
@@ -1052,6 +1053,12 @@ func (a *App) action(name string) {
 			report.AuthorProfile = a.corpus.Author
 			report.Evidence = a.corpus.Evidence(trace)
 		}
+		if a.pairedProfile != nil {
+			report.SourcePlayer = a.pairedProfile.Source.Player
+			report.SourceLabelRate = trace.Rate
+			report.SourceLabels = a.pairedProfile.SourceEvidence(trace)
+			report.Warnings = append(report.Warnings, "Source-labelled matches are candidates from the paired bank; MaxYMiser sound settings remain approximate.")
+		}
 		a.ymReport = &report
 		a.pattern, a.row, a.channel = 0, 0, 0
 		a.projectPath = ""
@@ -1059,6 +1066,8 @@ func (a *App) action(name string) {
 		a.status = fmt.Sprintf("Reconstructed candidate: %d instruments, %d patterns. Compare with the original YM.", report.Instruments, report.Patterns)
 	case "ym:profile":
 		a.beginFileBrowser("Load composer profile (.json)", "", false)
+	case "ym:paired-profile":
+		a.beginFileBrowser("Load paired source profile (.json)", "", false)
 	case "ym-library":
 		a.modal, a.entry = "YM library directory", a.ymLibraryDirectory
 	case "ym:range":
@@ -1368,6 +1377,10 @@ func (a *App) applyModal() {
 		}
 		a.corpus = &corpus
 		a.status = fmt.Sprintf("Loaded %s corpus: %d recordings, %d recurring timbres", corpus.Author, corpus.Unique, len(corpus.Instruments))
+	case modal == "Load paired source profile (.json)":
+		if err := a.LoadPairedProfile(entry); err != nil {
+			a.status = err.Error()
+		}
 	case modal == "Instrument name":
 		a.remember()
 		a.synth.Edit(func(e *replay.Engine) { e.Project.Bank.Instruments[a.instrument].SetName(entry) })
@@ -1623,6 +1636,8 @@ func (a *App) drawYM(dst *ebiten.Image) {
 	r, ok := a.synth.Reference()
 	if !ok {
 		a.text(dst, "Open a .ym file to listen and inspect the YM2149 registers.", 42, 222, 16, fg)
+		a.btn(dst, "YM library", 42, 268, 154, 34, "ym-library", len(a.ymLibrary.Files) > 0)
+		a.btn(dst, "Paired source profile", 214, 268, 218, 34, "ym:paired-profile", a.pairedProfile != nil)
 		return
 	}
 	a.text(dst, r.Name, 42, 211, 22, fg)
@@ -1633,6 +1648,7 @@ func (a *App) drawYM(dst *ebiten.Image) {
 	a.btn(dst, "Listen YM", 876, 246, 152, 34, "ym:reference", r.Active)
 	a.btn(dst, "Listen score", 1038, 246, 194, 34, "ym:score", !r.Active)
 	a.btn(dst, fmt.Sprintf("Range %d:%d · grid %d", a.ymOptions.StartFrame, a.ymOptions.EndFrame, a.ymOptions.FramesPerRow), 520, 205, 344, 30, "ym:range", false)
+	a.btn(dst, "Paired source profile", 350, 205, 154, 30, "ym:paired-profile", a.pairedProfile != nil)
 	a.text(dst, fmt.Sprintf("%d:%02d / %d:%02d", r.Position/60000, (r.Position/1000)%60, r.Duration/60000, (r.Duration/1000)%60), 968, 217, 18, accent)
 	labels := []string{"Tone A low", "Tone A high", "Tone B low", "Tone B high", "Tone C low", "Tone C high", "Noise period", "Mixer", "Volume A", "Volume B", "Volume C", "Envelope low", "Envelope high", "Envelope shape"}
 	for reg, label := range labels {
@@ -1646,7 +1662,20 @@ func (a *App) drawYM(dst *ebiten.Image) {
 		if a.corpus != nil {
 			label += fmt.Sprintf(" · %d corpus matches", len(a.ymReport.Evidence))
 		}
+		if a.pairedProfile != nil {
+			label += fmt.Sprintf(" · %d source labels", len(a.ymReport.SourceLabels))
+		}
 		a.text(dst, label, 42, 626, 13, purple)
+	}
+	if a.pairedProfile != nil && a.ymReport != nil {
+		frame := int(r.Position) * a.ymReport.SourceLabelRate / 1000
+		labels := [3]string{"?", "?", "?"}
+		for _, evidence := range a.ymReport.SourceLabels {
+			if evidence.Start <= frame && frame < evidence.End && evidence.Channel >= 0 && evidence.Channel < 3 {
+				labels[evidence.Channel] = fmt.Sprintf("%02X", evidence.Instrument)
+			}
+		}
+		a.text(dst, fmt.Sprintf("Paired source IDs: A %s · B %s · C %s · ? = unresolved", labels[0], labels[1], labels[2]), 42, 599, 12, accent)
 	}
 	a.text(dst, "Reconstruction infers a candidate score; original instrument definitions and pattern boundaries are not stored in YM.", 42, 652, 11, dim)
 }

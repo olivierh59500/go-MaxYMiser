@@ -15,6 +15,7 @@ func main() {
 	input := flag.String("input", "", "YM recording")
 	output := flag.String("output", "candidate.mys", "native output song")
 	profile := flag.String("profile", "", "composer corpus JSON")
+	paired := flag.String("paired-profile", "", "verified source-labelled SNDH/YM profile JSON")
 	start := flag.Int("start-frame", 0, "first reference frame to reconstruct")
 	end := flag.Int("end-frame", 0, "exclusive last frame; 0 uses the whole recording")
 	grid := flag.Int("row-frames", 1, "frames per proposed tracker row; 0 estimates a supported grid")
@@ -39,6 +40,16 @@ func main() {
 		report.AuthorProfile = corpus.Author
 		report.Evidence = corpus.Evidence(trace)
 	}
+	if *paired != "" {
+		p, err := ymimport.LoadPairedProfile(*paired)
+		if err != nil {
+			log.Fatal(err)
+		}
+		report.SourcePlayer = p.Source.Player
+		report.SourceLabelRate = trace.Rate
+		report.SourceLabels = p.SourceEvidence(trace)
+		report.Warnings = append(report.Warnings, "Source-labelled matches identify candidates from the paired bank; the generated MaxYMiser sound settings remain approximate.")
+	}
 	if err = project.Save(candidate, *output); err != nil {
 		log.Fatal(err)
 	}
@@ -49,5 +60,5 @@ func main() {
 	if err = os.WriteFile(*output+".analysis.json", append(data, '\n'), 0644); err != nil {
 		log.Fatal(err)
 	}
-	fmt.Printf("%d candidate instruments, %d patterns, %d positions, %d corpus matches\n", report.Instruments, report.Patterns, report.Positions, len(report.Evidence))
+	fmt.Printf("%d candidate instruments, %d patterns, %d positions, %d corpus matches, %d source-labelled matches\n", report.Instruments, report.Patterns, report.Positions, len(report.Evidence), len(report.SourceLabels))
 }

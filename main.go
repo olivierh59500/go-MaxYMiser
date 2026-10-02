@@ -26,6 +26,7 @@ func main() {
 	info := flag.Bool("info", false, "print native project information")
 	config := flag.String("config", "", "native MYM.CNF configuration")
 	ymLibrary := flag.String("ym-library", "", "directory containing YM recordings for SNDH alternatives")
+	pairedProfile := flag.String("paired-profile", "", "verified source-labelled SNDH/YM profile JSON")
 	flag.Parse()
 	if *song == "" && flag.NArg() > 0 {
 		*song = flag.Arg(0)
@@ -85,6 +86,11 @@ func main() {
 	}
 	if *config != "" {
 		if err = app.LoadConfiguration(*config); err != nil {
+			log.Fatal(err)
+		}
+	}
+	if *pairedProfile != "" {
+		if err = app.LoadPairedProfile(*pairedProfile); err != nil {
 			log.Fatal(err)
 		}
 	}

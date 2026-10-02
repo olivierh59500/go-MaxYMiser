@@ -47,7 +47,8 @@ trying the editor. External MaxYMiser files are not needed to launch it.
   **Pack project** removes duplicate pattern/sequence definitions and remaps their
   references, including sequence-selection commands in both effect columns.
 - **YM**: original YM playback, live register inspection and proposed tracker
-  reconstruction, with optional composer-corpus evidence.
+  reconstruction, with optional composer-corpus evidence and source-labelled
+  profiles learned from verified SNDH/YM pairs.
 - **Settings**: playback rate, speed, edit step, octave, volume, timer mask,
   saved Jam mode, one/two-voice/native-rate PCM modes, native CNF exchange and
   macOS MIDI input.
@@ -67,6 +68,10 @@ Opening an editable native song selects its first ordinary arrangement track
 and replaces the instrument/pattern view. An unsupported SNDH shows a visible
 explanation and preserves the current composition and playback. SNDH files using
 other replay formats do not carry editable MaxYMiser instruments or patterns.
+Their own music data can still support reconstruction after the player format
+has been decoded. The first paired source decoder covers the Mad Max Last Ninja
+player; see [YM reconstruction](docs/YM_RECONSTRUCTION.md) for commands,
+verification results and the current scope.
 
 ## Keyboard
 
