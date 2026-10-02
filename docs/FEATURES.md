@@ -7,7 +7,7 @@ replay validation and hardware-specific integration.
 | Area | Implemented | Remaining verification or work |
 | --- | --- | --- |
 | Tracker | Three YM voices, two PCM voices, both effect columns, live/step recording, masked block editing, transpose/remap, row tools, octave/percussion shortcuts, undo/redo | Additional convenience shortcuts can be extended |
-| Arrangement | Independent pattern lists, length/repeat, position selection, Jam markers, queued song jumps and track patterns, seamless song/pattern/record mode changes, native sequencer-only mutes and duplicate pattern/sequence packing with reference remapping | Broader hardware-controlled live performance verification |
+| Arrangement | Independent pattern lists, position insertion/deletion and clipboard ranges, occurrence cloning, length/repeat, Jam jumps, seamless song/pattern/record changes, sequencer-only mutes and validated pattern/sequence packing | Broader hardware-controlled live performance verification |
 | Instruments | 32 definitions, scalar/mask editing, linked sequence values, individual MYI exchange and copying | More native MYI legacy/sample fixtures |
 | Sequences | 256 sequences, length/repeat, generation, signed values, range add/scale, copying and morphing | Additional shortcuts |
 | Samples | Eight banks, signed PCM/WAV import, gain, interpolated tuning, trim, sign conversion, native YMise DAC quantization, STe DAC cadence/rate fixtures, save and preview | Analog mixer/filter response is approximated digitally |

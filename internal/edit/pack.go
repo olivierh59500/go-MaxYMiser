@@ -24,7 +24,13 @@ func PackProject(project *model.Project) (PackResult, error) {
 	var sourceRoles [240]byte
 	for _, order := range p.Song.Orders[:p.Song.Length] {
 		for channel, id := range order {
+			if channel == 3 && p.Song.State[49] == 0 {
+				continue
+			}
 			if id < 240 {
+				if int(id) >= len(p.Song.Patterns) {
+					return result, fmt.Errorf("edit: active song track refers to missing pattern %02X", id)
+				}
 				if channel == 3 {
 					sourceRoles[id] |= 2
 				} else {
@@ -106,6 +112,9 @@ func PackProject(project *model.Project) (PackResult, error) {
 	roles := map[byte]byte{}
 	for _, order := range p.Song.Orders[:p.Song.Length] {
 		for channel, id := range order {
+			if channel == 3 && p.Song.State[49] == 0 {
+				continue
+			}
 			if id >= 240 {
 				continue
 			}

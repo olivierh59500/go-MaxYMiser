@@ -26,6 +26,7 @@ func (a *App) drawPatternTools(dst *ebiten.Image, e *replay.Engine) {
 		a.btn(dst, string(mode), 42+i*180, 342, 166, 34, "paste-mode:"+string(mode), a.pasteMode == mode)
 	}
 	a.text(dst, fmt.Sprintf("Paste at cursor %02X · clipboard %d rows", a.row, len(a.blockClipboard)), 636, 350, 13, accent)
+	a.btn(dst, "All columns", 42, 366, 160, 26, "column-mask-all", false)
 	labels := []string{"Note", "Instrument", "Volume", "Effect 1", "Value 1", "Effect 2", "Value 2"}
 	if a.channel == 3 {
 		labels = []string{"Note A", "Sample A", "Volume A", "Note B", "Sample B", "Volume B", "Reserved"}
@@ -62,6 +63,14 @@ func (a *App) patternAction(name string) bool {
 		return true
 	}
 	switch name {
+	case "column-mask-all":
+		all := true
+		for _, on := range a.columnMask {
+			all = all && on
+		}
+		for i := range a.columnMask {
+			a.columnMask[i] = !all
+		}
 	case "project-pack":
 		e, _ := a.synth.Snapshot()
 		result, err := edit.PackProject(e.Project)

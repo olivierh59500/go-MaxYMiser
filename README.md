@@ -24,6 +24,10 @@ trying the editor. External MaxYMiser files are not needed to launch it.
 - **Song**: the four independent pattern lists making up the arrangement,
   selectable positions, length/repeat and title/artist editing. Assigning a new
   ordinary pattern ID creates its editable pattern automatically.
+  **Insert / Delete** work at the selected position. **Copy range / Paste**
+  insert complete four-track order rows and preserve the repeat anchor.
+  **Clone track** copies the selected occurrence's pattern to an independent
+  definition; other uses of the original pattern remain unchanged.
 - **Instruments**: both banks of 16 instruments, detune masks, sequence links,
   envelope, timer, sample and PWM parameters. Linked sequence values are shown
   beside the direct settings; click the values to open that sequence. Sequence
@@ -44,6 +48,7 @@ trying the editor. External MaxYMiser files are not needed to launch it.
   row insertion/deletion, expand/shrink, transposition, attenuation and sound remap.
   Sound remapping can cover the current block or every arrangement pattern
   belonging to the selected YM/PCM track type.
+  **All columns** enables or disables the complete copy/paste mask.
   **Pack project** removes duplicate pattern/sequence definitions and remaps their
   references, including sequence-selection commands in both effect columns.
 - **YM**: original YM playback, live register inspection and proposed tracker

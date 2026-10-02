@@ -74,6 +74,7 @@ type App struct {
 	copied                                                             model.Pattern
 	hasCopy                                                            bool
 	blockClipboard                                                     []model.Cell
+	orderClipboard                                                     [][4]byte
 	blockFirst, blockLast                                              int
 	pasteMode                                                          edit.PasteMode
 	columnMask                                                         edit.ColumnMask
@@ -345,10 +346,13 @@ func (a *App) drawSong(dst *ebiten.Image, e *replay.Engine) {
 	a.btn(dst, "Add position", 820, 204, 172, 34, "order:add", false)
 	a.btn(dst, "Remove last", 1008, 204, 174, 34, "order:remove", false)
 	if e.PositionQueued {
-		a.text(dst, fmt.Sprintf("Jam: next position %02X", e.NextPosition), 42, 640, 12, accent)
+		a.text(dst, fmt.Sprintf("Next %02X", e.NextPosition), 42, 614, 12, accent)
 	}
-	start := min(a.scroll, max(0, int(p.Song.Length)-18))
-	for pos := start; pos < int(p.Song.Length) && pos < start+18; pos++ {
+	for i, button := range []struct{ label, action string }{{"Insert", "order:insert"}, {"Delete", "order:delete"}, {"Copy", "order:copy"}, {"Copy range", "order:copy-range"}, {"Paste", "order:paste"}, {"Clone track", "order:clone-pattern"}} {
+		a.btn(dst, button.label, 42+i*147, 636, 137, 28, button.action, false)
+	}
+	start := min(a.scroll, max(0, int(p.Song.Length)-16))
+	for pos := start; pos < int(p.Song.Length) && pos < start+16; pos++ {
 		y := 252 + (pos-start)*22
 		if pos == e.Position {
 			rect(dst, 40, float32(y), 1200, 22, color.RGBA{31, 70, 67, 255})
@@ -893,6 +897,9 @@ func (a *App) enterField(r rune) {
 	}
 }
 func (a *App) action(name string) {
+	if a.modal == "" && a.arrangementAction(name) {
+		return
+	}
 	if a.modal == "" && a.subtuneAction(name) {
 		return
 	}
@@ -1214,22 +1221,24 @@ func (a *App) action(name string) {
 		})
 		a.status = "Recording notes into the playing native pattern"
 	case "pat:+":
-		a.synth.Edit(func(e *replay.Engine) {
-			a.pattern++
-			if a.pattern >= 240 {
-				a.pattern = 239
-			}
-			for len(e.Project.Song.Patterns) <= a.pattern {
-				e.Project.Song.Patterns = append(e.Project.Song.Patterns, model.Pattern{})
-			}
-		})
+		a.nextEditablePattern(1)
 	case "pat:-":
-		a.pattern = max(0, a.pattern-1)
+		a.nextEditablePattern(-1)
 	case "clear-pattern":
+		e, _ := a.synth.Snapshot()
+		if a.pattern < 0 || a.pattern >= len(e.Project.Song.Patterns) {
+			a.status = "Select an ordinary stored pattern first"
+			return
+		}
 		a.remember()
 		a.synth.Edit(func(e *replay.Engine) { e.Project.Song.Patterns[a.pattern] = model.Pattern{} })
 		a.dirty = true
 	case "copy-pattern":
+		e, _ := a.synth.Snapshot()
+		if a.pattern < 0 || a.pattern >= len(e.Project.Song.Patterns) || len(e.Project.Song.Patterns) >= model.MaxPatterns {
+			a.status = "Select a stored pattern and leave room for its copy"
+			return
+		}
 		a.remember()
 		a.synth.Edit(func(e *replay.Engine) {
 			if len(e.Project.Song.Patterns) < 240 {
@@ -1259,27 +1268,6 @@ func (a *App) action(name string) {
 	case "clear-sample":
 		a.remember()
 		a.synth.Edit(func(e *replay.Engine) { e.Project.Bank.Samples[a.sample] = model.Sample{} })
-		a.dirty = true
-	case "order:add":
-		a.remember()
-		a.synth.Edit(func(e *replay.Engine) {
-			if e.Project.Song.Length < 255 {
-				at := int(e.Project.Song.Length)
-				e.Project.Song.Orders[at] = e.Project.Song.Orders[at-1]
-				e.Project.Song.Length++
-			}
-		})
-		a.dirty = true
-	case "order:remove":
-		a.remember()
-		a.synth.Edit(func(e *replay.Engine) {
-			if e.Project.Song.Length > 1 {
-				e.Project.Song.Length--
-				e.Project.Song.Repeat = min(e.Project.Song.Repeat, e.Project.Song.Length-1)
-				e.Position = min(e.Position, int(e.Project.Song.Length)-1)
-				e.Patterns = e.Project.Song.Orders[e.Position]
-			}
-		})
 		a.dirty = true
 	case "song-length", "song-repeat":
 		e, _ := a.synth.Snapshot()
@@ -1332,6 +1320,9 @@ func (a *App) applyModal() {
 	}
 	modal, entry := a.modal, strings.TrimSpace(a.entry)
 	a.modal = ""
+	if a.arrangementModal(modal, entry) {
+		return
+	}
 	if a.subtuneModal(modal, entry) {
 		return
 	}

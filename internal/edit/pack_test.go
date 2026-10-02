@@ -48,3 +48,21 @@ func TestPackDoesNotRewritePCMSamplesAsYMSequences(t *testing.T) {
 		t.Fatal("packing interpreted a PCM note as a sequence command")
 	}
 }
+
+func TestPackRejectsMissingActiveMusicAndPreservesDisabledPCMReferences(t *testing.T) {
+	p := model.New()
+	p.Song.Orders[0][0] = 17
+	before := p.Clone()
+	if _, err := PackProject(p); err == nil || p.Song.Orders != before.Song.Orders || p.Bank.Instruments != before.Bank.Instruments {
+		t.Fatal("packing accepted or changed a missing active pattern")
+	}
+	p = model.New()
+	p.Song.State[49] = 0
+	p.Song.Orders[0][3] = 173
+	if _, err := PackProject(p); err != nil {
+		t.Fatal(err)
+	}
+	if p.Song.Orders[0][3] != 173 {
+		t.Fatal("packing rewrote an unused native PCM reference")
+	}
+}
