@@ -10,6 +10,7 @@ import (
 	"github.com/olivierh59500/go-MaxYMiser/internal/model"
 	"github.com/olivierh59500/go-MaxYMiser/internal/project"
 	"github.com/olivierh59500/go-MaxYMiser/internal/replay"
+	"github.com/olivierh59500/go-MaxYMiser/internal/sndh"
 	"github.com/olivierh59500/go-MaxYMiser/internal/ui"
 	"log"
 	"os"
@@ -55,6 +56,24 @@ func main() {
 	if defaults == nil && !isYM && (*song != "" || *bank != "") {
 		p, err = project.Load(*song, *bank)
 		if err != nil {
+			if *bank == "" && (strings.EqualFold(filepath.Ext(*song), ".sndh") || strings.EqualFold(filepath.Ext(*song), ".snd")) && (*info || *wav != "") {
+				raw, e := os.ReadFile(*song)
+				if e != nil {
+					log.Fatal(e)
+				}
+				file, e := sndh.Parse(raw)
+				if e != nil {
+					log.Fatal(e)
+				}
+				if *info {
+					fmt.Printf("%s: %s, %d executable subtunes, %d Hz; original player\n", filepath.Base(*song), file.Metadata.Title, file.Metadata.Subtunes, file.Metadata.Rate)
+					return
+				}
+				if e = export.SNDH(raw, 0, *wav, *duration); e != nil {
+					log.Fatal(e)
+				}
+				return
+			}
 			if !*info && *wav == "" && *bank == "" && (strings.EqualFold(filepath.Ext(*song), ".sndh") || strings.EqualFold(filepath.Ext(*song), ".snd")) {
 				p, inspectSourceAtStartup = model.Demo(), true
 			} else {

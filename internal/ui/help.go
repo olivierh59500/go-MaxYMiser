@@ -49,7 +49,8 @@ var helpText = [][]string{
 	{
 		"MYS stores arrangement/patterns; MYV instruments, sequences and samples.",
 		"Open MYS auto-loads matching MYV. MYI import allocates independent links.",
-		"MaxYMiser SNDH exposes subtunes; recognized Mad Max source can be inspected.",
+		"SNDH: native extraction, source inspection or executable audio with editable excerpts.",
+		"Listen SNDH / score compares original audio and inferred notes or sampled excerpts.",
 		"Native SNDH export needs a replay template; Settings edits composition year.",
 		"ICE applies to native saves; WAV export runs separately from playback.",
 		"YM records chip output. Reconstruction proposes data, not unique source recovery.",

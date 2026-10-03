@@ -9,6 +9,7 @@ import (
 	"github.com/olivierh59500/go-MaxYMiser/internal/model"
 	"github.com/olivierh59500/go-MaxYMiser/internal/project"
 	"github.com/olivierh59500/go-MaxYMiser/internal/replay"
+	sndhexec "github.com/olivierh59500/go-MaxYMiser/internal/sndh"
 	"log"
 	"os"
 	"path/filepath"
@@ -67,6 +68,35 @@ func main() {
 			p, err = project.Load(*song, *bank)
 		}
 		if err != nil {
+			if *bank == "" && (strings.EqualFold(filepath.Ext(*song), ".sndh") || strings.EqualFold(filepath.Ext(*song), ".snd")) {
+				raw, e := os.ReadFile(*song)
+				if e != nil {
+					log.Fatal(e)
+				}
+				file, e := sndhexec.Parse(raw)
+				if e != nil {
+					log.Fatal(e)
+				}
+				if *subtune < 1 || *subtune > file.Metadata.Subtunes {
+					log.Fatal("subtune outside executable range")
+				}
+				fmt.Printf("%s: %s, %d executable songs, %d Hz; original SNDH player\n", filepath.Base(*song), file.Metadata.Title, file.Metadata.Subtunes, file.Metadata.Rate)
+				if *sndh != "" {
+					log.Fatal("foreign SNDH cannot be used as a MaxYMiser export template")
+				}
+				if *songDuration {
+					if len(file.Metadata.Frames) < *subtune || file.Metadata.Frames[*subtune-1] == 0 {
+						log.Fatal("selected executable song has no declared duration")
+					}
+					*duration = time.Duration(uint64(file.Metadata.Frames[*subtune-1]) * uint64(time.Second) / uint64(file.Metadata.Rate))
+				}
+				if *wav != "" {
+					if e = export.SNDH(raw, *subtune, *wav, *duration); e != nil {
+						log.Fatal(e)
+					}
+				}
+				return
+			}
 			log.Fatal(err)
 		}
 	}

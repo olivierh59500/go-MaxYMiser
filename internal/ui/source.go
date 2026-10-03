@@ -20,12 +20,14 @@ func (a *App) inspectSource(raw []byte, path string) error {
 		return err
 	}
 	a.inspectDecodedSource(score, path)
+	a.sourceData = append([]byte(nil), raw...)
 	return nil
 }
 
 // Recognized source data remain inspectable when the selected native excerpt
 // cannot be encoded. Failed conversion never becomes an importable preview.
 func (a *App) inspectDecodedSource(score ymimport.SourceScore, path string) {
+	a.cancelSNDHImport()
 	p, report, err := ymimport.SourceProject(score, 0, score.Frames)
 	a.sourceScore, a.sourcePreview, a.sourceReport = &score, p, &report
 	a.sourcePath, a.sourcePage = path, 0
@@ -52,6 +54,7 @@ func (a *App) sourceAction(action string) bool {
 	case "source:close":
 		a.sourceScore, a.sourcePreview, a.sourceReport = nil, nil, nil
 		a.sourcePath = ""
+		a.sourceData = nil
 		a.sourceConversionError = ""
 	case "source:previous":
 		a.sourcePage = max(0, a.sourcePage-1)
@@ -72,7 +75,11 @@ func (a *App) sourceAction(action string) bool {
 		if index < 0 || index >= a.sourceScore.Subtunes {
 			return true
 		}
-		raw, err := os.ReadFile(a.sourcePath)
+		raw := a.sourceData
+		var err error
+		if len(raw) == 0 {
+			raw, err = os.ReadFile(a.sourcePath)
+		}
 		if err == nil {
 			var score ymimport.SourceScore
 			score, err = ymimport.DecodeSource(raw, index, a.sourceScore.Frames)
@@ -97,9 +104,9 @@ func (a *App) sourceAction(action string) bool {
 		}
 		p := a.sourcePreview.Clone()
 		p.Title = strings.TrimSuffix(filepath.Base(a.sourcePath), filepath.Ext(a.sourcePath)) + " excerpt"
-		score, preview, report, path := a.sourceScore, a.sourcePreview, a.sourceReport, a.sourcePath
+		score, preview, report, path, raw := a.sourceScore, a.sourcePreview, a.sourceReport, a.sourcePath, a.sourceData
 		a.acceptProject(p, a.sourcePath, "")
-		a.sourceScore, a.sourcePreview, a.sourceReport, a.sourcePath = score, preview, report, path
+		a.sourceScore, a.sourcePreview, a.sourceReport, a.sourcePath, a.sourceData = score, preview, report, path, raw
 		a.dirty = true
 		a.status = fmt.Sprintf("Imported source excerpt; %d notes use unsupported sounds; Save as keeps the source separate", a.sourceReport.UnsupportedEvents)
 	default:
@@ -189,6 +196,7 @@ func (a *App) drawSource(dst *ebiten.Image) {
 		}
 		a.text(dst, fmt.Sprintf("%02X  settings % X  ·  %s", sound.ID, sound.Settings, state), 42, float64(391+n*26), 11, fg)
 	}
+	a.btn(dst, "Execute source song", 422, 616, 220, 30, "sndh:select-source", false)
 	a.btn(dst, "Previous sounds", 42, 616, 176, 30, "source:previous", false)
 	a.btn(dst, "Next sounds", 232, 616, 176, 30, "source:next", false)
 	var commands []int

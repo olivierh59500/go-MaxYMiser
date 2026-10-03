@@ -16,6 +16,7 @@ import (
 // OpenMusic validates the complete input before replacing the current score or
 // stopping its audio. It selects the first editable native track for the view.
 func (a *App) OpenMusic(path string) error {
+	a.cancelSNDHImport()
 	if strings.EqualFold(filepath.Ext(path), ".ym") {
 		return a.LoadYM(path)
 	}
@@ -38,6 +39,7 @@ func (a *App) OpenMusic(path string) error {
 				if e := a.inspectSource(raw, path); e == nil {
 					return nil
 				}
+				return a.queueSNDH(raw, path, 0)
 			}
 		}
 		return err
@@ -47,8 +49,10 @@ func (a *App) OpenMusic(path string) error {
 }
 
 func (a *App) acceptVoiceBank(bank model.VoiceBank, path string) {
+	a.clearSNDH()
 	a.sourceScore, a.sourcePreview, a.sourceReport = nil, nil, nil
 	a.sourcePath = ""
+	a.sourceData = nil
 	a.sourceConversionError = ""
 	a.remember()
 	a.synth.CloseYM()
@@ -59,9 +63,11 @@ func (a *App) acceptVoiceBank(bank model.VoiceBank, path string) {
 }
 
 func (a *App) acceptProject(p *model.Project, path, savePath string) {
+	a.clearSNDH()
 	a.collectionSource = nil
 	a.sourceScore, a.sourcePreview, a.sourceReport = nil, nil, nil
 	a.sourcePath = ""
+	a.sourceData = nil
 	a.sourceConversionError = ""
 	reloaded := a.reloadConfiguration(&p.Song)
 	var subtunes []native.EmbeddedProject
@@ -100,7 +106,7 @@ func (a *App) showOpenError(path string, err error) {
 	a.errorDetails = []string{"File: " + filepath.Base(path)}
 	if raw, e := os.ReadFile(path); e == nil && (strings.EqualFold(filepath.Ext(path), ".sndh") || strings.EqualFold(filepath.Ext(path), ".snd")) {
 		if plain, e := native.UnpackICE(raw); e == nil && !bytes.Contains(plain, []byte("MYM0INST")) && !bytes.Contains(plain, []byte("MYM1INST")) {
-			a.errorDetails = append(a.errorDetails, "This SNDH uses another replay format and contains no MaxYMiser score.", "Open a MaxYMiser MYS/MYV or SNDH to edit its instruments and patterns.")
+			a.errorDetails = append(a.errorDetails, "This SNDH contains no native MaxYMiser score; executable import failed.", "Replay error: "+err.Error()+"")
 		} else {
 			a.errorDetails = append(a.errorDetails, "This native score could not be decoded: "+err.Error())
 		}

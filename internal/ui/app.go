@@ -3,6 +3,7 @@ package ui
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/audio"
@@ -43,6 +44,15 @@ type button struct {
 	action     string
 }
 type App struct {
+	sndhSelectionData                                                  []byte
+	sndhSelectionPath                                                  string
+	sndhWorkspaces                                                     map[int]sndhWorkspace
+	sndhData                                                           []byte
+	sndhPath                                                           string
+	sndhSubtune                                                        int
+	sndhTrace                                                          *ymimport.Trace
+	sndhCancel                                                         context.CancelFunc
+	sndhImportResults                                                  chan sndhImportResult
 	ymData                                                             []byte
 	exportResults                                                      chan error
 	exportDuration                                                     time.Duration
@@ -58,6 +68,7 @@ type App struct {
 	sourcePreview                                                      *model.Project
 	sourceReport                                                       *ymimport.SourceProjectReport
 	sourcePath                                                         string
+	sourceData                                                         []byte
 	sourceConversionError                                              string
 	sourcePage                                                         int
 	ymPath                                                             string
@@ -150,6 +161,7 @@ func New(p *model.Project, projectPath string, mute bool) (*App, error) {
 	return a, nil
 }
 func (a *App) Close() {
+	a.cancelSNDHImport()
 	if a.midiOutput != nil {
 		a.synth.EnableMIDIOutput(false)
 		a.flushMIDIOutput()
@@ -371,6 +383,9 @@ func (a *App) drawSong(dst *ebiten.Image, e *replay.Engine) {
 			a.btn(dst, fmt.Sprintf("%02X", p.Song.Orders[pos][ch]), 160+ch*248, y, 206, 22, fmt.Sprintf("order:%d:%d", pos, ch), false)
 		}
 	}
+	if native.DeclaredSubtunes(p.ReplaySource) > len(a.subtunes) {
+		a.btn(dst, "Execute source song", 42, 592, 242, 30, "sndh:select-source", false)
+	}
 	if len(a.subtunes) > 1 {
 		a.btn(dst, "Export collection", 942, 594, 284, 30, "subtune-export-all", false)
 		a.btn(dst, fmt.Sprintf("Subtune %d / %d", a.subtuneIndex+1, len(a.subtunes)), 942, 636, 198, 28, "subtune-select", false)
@@ -580,6 +595,7 @@ func (a *App) drawModal(dst *ebiten.Image) {
 	a.btn(dst, "Apply", 918, 437, 114, 40, "modal:apply", true)
 }
 func (a *App) Update() error {
+	a.pollSNDHImport()
 	a.flushMIDIOutput()
 	a.pollExportResult()
 	_, wheel := ebiten.Wheel()
@@ -958,6 +974,9 @@ func (a *App) enterField(r rune) {
 	}
 }
 func (a *App) action(name string) {
+	if a.sndhAction(name) {
+		return
+	}
 	if a.modal == "" && a.unusedAction(name) {
 		return
 	}
@@ -1128,12 +1147,19 @@ func (a *App) action(name string) {
 	}
 	switch name {
 	case "ym:infer":
-		data, err := a.ymData, error(nil)
-		if err != nil {
-			a.status = err.Error()
+		if len(a.sndhData) > 0 {
+			if err := a.queueSNDHSelection(a.sndhData, a.sndhPath, a.sndhSubtune, a.ymOptions); err != nil {
+				a.status = err.Error()
+			}
 			return
 		}
-		trace, err := ymimport.Decode(data)
+		var trace ymimport.Trace
+		var err error
+		if a.sndhTrace != nil {
+			trace = *a.sndhTrace
+		} else {
+			trace, err = ymimport.Decode(a.ymData)
+		}
 		if err != nil {
 			a.status = err.Error()
 			return
@@ -1167,9 +1193,16 @@ func (a *App) action(name string) {
 	case "ym-library":
 		a.modal, a.entry = "YM library directory", a.ymLibraryDirectory
 	case "ym:range":
-		a.modal, a.entry = "YM range (first,last,row frames)", fmt.Sprintf("%d,%d,%d", a.ymOptions.StartFrame, a.ymOptions.EndFrame, a.ymOptions.FramesPerRow)
+		label := "YM range (first,last,row frames)"
+		if len(a.sndhData) > 0 {
+			label = "SNDH range (first,last,row frames)"
+		}
+		a.modal, a.entry = label, fmt.Sprintf("%d,%d,%d", a.ymOptions.StartFrame, a.ymOptions.EndFrame, a.ymOptions.FramesPerRow)
 	case "ym:reference":
 		a.synth.SelectReference(true)
+		if a.sndhTrace != nil && a.ymOptions.StartFrame > 0 {
+			a.synth.SeekYM(uint32(a.ymOptions.StartFrame * 1000 / a.sndhTrace.Rate))
+		}
 	case "ym:score":
 		a.synth.SelectReference(false)
 	case "jam":
@@ -1232,15 +1265,15 @@ func (a *App) action(name string) {
 	case "bank:1":
 		a.instrument = 16 + a.instrument%16
 	case "new":
+		a.clearSNDH()
 		a.collectionSource = nil
 		a.sourceScore, a.sourcePreview, a.sourceReport = nil, nil, nil
 		a.sourcePath = ""
+		a.sourceData = nil
 		a.sourceConversionError = ""
 		a.subtunes = nil
 		a.subtuneIndex = 0
-		if _, ok := a.synth.Reference(); ok {
-			a.synth.SelectReference(false)
-		}
+		a.synth.CloseYM()
 		a.synth.Edit(func(e *replay.Engine) { e.Stop(); e.Project = model.New(); e.Reset() })
 		a.projectPath = ""
 		a.dirty = false
@@ -1248,7 +1281,7 @@ func (a *App) action(name string) {
 	case "instrument-preview":
 		a.AuditionInstrument(48)
 	case "open":
-		a.beginFileBrowser("Open music (.mys / .myv / .snd / .ym)", "", false)
+		a.beginFileBrowser("Open music (.mys / .myv / .sndh / .ym)", "", false)
 	case "subtune-next":
 		if len(a.subtunes) > 1 {
 			if err := a.SelectSubtune((a.subtuneIndex + 1) % len(a.subtunes)); err != nil {
@@ -1433,6 +1466,9 @@ func (a *App) applyModal() {
 	}
 	modal, entry := a.modal, strings.TrimSpace(a.entry)
 	a.modal = ""
+	if a.sndhModal(modal, entry) {
+		return
+	}
 	if a.sourceModal(modal, entry) {
 		return
 	}
@@ -1468,10 +1504,15 @@ func (a *App) applyModal() {
 	}
 	var x, y int
 	switch {
-	case modal == "YM range (first,last,row frames)":
+	case modal == "YM range (first,last,row frames)" || modal == "SNDH range (first,last,row frames)":
 		parts := strings.Split(entry, ",")
 		if len(parts) != 3 {
-			a.status = "Enter decimal first,last,row frames (last 0 = end; row 0 = estimate)"
+			a.status = "Enter decimal first,last,row frames (row 0 = estimate)"
+			if len(a.sndhData) > 0 {
+				a.status += "; last 0 = default excerpt"
+			} else {
+				a.status += "; last 0 = end"
+			}
 			return
 		}
 		first, e1 := strconv.Atoi(strings.TrimSpace(parts[0]))
@@ -1554,10 +1595,14 @@ func (a *App) applyModal() {
 		a.status = "Rendering WAV audio…"
 		reference, active := a.synth.Reference()
 		raw := append([]byte(nil), a.ymData...)
+		sndhRaw := append([]byte(nil), a.sndhData...)
+		sndhSong := a.sndhSubtune
 		duration := a.exportDuration
 		a.exporting = true
 		go func() {
-			if active && reference.Active {
+			if active && reference.Active && reference.Format == "SNDH" {
+				a.exportResults <- export.SNDH(sndhRaw, sndhSong, entry, duration)
+			} else if active && reference.Active {
 				a.exportResults <- export.YM(raw, entry, duration)
 			} else {
 				a.exportResults <- export.WAV(snapshot, entry, duration)
@@ -1671,7 +1716,7 @@ func (a *App) SetSequenceTools(enabled bool) { a.sequenceTools = enabled }
 
 // ShowFileBrowser opens the native file chooser for captures and initial views.
 func (a *App) ShowFileBrowser() {
-	a.beginFileBrowser("Open music (.mys / .myv / .snd / .ym)", "", false)
+	a.beginFileBrowser("Open music (.mys / .myv / .sndh / .ym)", "", false)
 }
 
 // SelectInstrument selects the editable definition, not a channel's cached
@@ -1766,8 +1811,10 @@ func (a *App) loadYMBytes(data []byte) error {
 	if err := a.synth.LoadYM(data); err != nil {
 		return err
 	}
+	a.clearSNDH()
 	a.sourceScore, a.sourcePreview, a.sourceReport = nil, nil, nil
 	a.sourcePath = ""
+	a.sourceData = nil
 	a.sourceConversionError = ""
 	a.ymData = append([]byte(nil), data...)
 	if strings.EqualFold(filepath.Ext(a.projectPath), ".ym") {
@@ -1787,17 +1834,21 @@ func (a *App) drawYM(dst *ebiten.Image) {
 	}
 	r, ok := a.synth.Reference()
 	if !ok {
-		a.text(dst, "Open a .ym file to listen and inspect the YM2149 registers.", 42, 222, 16, fg)
+		a.text(dst, "Open a .ym or .sndh file to listen and inspect the YM2149 registers.", 42, 222, 16, fg)
 		a.btn(dst, "YM library", 42, 268, 154, 34, "ym-library", len(a.ymLibrary.Files) > 0)
 		a.btn(dst, "Paired source profile", 214, 268, 218, 34, "ym:paired-profile", a.pairedProfile != nil)
 		return
 	}
-	a.text(dst, r.Name, 42, 211, 22, fg)
+	a.text(dst, a.fitText(r.Name, 18, 164), 42, 211, 18, fg)
 	a.text(dst, r.Author+" · "+r.Format, 42, 248, 13, dim)
 	a.btn(dst, "Composer profile", 520, 246, 180, 34, "ym:profile", a.corpus != nil)
 	a.btn(dst, "YM library", 350, 246, 154, 34, "ym-library", len(a.ymLibrary.Files) > 0)
 	a.btn(dst, "Reconstruct", 710, 246, 156, 34, "ym:infer", false)
-	a.btn(dst, "Listen YM", 876, 246, 152, 34, "ym:reference", r.Active)
+	referenceLabel := "Listen YM"
+	if r.Format == "SNDH" {
+		referenceLabel = "Listen SNDH"
+	}
+	a.btn(dst, referenceLabel, 876, 246, 152, 34, "ym:reference", r.Active)
 	a.btn(dst, "Listen score", 1038, 246, 194, 34, "ym:score", !r.Active)
 	a.btn(dst, fmt.Sprintf("Range %d:%d · grid %d", a.ymOptions.StartFrame, a.ymOptions.EndFrame, a.ymOptions.FramesPerRow), 520, 205, 344, 30, "ym:range", false)
 	a.btn(dst, "Paired profile", 350, 205, 154, 30, "ym:paired-profile", a.pairedProfile != nil)
@@ -1806,6 +1857,23 @@ func (a *App) drawYM(dst *ebiten.Image) {
 	if a.ymPatternView {
 		a.drawYMPatterns(dst)
 		return
+	}
+	if r.Format == "SNDH" {
+		a.btn(dst, "Previous song", 42, 612, 142, 26, "sndh:previous", false)
+		a.text(dst, fmt.Sprintf("%d / %d", r.Subtune, r.Subtunes), 192, 620, 11, accent)
+		a.btn(dst, "Next song", 265, 612, 126, 26, "sndh:next", false)
+		mode := "Inferred score; original instrument identities are not recovered."
+		if a.ymReport != nil {
+			mode = sndhImportLabel(a.ymReport.SourcePlayer) + "; compare with Listen SNDH."
+		}
+		a.text(dst, a.fitText(mode, 11, 800), 410, 620, 11, dim)
+		if r.Error != "" {
+			a.text(dst, a.fitText(r.Error, 11, 1100), 42, 648, 11, purple)
+		} else if r.Seeking {
+			a.text(dst, "Preparing seek; current playback continues.", 42, 648, 11, accent)
+		} else if a.ymReport != nil && len(a.ymReport.Warnings) > 0 {
+			a.text(dst, a.fitText(a.ymReport.Warnings[0], 11, 1170), 42, 648, 11, dim)
+		}
 	}
 	labels := []string{"Tone A low", "Tone A high", "Tone B low", "Tone B high", "Tone C low", "Tone C high", "Noise period", "Mixer", "Volume A", "Volume B", "Volume C", "Envelope low", "Envelope high", "Envelope shape"}
 	for reg, label := range labels {
@@ -1816,6 +1884,9 @@ func (a *App) drawYM(dst *ebiten.Image) {
 	}
 	if a.ymReport != nil {
 		label := fmt.Sprintf("Candidate: %d instruments · %d patterns · %d positions", a.ymReport.Instruments, a.ymReport.Patterns, a.ymReport.Positions)
+		if a.ymReport.SourcePlayer == "sndh-sampled-excerpt" {
+			label = fmt.Sprintf("Sampled excerpt: %d PCM chunks · %d patterns · %d positions", a.ymReport.Instruments, a.ymReport.Patterns, a.ymReport.Positions)
+		}
 		if a.corpus != nil {
 			label += fmt.Sprintf(" · %d corpus matches", len(a.ymReport.Evidence))
 		}
@@ -1826,9 +1897,13 @@ func (a *App) drawYM(dst *ebiten.Image) {
 			}
 			label += fmt.Sprintf(" · %d %s · %d improved passages", len(a.ymReport.SourceLabels), kind, len(a.ymReport.RecipeApplications))
 		}
-		a.text(dst, label, 42, 626, 13, purple)
+		labelY := 626.0
+		if r.Format == "SNDH" {
+			labelY = 589
+		}
+		a.text(dst, label, 42, labelY, 13, purple)
 	}
-	if a.pairedProfile != nil && a.ymReport != nil {
+	if a.pairedProfile != nil && a.ymReport != nil && r.Format != "SNDH" {
 		frame := int(r.Position) * a.ymReport.SourceLabelRate / 1000
 		labels := [3]string{"?", "?", "?"}
 		for _, evidence := range a.ymReport.SourceLabels {
@@ -1842,5 +1917,7 @@ func (a *App) drawYM(dst *ebiten.Image) {
 		}
 		a.text(dst, fmt.Sprintf("%s: A %s · B %s · C %s · ? = unresolved", kind, labels[0], labels[1], labels[2]), 42, 599, 12, accent)
 	}
-	a.text(dst, "Reconstruction infers a candidate score; original instrument definitions and pattern boundaries are not stored in YM.", 42, 652, 11, dim)
+	if r.Format != "SNDH" {
+		a.text(dst, "Reconstruction infers a candidate score; original instrument definitions and pattern boundaries are not stored in YM.", 42, 652, 11, dim)
+	}
 }

@@ -16,6 +16,7 @@ import (
 type capture struct {
 	app     *ui.App
 	output  string
+	tab     string
 	written bool
 	ticks   int
 }
@@ -25,11 +26,15 @@ func (c *capture) Update() error {
 	if c.written && c.ticks > 8 {
 		return ebiten.Termination
 	}
-	return c.app.Update()
+	if err := c.app.Update(); err != nil {
+		return err
+	}
+	c.app.SetTab(c.tab)
+	return nil
 }
 func (c *capture) Draw(screen *ebiten.Image) {
 	c.app.Draw(screen)
-	if c.written {
+	if c.written || c.app.ImportPending() {
 		return
 	}
 	b := screen.Bounds()
@@ -86,7 +91,7 @@ func main() {
 	}
 	ebiten.SetWindowSize(1280, 800)
 	ebiten.SetWindowTitle("MaxYMiser Go — interface capture")
-	if e = ebiten.RunGame(&capture{app: app, output: *output}); e != nil {
+	if e = ebiten.RunGame(&capture{app: app, output: *output, tab: *tab}); e != nil {
 		log.Fatal(e)
 	}
 }

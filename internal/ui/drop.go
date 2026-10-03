@@ -14,6 +14,7 @@ import (
 // OpenDroppedMusic validates the selected dropped music and its companion bank
 // before replacing the editor. Song files take priority over their MYV bank.
 func (a *App) OpenDroppedMusic(files fs.FS) error {
+	a.cancelSNDHImport()
 	directory := a.directory
 	defer func() { a.directory = directory }()
 	var paths []string
@@ -71,6 +72,7 @@ func (a *App) OpenDroppedMusic(files fs.FS) error {
 					if e := a.inspectSource(raw, path); e == nil {
 						return nil
 					}
+					return a.queueSNDH(raw, path, 0)
 				}
 			}
 			return err
