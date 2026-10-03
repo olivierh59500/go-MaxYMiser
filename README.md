@@ -4,10 +4,12 @@ A modern Go/Ebitengine tracker inspired by **MaxYMiser FM 1.67**, with native
 MaxYMiser song and voice-bank editing and YM2149 synthesis supplied by
 [YM Player](https://github.com/olivierh59500/ym-player).
 
-Version **0.1.0** is the first tagged development release. Native tracker editing
-is usable; automatic YM/source reconstruction remains experimental.
-See [Getting started](docs/GETTING_STARTED.md) and
-[Release scope and validation](docs/RELEASE_0.1.0.md).
+Version **0.2.0** adds executable SNDH playback and editable inferred or sampled
+excerpts to the native tracker. This remains a development release; automatic
+source reconstruction is experimental.
+See [Getting started](docs/GETTING_STARTED.md),
+[Release scope and validation](docs/RELEASE_0.2.0.md) and
+[SNDH import](docs/SNDH_IMPORT.md).
 
 ## Run
 

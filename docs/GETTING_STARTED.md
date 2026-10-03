@@ -1,6 +1,6 @@
 # Creating and editing a song
 
-Go MaxYMiser 0.1.0 provides a native-format tracker with a modern interface. It
+Go MaxYMiser 0.2.0 provides a native-format tracker with a modern interface. It
 starts with the original composition First signal; select New to begin a blank
 song with an ordinary square-wave instrument. Go 1.26 or newer is required.
 

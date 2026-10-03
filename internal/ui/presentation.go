@@ -13,6 +13,7 @@ import (
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/vector"
+	"github.com/olivierh59500/go-MaxYMiser/internal/buildinfo"
 	"github.com/olivierh59500/go-MaxYMiser/internal/model"
 	"github.com/olivierh59500/go-MaxYMiser/internal/replay"
 )
@@ -197,7 +198,7 @@ func presentationSteps(c PresentationConfig) []presentationStep {
 		return nil
 	})
 	add(173, "Keyboard, MIDI and export settings", "Native configuration, audio controls and macOS MIDI complete the editing workflow.", func(a *App) error { a.ymPatternView = false; a.tab = "Settings"; return nil })
-	add(177, "Go MaxYMiser · Development release 0.1.0", "Explore the tracker and its documented compatibility limits on GitHub.", func(a *App) error {
+	add(177, "Go MaxYMiser · Development release "+buildinfo.Version, "Explore the tracker and its documented compatibility limits on GitHub.", func(a *App) error {
 		a.synth.CloseYM()
 		a.tab = "Patterns"
 		a.synth.Edit(func(e *replay.Engine) { e.Stop(); e.Project = model.Demo(); e.Reset(); e.Play(false) })
