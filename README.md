@@ -4,12 +4,50 @@ A modern Go/Ebitengine tracker inspired by **MaxYMiser FM 1.67**, with native
 MaxYMiser song and voice-bank editing and YM2149 synthesis supplied by
 [YM Player](https://github.com/olivierh59500/ym-player).
 
+![Pattern editor with three YM2149 voices and an editable sound bank](docs/images/patterns.png)
+
 Version **0.2.0** adds executable SNDH playback and editable inferred or sampled
 excerpts to the native tracker. This remains a development release; automatic
 source reconstruction is experimental.
 See [Getting started](docs/GETTING_STARTED.md),
 [Release scope and validation](docs/RELEASE_0.2.0.md) and
 [SNDH import](docs/SNDH_IMPORT.md).
+
+## Video
+
+[![Animated preview of instrument editing, playback and shared sequences](docs/images/tracker-preview.gif)](https://github.com/olivierh59500/go-MaxYMiser/releases/download/v0.2.0/go-maxymiser-presentation.mp4)
+
+**[Watch or download the three-minute presentation with sound — MP4](https://github.com/olivierh59500/go-MaxYMiser/releases/download/v0.2.0/go-maxymiser-presentation.mp4)** ·
+[WebM](https://github.com/olivierh59500/go-MaxYMiser/releases/download/v0.2.0/go-maxymiser-presentation.webm) ·
+[English subtitles](https://github.com/olivierh59500/go-MaxYMiser/releases/download/v0.2.0/go-maxymiser-presentation.en.srt)
+
+The tour shows native SNDH loading, instrument and sequence editing, sample
+preview, composition, save/export, and YM reconstruction with reference playback.
+It was recorded with 0.1.0; the current release additionally provides executable
+SNDH playback and inferred or sampled imports. The animated preview is silent;
+the complete video includes music and English captions.
+
+## Screenshots
+
+Click a screenshot to inspect the full-size interface.
+
+| Song arrangement | Instrument editor |
+| --- | --- |
+| [![Four independent pattern lists, positions and repeat controls](docs/images/song.png)](docs/images/song.png) | [![Chord pulse instrument with component masks and shared arpeggio sequence](docs/images/instruments.png)](docs/images/instruments.png) |
+| Arrange independent YM and PCM tracks. | Edit sound parameters and shared sequence links. |
+
+| Sequences and generators | Samples |
+| --- | --- |
+| [![Shared volume envelope with ramp, triangle, sine and square generation controls](docs/images/sequences.png)](docs/images/sequences.png) | [![Editable signed PCM waveform captured from an executable Quartet SNDH](docs/images/samples.png)](docs/images/samples.png) |
+| Shape envelopes, modulation and waveform sequences. | Preview, tune, trim and save PCM samples. |
+
+**SNDH playback and editable excerpts**
+
+[![Original SNDH reference with live registers, adjustable reconstruction range and score comparison](docs/images/sndh.png)](docs/images/sndh.png)
+
+Listen to the original executable, inspect its registers and compare it with an
+editable candidate. Inferred instrument identities and sampled excerpts are
+labeled explicitly; they are not guaranteed recovery of the original tracker.
 
 ## Run
 

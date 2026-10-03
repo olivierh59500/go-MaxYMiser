@@ -1,5 +1,10 @@
 # Guided tracker presentation
 
+The [README gallery](../README.md#video) includes an animated preview and links
+to the complete MP4/WebM tour with English captions and downloadable subtitles.
+That recording uses 0.1.0; executable SNDH import added in 0.2.0 is documented
+separately in [SNDH import](SNDH_IMPORT.md).
+
 `cmd/presentation` records a three-minute tour of the actual tracker controls.
 It opens a native MaxYMiser SNDH, edits instruments and linked sequences, auditions
 PCM samples, enters an original melody, saves a native pair and exports WAV.
