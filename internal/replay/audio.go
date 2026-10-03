@@ -11,8 +11,8 @@ import (
 // Synth owns the hardware state. Its lock separates the audio callback from
 // edits and transport commands without creating a new synthesizer every frame.
 type Synth struct {
-	reference        *stsound.CYmMusic
-	referenceBuffer  []int16
+	reference        referenceSource
+	referenceError   string
 	referencePlaying bool
 	referenceActive  bool
 	mu               sync.Mutex

@@ -11,7 +11,54 @@ type Reference struct {
 	Position, Duration   uint32
 	Registers            [14]byte
 	Playing              bool
+	Subtune, Subtunes    int
+	Effects              bool
+	Seeking              bool
+	Error                string
 }
+
+type referenceSource interface {
+	Read([]byte) (int, error)
+	Info() Reference
+	SetPlaying(bool)
+	Seek(uint32) error
+	Close()
+}
+
+type ymReference struct {
+	music  *stsound.CYmMusic
+	buffer []int16
+}
+
+func (r *ymReference) Read(p []byte) (int, error) {
+	frames := len(p) / 4
+	if cap(r.buffer) < frames {
+		r.buffer = make([]int16, frames)
+	}
+	r.music.Update(r.buffer[:frames], frames)
+	for i, sample := range r.buffer[:frames] {
+		binary.LittleEndian.PutUint16(p[i*4:], uint16(sample))
+		binary.LittleEndian.PutUint16(p[i*4+2:], uint16(sample))
+	}
+	return frames * 4, nil
+}
+func (r *ymReference) Info() Reference {
+	info := r.music.GetMusicInfo()
+	out := Reference{Name: info.SongName, Author: info.SongAuthor, Format: info.SongType, Position: uint32(r.music.GetPos()), Duration: uint32(r.music.GetMusicTime()), Subtune: 1, Subtunes: 1}
+	for reg := range out.Registers {
+		out.Registers[reg] = byte(r.music.ReadYmRegister(reg))
+	}
+	return out
+}
+func (r *ymReference) SetPlaying(on bool) {
+	if on {
+		r.music.Play()
+	} else {
+		r.music.Pause()
+	}
+}
+func (r *ymReference) Seek(ms uint32) error { r.music.SetMusicTime(stsound.YmU32(ms)); return nil }
+func (r *ymReference) Close()               { r.music.UnLoad() }
 
 func (s *Synth) LoadYM(data []byte) error {
 	music := stsound.NewYmMusic(s.Rate)
@@ -20,26 +67,30 @@ func (s *Synth) LoadYM(data []byte) error {
 	}
 	music.SetLoopMode(true)
 	music.Play()
+	s.replaceReference(&ymReference{music: music})
+	return nil
+}
+func (s *Synth) replaceReference(ref referenceSource) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.reference != nil {
-		s.reference.UnLoad()
+		s.reference.Close()
 	}
 	s.Engine.Stop()
-	s.reference = music
+	s.reference = ref
 	s.referencePlaying = true
 	s.referenceActive = true
-	return nil
+	s.referenceError = ""
 }
 func (s *Synth) CloseYM() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.reference != nil {
-		s.reference.UnLoad()
+		s.reference.Close()
 		s.reference = nil
 	}
-	s.referencePlaying = false
-	s.referenceActive = false
+	s.referencePlaying, s.referenceActive = false, false
+	s.referenceError = ""
 }
 func (s *Synth) ToggleYM() {
 	s.mu.Lock()
@@ -48,37 +99,46 @@ func (s *Synth) ToggleYM() {
 		return
 	}
 	s.referencePlaying = !s.referencePlaying
-	if s.referencePlaying {
-		s.reference.Play()
-	} else {
-		s.reference.Pause()
-	}
+	s.reference.SetPlaying(s.referencePlaying)
 }
 func (s *Synth) StopYM() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.reference != nil {
-		s.reference.Stop()
+		s.reference.SetPlaying(false)
 	}
 	s.referencePlaying = false
 }
 
-// PauseReference keeps the register recording loaded while returning to the
-// current native transport state without resetting its position or voices.
+// PauseReference returns to the current native transport without restarting it.
 func (s *Synth) PauseReference() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.reference != nil {
-		s.reference.Pause()
+		s.reference.SetPlaying(false)
 	}
 	s.referencePlaying, s.referenceActive = false, false
 }
-func (s *Synth) SeekYM(milliseconds uint32) {
+func (s *Synth) SeekYM(ms uint32) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.reference != nil {
-		s.reference.SetMusicTime(stsound.YmU32(milliseconds))
+		s.seekReferenceLocked(ms)
 	}
+}
+
+// The audio mutex owns the audible renderer. An SNDH seek prepares an
+// independent renderer outside this lock and replaces it only when complete.
+func (s *Synth) seekReferenceLocked(ms uint32) bool {
+	if ref, ok := s.reference.(*sndhReference); ok {
+		s.startSNDHSeekLocked(ref, ms)
+		return ref.seeking
+	}
+	if err := s.reference.Seek(ms); err != nil {
+		s.referenceError = err.Error()
+		return false
+	}
+	return true
 }
 func (s *Synth) Reference() (Reference, bool) {
 	s.mu.Lock()
@@ -86,30 +146,33 @@ func (s *Synth) Reference() (Reference, bool) {
 	if s.reference == nil {
 		return Reference{}, false
 	}
-	info := s.reference.GetMusicInfo()
-	r := Reference{Name: info.SongName, Author: info.SongAuthor, Format: info.SongType, Position: uint32(s.reference.GetPos()), Duration: uint32(s.reference.GetMusicTime()), Playing: s.referencePlaying, Active: s.referenceActive}
-	for reg := range r.Registers {
-		r.Registers[reg] = byte(s.reference.ReadYmRegister(reg))
-	}
+	r := s.reference.Info()
+	r.Active = s.referenceActive
+	r.Playing = s.referencePlaying
+	r.Error = s.referenceError
 	return r, true
 }
 func (s *Synth) readReference(p []byte) (int, error) {
-	frames := len(p) / 4
-	if cap(s.referenceBuffer) < frames {
-		s.referenceBuffer = make([]int16, frames)
+	if !s.referencePlaying {
+		clear(p)
+		return len(p), nil
 	}
-	buffer := s.referenceBuffer[:frames]
-	s.reference.Update(buffer, frames)
-	for i, sample := range buffer {
-		binary.LittleEndian.PutUint16(p[i*4:], uint16(sample))
-		binary.LittleEndian.PutUint16(p[i*4+2:], uint16(sample))
+	n, err := s.reference.Read(p)
+	if err != nil {
+		s.referenceError = err.Error()
+		s.referencePlaying = false
+		clear(p[n:])
+		n = len(p)
+	}
+	for i := 0; i+4 <= n; i += 4 {
+		sample := int16(binary.LittleEndian.Uint16(p[i:]))
 		s.waveform[s.waveAt] = float32(sample) / 32768
 		s.waveAt = (s.waveAt + 1) % len(s.waveform)
 	}
-	return frames * 4, nil
+	return n, nil
 }
 
-// SelectReference keeps the original YM loaded while switching the audible source.
+// SelectReference switches the audible source while preserving the reference.
 func (s *Synth) SelectReference(active bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -119,22 +182,23 @@ func (s *Synth) SelectReference(active bool) {
 	s.referenceActive = active
 	if active {
 		s.Engine.Stop()
-		s.reference.SetMusicTime(0)
-		s.reference.Play()
+		if !s.seekReferenceLocked(0) {
+			return
+		}
+		s.reference.SetPlaying(true)
 		s.referencePlaying = true
 	} else {
-		s.reference.Pause()
+		s.reference.SetPlaying(false)
 		s.referencePlaying = false
 		s.Engine.Reset()
 		s.Engine.Play(false)
 	}
 }
-
 func (s *Synth) PreviewInstrument(channel int, note, instrument byte) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.reference != nil {
-		s.reference.Pause()
+		s.reference.SetPlaying(false)
 		s.referencePlaying = false
 		s.referenceActive = false
 	}
