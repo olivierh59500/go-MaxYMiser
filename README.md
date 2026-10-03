@@ -266,8 +266,10 @@ Existing permissions are preserved; directories and symbolic links are rejected.
 Saving a sound independently retains the composition's unsaved-edit state.
 
 Unpacked `.SND`/`.SNDH` files created by MaxYMiser can be opened as editable
-projects by extracting their native song and voice-bank payloads. This import
-is specific to MaxYMiser exports; it is not a general 68000 SNDH player.
+projects by extracting their native song and voice-bank payloads. This direct extraction
+is specific to MaxYMiser exports. Other SNDH players are handled by the
+[executable importer](docs/SNDH_IMPORT.md), which keeps the original sound
+separate from inferred editable excerpts.
 Native formats also accept ICE-compressed wrappers. The Go decoder is checked
 against streams produced by the original editor's compressor. **Settings → ICE**
 enables compression for native project, MYI and SNDH saves. Go-packed files have
@@ -445,9 +447,11 @@ loops and saved Jam behaviour. Isolated timer tests verify native levels,
 frequency steps and MFP divider/data calculations.
 See [native replay verification](docs/REPLAY_VERIFICATION.md) for the scope,
 method and register-trace verifier.
-The [SNDH corpus audit](docs/SNDH_CORPUS.md) covers 690 imported files, 880 native
-subtunes and 658 unchanged single-song export/reload checks, with explicit
-remaining issues and incomplete declared collections.
+The [native SNDH corpus audit](docs/SNDH_CORPUS.md) covers 690 directly imported
+files, 880 native subtunes and 666 unchanged single-song export/reload checks.
+The separate [executable SNDH import audit](docs/SNDH_IMPORT.md) covers the
+complete 5,897-file collection, with original replay and editable transcription
+measured independently.
 
 ## Credits
 
@@ -455,6 +459,13 @@ MaxYMiser code and design: Gareth Morris / gwEm. Original design: Mathieu
 Stempell / Dma-Sc. Original graphics: Sebastien Larnac / STSurvivor. The replay
 format and frequency tables are based on the
 [original replay source](https://github.com/gwEm303/maxYMiser_replay).
+
+The general SNDH hardware implementation draws on
+[Arnaud Carré’s sndh-player](https://github.com/arnaud-carre/sndh-player) and
+[AtariAudio](https://github.com/arnaud-carre/AtariAudio). Its Go 68000 core is
+adapted from [John Schember’s go-chip-m68k](https://github.com/user-none/go-chip-m68k),
+with the upstream MIT notices retained in `internal/sndh`. No external emulator
+is required at runtime.
 
 Go implementation: Olivier Houte / Malakh Software. Native music credits remain
 those of their respective composers.

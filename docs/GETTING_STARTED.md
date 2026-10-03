@@ -48,7 +48,12 @@ Supported MaxYMiser SNDH files expose editable instruments and patterns directly
 Verified collections retain independent subtunes. A foreign SNDH can instead
 open in the source inspector when its player is supported. The classic Mad Max
 inspector offers song selection, original IDs and an explicit excerpt import.
-An unrecognized format reports its limitation while retaining the current song.
+Other valid SNDH players execute through the built-in Go 68000/MFP/STE engine.
+Their original sound remains available through Listen SNDH. The editor builds
+an inferred excerpt, or a sampled excerpt when register transcription cannot
+provide playable notes. These do not claim the original instrument bank.
+Analysis runs in the background; failed imports retain the previous composition.
+See [SNDH import](SNDH_IMPORT.md) for comparison, song selection and export.
 
 A YM initially plays the original register recording. Select Range and a bounded
 excerpt before Reconstruct; the native tracker has finite pattern and sequence

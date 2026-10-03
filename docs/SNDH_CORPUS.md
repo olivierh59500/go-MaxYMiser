@@ -1,4 +1,8 @@
-# Local SNDH corpus compatibility
+# Native SNDH corpus compatibility
+
+This document measures direct extraction of MaxYMiser payloads. The newer
+[executable importer](SNDH_IMPORT.md) handles other players independently, with
+original playback and inferred or sampled editable excerpts.
 
 The native codecs are also checked against a local collection containing 5,897
 SNDH files. Of these, 704 contain MaxYMiser native instrument signatures.
